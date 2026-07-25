@@ -15,20 +15,23 @@ simulator draws those, and fixes played ones to their recorded score.
 
 Sources
 -------
-* ``fbref``       — the primary, xG-bearing source (via the ``soccerdata``
+* ``fbref``       — the default, xG-bearing source (via the ``soccerdata``
                     package). Requires outbound access to fbref.com, so it runs
                     locally or wherever FBref is allowlisted — not inside a
-                    sandbox that blocks it.
+                    sandbox that blocks it. Leagues soccerdata doesn't ship
+                    natively (e.g. MLS) are auto-registered via
+                    ``_ensure_fbref_league``.
 * ``openfootball``— the openfootball GitHub JSON mirror (schedules + scores,
-                    **no xG**). Reachable from restricted environments, used to
-                    validate the full pipeline offline. xg columns are left
-                    empty and the model falls back to goals.
+                    **no xG**). Reachable from restricted environments and needs
+                    no extra packages, so it's the offline fallback. xg columns
+                    are left empty and the model falls back to goals.
 * manual          — drop hand-made CSVs in the canonical schema; nothing to do.
 
 Usage
 -----
+    venv/bin/python -m leagues.ingest eng --season 2025-2026            # fbref (default)
+    venv/bin/python -m leagues.ingest mls --season 2026
     venv/bin/python -m leagues.ingest eng --season 2024-25 --source openfootball
-    venv/bin/python -m leagues.ingest eng --season 2025-26 --source fbref
 """
 
 from __future__ import annotations
@@ -36,6 +39,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 import sys
 import urllib.request
@@ -154,12 +158,46 @@ def from_openfootball(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[
 # FBref source (primary; xG-bearing) via soccerdata
 # ---------------------------------------------------------------------------
 
+def _ensure_fbref_league(sd, cfg: LeagueConfig) -> None:
+    """Register a league soccerdata doesn't ship natively (e.g. MLS).
+
+    soccerdata's FBref only ships the Big-5 leagues; others are added via
+    ``<SOCCERDATA_DIR or ~/soccerdata>/config/league_dict.json``, which it reads
+    **at import time**. So we do two things: persist the entry to that file (so
+    fresh processes pick it up) and patch the already-imported ``LEAGUE_DICT`` in
+    memory (so the current process sees it without a restart). Only our own key
+    is touched; the rest of the file is preserved.
+    """
+    if not cfg.fbref_name:
+        return
+    entry = {"FBref": cfg.fbref_name}
+    if cfg.season_start:
+        entry["season_start"] = cfg.season_start
+    if cfg.season_end:
+        entry["season_end"] = cfg.season_end
+
+    cfg_dir = Path(os.environ.get("SOCCERDATA_DIR", Path.home() / "soccerdata")) / "config"
+    cfg_dir.mkdir(parents=True, exist_ok=True)
+    path = cfg_dir / "league_dict.json"
+    data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    if data.get(cfg.fbref_league) != entry:
+        data[cfg.fbref_league] = entry
+        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    # soccerdata reads the file only at import; patch the live dicts too.
+    for mod in ("_config", "_common"):
+        live = getattr(getattr(sd, mod, None), "LEAGUE_DICT", None)
+        if isinstance(live, dict):
+            live[cfg.fbref_league] = entry
+
+
 def from_fbref(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[dict]]:
     """
     Return (teams, matches) rows from FBref via the soccerdata package.
 
     Requires ``pip install soccerdata`` and outbound access to fbref.com.
-    Season is FBref-style, e.g. "2025-2026" or "2526".
+    Season is FBref-style, e.g. "2025-2026" or "2526". Leagues soccerdata does
+    not know natively (e.g. MLS) are auto-registered via ``_ensure_fbref_league``.
     """
     try:
         import soccerdata as sd
@@ -171,6 +209,7 @@ def from_fbref(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[dict]]:
             "environment use --source openfootball instead."
         ) from exc
 
+    _ensure_fbref_league(sd, cfg)
     fbref = sd.FBref(leagues=cfg.fbref_league, seasons=season)
     schedule = fbref.read_schedule().reset_index()
 
@@ -248,11 +287,12 @@ SOURCES = {"openfootball": from_openfootball, "fbref": from_fbref}
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Ingest league fixtures/results into canonical CSVs.")
-    ap.add_argument("league", help="league key (eng, esp, ita, de, fr)")
+    ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls)")
     ap.add_argument("--season", required=True,
-                    help="season, e.g. 2024-25 (openfootball) or 2025-2026 (fbref)")
-    ap.add_argument("--source", default="openfootball", choices=list(SOURCES),
-                    help="data source (default: openfootball)")
+                    help="season, e.g. 2025-2026 / 2026 (fbref) or 2024-25 (openfootball)")
+    ap.add_argument("--source", default="fbref", choices=list(SOURCES),
+                    help="data source (default: fbref — current data + xG; "
+                         "openfootball is the offline, no-dependency fallback)")
     args = ap.parse_args()
 
     cfg = get_league(args.league)

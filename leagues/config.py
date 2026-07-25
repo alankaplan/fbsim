@@ -43,7 +43,13 @@ class LeagueConfig:
     relegation_slots: int          # bottom-R are relegated (0 = no relegation)
     tiebreakers: tuple[str, ...]   # ordered chain from the vocabulary above
     europa_slots: int = 0          # informational second band shown in the report
-    default_season: str = "2025-26"  # season slug used by update.py when none is given
+    default_season: str = "2025-26"  # openfootball season slug (dir name on the mirror)
+    fbref_season: str = "2025-2026"  # fbref/soccerdata season for the current campaign
+    # soccerdata custom-league registration (only for leagues not built into
+    # soccerdata's FBref list — the Big 5 are built in and leave these blank) --
+    fbref_name: str = ""           # FBref competition display name, e.g. "Major League Soccer"
+    season_start: str = ""         # first month of the season, e.g. "Feb" (soccerdata hint)
+    season_end: str = ""           # last month of the season, e.g. "Dec"
     # Report display labels (European defaults; leagues like MLS override) ----
     title_label: str = "Title"     # header for the finish-1st column
     qual_label: str = "UCL"        # header for the top-`ucl_slots` band
@@ -99,7 +105,9 @@ LEAGUES: dict[str, LeagueConfig] = {
     "mls": LeagueConfig(
         key="mls", name="MLS", country="USA", n_teams=30,
         openfootball_path="mls", fbref_league="USA-Major League Soccer",
-        default_season="2025",
+        default_season="2025", fbref_season="2026",
+        # MLS isn't a built-in soccerdata FBref league; from_fbref registers it.
+        fbref_name="Major League Soccer", season_start="Feb", season_end="Dec",
         ucl_slots=18, europa_slots=0, relegation_slots=0,
         tiebreakers=("pts", "wins", "gd", "gf"),
         title_label="Shield", qual_label="Playoff",
