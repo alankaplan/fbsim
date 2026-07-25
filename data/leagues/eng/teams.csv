@@ -1,21 +1,21 @@
 id,team_name,code
-1,Manchester United FC,MAN
-2,Fulham FC,FUL
-3,Ipswich Town FC,IPS
-4,Liverpool FC,LIV
-5,Arsenal FC,ARS
-6,Wolverhampton Wanderers FC,WOL
-7,Everton FC,EVE
-8,Brighton & Hove Albion FC,B&H
-9,Newcastle United FC,NEW
-10,Southampton FC,SOU
-11,Nottingham Forest FC,NOT
-12,AFC Bournemouth,BOU
-13,West Ham United FC,WHU
-14,Aston Villa FC,AST
-15,Brentford FC,BRE
+1,Liverpool FC,LIV
+2,AFC Bournemouth,BOU
+3,Aston Villa FC,AST
+4,Newcastle United FC,NEW
+5,Brighton & Hove Albion FC,B&H
+6,Fulham FC,FUL
+7,Sunderland AFC,SUN
+8,West Ham United FC,WHU
+9,Tottenham Hotspur FC,TOT
+10,Burnley FC,BUR
+11,Wolverhampton Wanderers FC,WOL
+12,Manchester City FC,MAN
+13,Nottingham Forest FC,NOT
+14,Brentford FC,BRE
+15,Chelsea FC,CHE
 16,Crystal Palace FC,CRY
-17,Chelsea FC,CHE
-18,Manchester City FC,MA1
-19,Leicester City FC,LEI
-20,Tottenham Hotspur FC,TOT
+17,Manchester United FC,MA1
+18,Arsenal FC,ARS
+19,Leeds United FC,LEE
+20,Everton FC,EVE

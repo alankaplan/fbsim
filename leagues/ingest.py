@@ -93,6 +93,20 @@ def _matchday_num(round_label: str) -> int | str:
     return int(m.group(1)) if m else ""
 
 
+def _full_time(score) -> list | None:
+    """Full-time [home, away] from openfootball's dict or bare-list score shape.
+
+    The feed mixes two encodings within a single file: ``{"ft": [h, a], ...}``
+    and a bare ``[h, a]`` list (used for 0-0 results). ``None`` for either an
+    absent score or a dict without an ``ft`` key.
+    """
+    if isinstance(score, dict):
+        return score.get("ft")
+    if isinstance(score, list):
+        return score
+    return None
+
+
 def from_openfootball(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[dict]]:
     """Return (teams, matches) rows from the openfootball mirror."""
     url = f"{OPENFOOTBALL_BASE}/{season}/{cfg.openfootball_path}.json"
@@ -118,8 +132,7 @@ def from_openfootball(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[
         if not home or not away:
             continue
         hid, aid = team_id(home), team_id(away)
-        score = m.get("score") or {}
-        ft = score.get("ft")
+        ft = _full_time(m.get("score"))
         played = isinstance(ft, list) and len(ft) == 2 and all(g is not None for g in ft)
         matches.append({
             "match_number": i,

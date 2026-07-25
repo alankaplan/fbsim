@@ -1,21 +1,21 @@
 id,team_name,code
 1,Genoa CFC,GEN
-2,FC Internazionale Milano,INT
-3,Parma Calcio 1913,PC1
-4,ACF Fiorentina,ACF
-5,Empoli FC,EMP
-6,AC Monza,MON
-7,AC Milan,MIL
-8,Torino FC,TOR
-9,Bologna FC 1909,BOL
-10,Udinese Calcio,UDI
-11,Hellas Verona FC,HEL
-12,SSC Napoli,NAP
-13,Cagliari Calcio,CAG
-14,AS Roma,ROM
-15,SS Lazio,LAZ
-16,Venezia FC,VEN
-17,US Lecce,LEC
-18,Atalanta BC,ATA
-19,Juventus FC,JUV
-20,Como 1907,COM
+2,US Lecce,LEC
+3,US Sassuolo Calcio,SAS
+4,SSC Napoli,NAP
+5,AC Milan,MIL
+6,US Cremonese,CRE
+7,AS Roma,ROM
+8,Bologna FC 1909,BOL
+9,Cagliari Calcio,CAG
+10,ACF Fiorentina,ACF
+11,Como 1907,COM
+12,SS Lazio,LAZ
+13,Atalanta BC,ATA
+14,AC Pisa 1909,PIS
+15,Juventus FC,JUV
+16,Parma Calcio 1913,PC1
+17,Udinese Calcio,UDI
+18,Hellas Verona FC,HEL
+19,FC Internazionale Milano,INT
+20,Torino FC,TOR
