@@ -15,12 +15,16 @@ simulator draws those, and fixes played ones to their recorded score.
 
 Sources
 -------
-* ``fbref``       — the default, xG-bearing source (via the ``soccerdata``
-                    package). Requires outbound access to fbref.com, so it runs
-                    locally or wherever FBref is allowlisted — not inside a
-                    sandbox that blocks it. Leagues soccerdata doesn't ship
-                    natively (e.g. MLS) are auto-registered via
-                    ``_ensure_fbref_league``.
+* ``fbref-http``  — the default, xG-bearing source. Fetches fbref's Scores &
+                    Fixtures page over plain HTTP (no browser) and parses it with
+                    ``pandas.read_html`` (needs ``lxml``). fbref is behind
+                    Cloudflare and rate-limits, so a plain request can be blocked;
+                    when that happens it raises a clear error pointing at the
+                    fallbacks.
+* ``fbref``       — same data via the ``soccerdata`` package, which drives an
+                    undetected browser that reliably clears Cloudflare (at the
+                    cost of a visible Chrome window). Leagues soccerdata doesn't
+                    ship natively (e.g. MLS) are auto-registered.
 * ``openfootball``— the openfootball GitHub JSON mirror (schedules + scores,
                     **no xG**). Reachable from restricted environments and needs
                     no extra packages, so it's the offline fallback. xg columns
@@ -29,19 +33,23 @@ Sources
 
 Usage
 -----
-    venv/bin/python -m leagues.ingest eng --season 2025-2026            # fbref (default)
+    venv/bin/python -m leagues.ingest eng --season 2025-2026            # fbref-http (default)
     venv/bin/python -m leagues.ingest mls --season 2026
-    venv/bin/python -m leagues.ingest eng --season 2024-25 --source openfootball
+    venv/bin/python -m leagues.ingest eng --season 2025-2026 --source fbref       # browser
+    venv/bin/python -m leagues.ingest eng --season 2024-25   --source openfootball
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
+import io
 import json
 import os
 import re
 import sys
+import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -51,6 +59,11 @@ DATA_ROOT = Path(__file__).resolve().parent.parent / "data" / "leagues"
 OPENFOOTBALL_BASE = (
     "https://raw.githubusercontent.com/openfootball/football.json/master"
 )
+FBREF_BASE = "https://fbref.com"
+# A real browser User-Agent; fbref rejects obvious bot agents outright.
+FBREF_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+FBREF_DELAY = 4.0  # seconds to pause between fbref requests (they rate-limit)
 
 TEAM_FIELDS = ["id", "team_name", "code"]
 MATCH_FIELDS = [
@@ -155,8 +168,21 @@ def from_openfootball(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[
 
 
 # ---------------------------------------------------------------------------
-# FBref source (primary; xG-bearing) via soccerdata
+# FBref sources (xG-bearing): "fbref" (soccerdata/browser) and "fbref-http"
+# (plain HTTP + pandas.read_html). Both parse the same "N–M" score strings.
 # ---------------------------------------------------------------------------
+
+def _parse_score(val) -> tuple[int, int] | None:
+    """Parse a fbref score string like "2–1" (en-dash) or "2-1" into (h, a)."""
+    if not isinstance(val, str) or ("–" not in val and "-" not in val):
+        return None
+    sep = "–" if "–" in val else "-"
+    try:
+        h, a = (int(x.strip()) for x in val.split(sep)[:2])
+        return h, a
+    except ValueError:
+        return None
+
 
 def _ensure_fbref_league(sd, cfg: LeagueConfig) -> None:
     """Register a league soccerdata doesn't ship natively (e.g. MLS).
@@ -227,16 +253,6 @@ def from_fbref(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[dict]]:
                           "code": _make_code(name, codes_taken)})
         return name_to_id[name]
 
-    def parse_score(val) -> tuple[int, int] | None:
-        if not isinstance(val, str) or "–" not in val and "-" not in val:
-            return None
-        sep = "–" if "–" in val else "-"
-        try:
-            h, a = (int(x.strip()) for x in val.split(sep)[:2])
-            return h, a
-        except ValueError:
-            return None
-
     matches: list[dict] = []
     for i, row in enumerate(schedule.itertuples(index=False), start=1):
         d = row._asdict()
@@ -244,7 +260,7 @@ def from_fbref(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[dict]]:
         if not home or not away:
             continue
         hid, aid = team_id(str(home)), team_id(str(away))
-        sc = parse_score(d.get("score"))
+        sc = _parse_score(d.get("score"))
         played = sc is not None
         hx, ax = d.get("home_xg"), d.get("away_xg")
         matches.append({
@@ -261,6 +277,124 @@ def from_fbref(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[dict]]:
         })
 
     return teams, matches
+
+
+# ---------------------------------------------------------------------------
+# FBref via plain HTTP + pandas.read_html (no browser, keeps xG)
+# ---------------------------------------------------------------------------
+
+# Text that only appears on a Cloudflare challenge/block page, not a real one.
+_CF_MARKERS = ("just a moment", "attention required", "checking your browser",
+               "cf-browser-verification", "cf-challenge")
+
+
+def _xg_val(row, col) -> str:
+    """Read and round an xG cell, returning "" when absent/blank."""
+    import pandas as pd
+    if col is None:
+        return ""
+    v = pd.to_numeric(row.get(col), errors="coerce")
+    return "" if pd.isna(v) else round(float(v), 3)
+
+
+def _parse_fbref_schedule(df, cfg: LeagueConfig) -> tuple[list[dict], list[dict]]:
+    """Parse a fbref 'Scores & Fixtures' table into canonical (teams, matches).
+
+    The table's columns are ``Wk, Day, Date, Time, Home, xG, Score, xG, Away,
+    …``; ``read_html`` de-duplicates the two ``xG`` headers to ``xG`` (home,
+    before Score) and ``xG.1`` (away, after Score). xG columns are absent for
+    leagues/seasons FBref doesn't cover with expected goals.
+    """
+    cols = list(df.columns)
+    home_xg = "xG" if "xG" in cols else None
+    away_xg = "xG.1" if "xG.1" in cols else None
+
+    name_to_id: dict[str, int] = {}
+    codes_taken: set[str] = set()
+    teams: list[dict] = []
+
+    def team_id(name: str) -> int:
+        if name not in name_to_id:
+            tid = len(name_to_id) + 1
+            name_to_id[name] = tid
+            teams.append({"id": tid, "team_name": name,
+                          "code": _make_code(name, codes_taken)})
+        return name_to_id[name]
+
+    matches: list[dict] = []
+    n = 0
+    for row in df.to_dict("records"):
+        home, away = row.get("Home"), row.get("Away")
+        # fbref repeats the header row and pads blank separator rows; skip them.
+        if not isinstance(home, str) or not isinstance(away, str) or not home or not away:
+            continue
+        if home == "Home" or away == "Away":
+            continue
+        n += 1
+        hid, aid = team_id(home.strip()), team_id(away.strip())
+        sc = _parse_score(row.get("Score"))
+        played = sc is not None
+        matches.append({
+            "match_number": n,
+            "matchday": _matchday_num(str(row.get("Wk", ""))),
+            "date": str(row.get("Date", ""))[:10],
+            "home_team_id": hid,
+            "away_team_id": aid,
+            "home_goals": sc[0] if played else "",
+            "away_goals": sc[1] if played else "",
+            "xg_home": _xg_val(row, home_xg) if played else "",
+            "xg_away": _xg_val(row, away_xg) if played else "",
+            "played": played,
+        })
+    return teams, matches
+
+
+def from_fbref_http(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[dict]]:
+    """
+    Return (teams, matches) by scraping fbref's Scores & Fixtures page over plain
+    HTTP (no browser) and parsing it with ``pandas.read_html``.
+
+    fbref sits behind Cloudflare and rate-limits, so a plain request can be
+    blocked; when that happens this raises ``SystemExit`` pointing at the
+    ``fbref`` (browser) or ``openfootball`` fallbacks. Needs ``lxml`` for
+    ``read_html``.
+    """
+    try:
+        import pandas as pd
+    except ImportError as exc:  # pragma: no cover
+        raise SystemExit("The 'fbref-http' source needs pandas + lxml.") from exc
+
+    url = (f"{FBREF_BASE}/en/comps/{cfg.fbref_comp_id}/{season}/schedule/"
+           f"{season}-{cfg.fbref_slug}-Scores-and-Fixtures")
+    req = urllib.request.Request(url, headers={"User-Agent": FBREF_UA})
+    try:
+        with urllib.request.urlopen(req, timeout=45) as resp:
+            html = resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        if exc.code in (403, 429, 503):
+            raise SystemExit(
+                f"fbref blocked the request (HTTP {exc.code}) — likely Cloudflare "
+                "or rate limiting. Retry later, or use --source fbref (browser) "
+                "or --source openfootball."
+            ) from exc
+        raise
+    time.sleep(FBREF_DELAY)  # be polite; fbref asks for ~1 request / few seconds
+
+    if any(m in html.lower()[:4000] for m in _CF_MARKERS):
+        raise SystemExit(
+            "fbref returned a Cloudflare challenge page instead of data. "
+            "Retry later, or use --source fbref (browser) or --source openfootball."
+        )
+
+    tables = pd.read_html(io.StringIO(html))
+    sched = next((t for t in tables
+                  if "Score" in t.columns and "Home" in t.columns and "Away" in t.columns), None)
+    if sched is None:
+        raise SystemExit(
+            f"No Scores & Fixtures table found at {url}. The page layout may have "
+            "changed, or the season isn't published yet."
+        )
+    return _parse_fbref_schedule(sched, cfg)
 
 
 # ---------------------------------------------------------------------------
@@ -282,17 +416,22 @@ def write_league(cfg: LeagueConfig, teams: list[dict], matches: list[dict]) -> P
     return out_dir
 
 
-SOURCES = {"openfootball": from_openfootball, "fbref": from_fbref}
+SOURCES = {
+    "fbref-http": from_fbref_http,   # default: plain HTTP + read_html, xG, no browser
+    "fbref": from_fbref,             # soccerdata (browser); reliably clears Cloudflare
+    "openfootball": from_openfootball,  # offline mirror, no xG, no dependencies
+}
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Ingest league fixtures/results into canonical CSVs.")
     ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls)")
     ap.add_argument("--season", required=True,
-                    help="season, e.g. 2025-2026 / 2026 (fbref) or 2024-25 (openfootball)")
-    ap.add_argument("--source", default="fbref", choices=list(SOURCES),
-                    help="data source (default: fbref — current data + xG; "
-                         "openfootball is the offline, no-dependency fallback)")
+                    help="season, e.g. 2025-2026 / 2026 (fbref sources) or 2024-25 (openfootball)")
+    ap.add_argument("--source", default="fbref-http", choices=list(SOURCES),
+                    help="data source (default: fbref-http — current data + xG, no browser; "
+                         "'fbref' uses a browser to clear Cloudflare; "
+                         "'openfootball' is the offline fallback)")
     args = ap.parse_args()
 
     cfg = get_league(args.league)

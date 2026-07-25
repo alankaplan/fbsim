@@ -11,15 +11,19 @@ probabilities come from the outer product of the two Poisson PMFs.
 ## Requirements
 
 - Python 3.10+
-- `numpy`, `pandas`, `scipy`
-- `soccerdata` — for the default **fbref** ingest source (current data + xG).
-  It scrapes `fbref.com` with a headless **Chrome/Chromium** (to get past
-  Cloudflare), so you need a browser installed and outbound access to fbref.com.
-  Only optional if you stick to the offline `openfootball` source.
+- `numpy`, `pandas`, `scipy`, `lxml`
+- `lxml` powers `pandas.read_html` for the default **fbref-http** source, which
+  pulls current data + xG from `fbref.com` over plain HTTP (no browser). fbref
+  is behind Cloudflare and rate-limits, so a plain request is occasionally
+  blocked — see the sources below for the fallbacks.
+- `soccerdata` *(optional)* — only for `--source fbref`, which fetches the same
+  fbref data through an undetected **Chrome/Chromium** browser that reliably
+  clears Cloudflare (a visible browser window opens while it scrapes).
 
 ```bash
 python -m venv venv
-venv/bin/pip install numpy pandas scipy soccerdata
+venv/bin/pip install numpy pandas scipy lxml
+venv/bin/pip install soccerdata   # optional, for the browser-based --source fbref
 ```
 
 ## Quick start
@@ -28,8 +32,8 @@ One command refreshes data, re-simulates the leagues whose data changed, and
 rebuilds the report:
 
 ```bash
-# Refresh every league at its current season via fbref (current data + xG), then
-# simulate what changed and open the page. Needs soccerdata + fbref.com access:
+# Refresh every league at its current season via fbref-http (current data + xG,
+# no browser), simulate what changed, and open the page:
 venv/bin/python -m leagues.update --refresh --open
 
 # Re-simulate stale leagues from the CSVs already on disk (no network):
@@ -43,9 +47,9 @@ when nothing has changed does no simulation work and just rebuilds `leagues.html
 
 `--refresh` ingests each league at its own current season, so it handles the
 different formats (European leagues on `2025-2026`, MLS on the calendar-year
-`2026`). Use `--season <s>` to pin one season across the leagues it applies to,
-and `--source openfootball` for the offline mirror (no xG, and it lags live
-seasons — see below).
+`2026`). Use `--season <s>` to pin one season across the leagues it applies to.
+If fbref's Cloudflare blocks the default `fbref-http` source, fall back to
+`--source fbref` (browser) or `--source openfootball` (offline, no xG).
 
 Useful flags: `--refresh` / `--season <s>` (ingest first; omit both to skip the
 network), `--source`, `--sims`, `--seed`, `--force`, `--no-page`, `--open`, and
@@ -78,11 +82,11 @@ Supporters' Shield race and playoff qualification (top-18 as a single-table
 approximation of the 9-per-conference field). The two conferences and the MLS
 Cup playoff bracket are not modeled, and there is no relegation, so its report
 shows **Shield%** and **Playoff%** columns instead of Champions League / Europe /
-relegation. Its season is a calendar year (`--season 2026`). MLS isn't one of
-soccerdata's built-in FBref leagues, so the fbref source auto-registers it as a
-custom league on first use (best-effort — soccerdata gives no guarantee a custom
-league scrapes cleanly). The openfootball MLS feed is stale (its 2025 file stops
-in May 2025 and there's no 2026), so use fbref for current MLS data.
+relegation. Its season is a calendar year (`--season 2026`). The openfootball
+MLS feed is stale (its 2025 file stops in May 2025 and there's no 2026), so use
+a fbref source for current MLS data. (For the browser-based `--source fbref`,
+MLS isn't one of soccerdata's built-in leagues, so it's auto-registered as a
+custom league on first use — best-effort.)
 
 ### 1. Ingest data
 
@@ -94,13 +98,24 @@ source-agnostic:
   home_team_id, away_team_id, home_goals, away_goals, xg_home, xg_away, played`
 
 ```bash
-# fbref (default) — current data + xG; needs soccerdata + access to fbref.com
+# fbref-http (default) — current data + xG over plain HTTP, no browser (needs lxml)
 venv/bin/python -m leagues.ingest eng --season 2025-2026
 venv/bin/python -m leagues.ingest mls --season 2026
+
+# fbref via soccerdata — same data through a browser that clears Cloudflare
+venv/bin/python -m leagues.ingest eng --season 2025-2026 --source fbref
 
 # openfootball GitHub mirror (schedules + scores, no xG) — works offline/sandboxed
 venv/bin/python -m leagues.ingest eng --season 2024-25 --source openfootball
 ```
+
+Data sources (all write the same canonical CSVs):
+
+| `--source` | Browser? | xG? | Current data? | Notes |
+|---|---|---|---|---|
+| `fbref-http` *(default)* | no | yes | yes | plain HTTP + `read_html`; Cloudflare may block it |
+| `fbref` | yes (Chrome) | yes | yes | soccerdata; reliably clears Cloudflare |
+| `openfootball` | no | no | no (lags) | static mirror; offline, no dependencies |
 
 You can also hand-author CSVs in the canonical schema (the `data/leagues/`
 directory already ships with sample data for all six leagues). Unplayed
@@ -160,7 +175,7 @@ form.
 ```
 leagues/
   config.py               per-league definitions & tiebreakers
-  ingest.py               fbref / openfootball / manual → canonical CSVs
+  ingest.py               fbref-http / fbref / openfootball → canonical CSVs
   model.py                attack/defense Poisson fit
   match.py                Poisson match primitive (λ → W/D/L probabilities)
   simulator.py            round-robin season engine + tiebreaker resolver

@@ -17,11 +17,13 @@ Usage
     # Re-simulate stale leagues from existing CSVs and rebuild the page (no network):
     venv/bin/python -m leagues.update
 
-    # Refresh every league at its own current season via fbref (Euro 2025-2026
-    # + MLS 2026, with xG). Needs soccerdata + fbref.com access:
+    # Refresh every league at its current season via fbref-http (Euro 2025-2026
+    # + MLS 2026, with xG, no browser):
     venv/bin/python -m leagues.update --refresh
 
-    # Same, but from the offline openfootball mirror (no xG, lags live seasons):
+    # Same via the browser-based fbref source (reliably clears Cloudflare), or
+    # from the offline openfootball mirror (no xG, lags live seasons):
+    venv/bin/python -m leagues.update --refresh --source fbref
     venv/bin/python -m leagues.update --refresh --source openfootball
 
     # Fetch a specific season for the leagues it applies to, then simulate:
@@ -142,10 +144,10 @@ def main() -> None:
                     help="ingest each league at its own current season "
                          "(handles mixed formats, e.g. Euro 2025-2026 + MLS 2026); "
                          "ignored when --season is given")
-    ap.add_argument("--source", default="fbref", choices=list(SOURCES),
-                    help="ingest source for --season / --refresh (default: fbref — "
-                         "current data + xG, needs soccerdata + fbref access; "
-                         "openfootball is the offline fallback)")
+    ap.add_argument("--source", default="fbref-http", choices=list(SOURCES),
+                    help="ingest source for --season / --refresh (default: fbref-http — "
+                         "current data + xG, no browser; 'fbref' uses a browser to "
+                         "clear Cloudflare; 'openfootball' is the offline fallback)")
     ap.add_argument("--sims", type=int, default=20000, help="simulations per league")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--reg", type=float, default=0.05, help="model L2 shrinkage")
@@ -169,7 +171,7 @@ def main() -> None:
         if args.season:
             season = args.season
         elif args.refresh:
-            season = cfg.fbref_season if args.source == "fbref" else cfg.default_season
+            season = cfg.season_for(args.source)
         else:
             season = None
         if season:

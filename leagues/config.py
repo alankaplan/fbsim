@@ -44,7 +44,9 @@ class LeagueConfig:
     tiebreakers: tuple[str, ...]   # ordered chain from the vocabulary above
     europa_slots: int = 0          # informational second band shown in the report
     default_season: str = "2025-26"  # openfootball season slug (dir name on the mirror)
-    fbref_season: str = "2025-2026"  # fbref/soccerdata season for the current campaign
+    fbref_season: str = "2025-2026"  # fbref season for the current campaign (fbref + fbref-http)
+    fbref_comp_id: int = 0         # fbref.com competition id, e.g. 9 (Premier League)
+    fbref_slug: str = ""           # fbref URL slug, e.g. "Premier-League"
     # soccerdata custom-league registration (only for leagues not built into
     # soccerdata's FBref list — the Big 5 are built in and leave these blank) --
     fbref_name: str = ""           # FBref competition display name, e.g. "Major League Soccer"
@@ -62,6 +64,12 @@ class LeagueConfig:
     def total_matches(self) -> int:
         return self.n_teams * (self.n_teams - 1)
 
+    def season_for(self, source: str) -> str:
+        """The season string for this league in the given source's format."""
+        if source == "openfootball":
+            return self.default_season
+        return self.fbref_season  # fbref + fbref-http share fbref's season format
+
 
 # The current big-five European leagues. Slot counts reflect the 2025-26
 # allocation and are intentionally easy to edit as UEFA coefficients shift.
@@ -69,30 +77,35 @@ LEAGUES: dict[str, LeagueConfig] = {
     "eng": LeagueConfig(
         key="eng", name="Premier League", country="England", n_teams=20,
         openfootball_path="en.1", fbref_league="ENG-Premier League",
+        fbref_comp_id=9, fbref_slug="Premier-League",
         ucl_slots=5, europa_slots=2, relegation_slots=3,
         tiebreakers=("pts", "gd", "gf", "h2h"),
     ),
     "esp": LeagueConfig(
         key="esp", name="La Liga", country="Spain", n_teams=20,
         openfootball_path="es.1", fbref_league="ESP-La Liga",
+        fbref_comp_id=12, fbref_slug="La-Liga",
         ucl_slots=5, europa_slots=2, relegation_slots=3,
         tiebreakers=("pts", "h2h", "gd", "gf"),
     ),
     "ita": LeagueConfig(
         key="ita", name="Serie A", country="Italy", n_teams=20,
         openfootball_path="it.1", fbref_league="ITA-Serie A",
+        fbref_comp_id=11, fbref_slug="Serie-A",
         ucl_slots=5, europa_slots=2, relegation_slots=3,
         tiebreakers=("pts", "h2h", "gd", "gf"),
     ),
     "de": LeagueConfig(
         key="de", name="Bundesliga", country="Germany", n_teams=18,
         openfootball_path="de.1", fbref_league="GER-Bundesliga",
+        fbref_comp_id=20, fbref_slug="Bundesliga",
         ucl_slots=4, europa_slots=2, relegation_slots=2,  # +1 relegation playoff, not modeled
         tiebreakers=("pts", "gd", "gf", "h2h"),
     ),
     "fr": LeagueConfig(
         key="fr", name="Ligue 1", country="France", n_teams=18,
         openfootball_path="fr.1", fbref_league="FRA-Ligue 1",
+        fbref_comp_id=13, fbref_slug="Ligue-1",
         ucl_slots=4, europa_slots=2, relegation_slots=2,  # +1 relegation playoff, not modeled
         tiebreakers=("pts", "gd", "gf", "h2h"),
     ),
@@ -105,6 +118,7 @@ LEAGUES: dict[str, LeagueConfig] = {
     "mls": LeagueConfig(
         key="mls", name="MLS", country="USA", n_teams=30,
         openfootball_path="mls", fbref_league="USA-Major League Soccer",
+        fbref_comp_id=22, fbref_slug="Major-League-Soccer",
         default_season="2025", fbref_season="2026",
         # MLS isn't a built-in soccerdata FBref league; from_fbref registers it.
         fbref_name="Major League Soccer", season_start="Feb", season_end="Dec",
