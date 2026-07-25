@@ -1,10 +1,10 @@
 """
 leagues
 -------
-Domestic-league season simulator for the big-five European leagues (and,
-eventually, MLS), built on a Poisson attack/defense core. Team strengths are
-derived from FBref expected-goals (xG) data when available, falling back to
-actual goals otherwise.
+Domestic-league season simulator for the big-five European leagues and MLS,
+built on a Poisson attack/defense core. Team strengths are derived from FBref
+expected-goals (xG) data when available, falling back to actual goals
+otherwise.
 
 Layers:
 

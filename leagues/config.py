@@ -11,15 +11,17 @@ Each league differs in three ways that matter to the model and the report:
 
 The tiebreaker vocabulary (applied in order until the tie is broken):
 
-  "pts" — competition points (always first).
-  "h2h" — a mini-table among only the tied teams: head-to-head points, then
-          head-to-head goal difference, then head-to-head goals for.
-  "gd"  — overall goal difference.
-  "gf"  — overall goals for.
+  "pts"  — competition points (always first).
+  "wins" — total wins (MLS ranks on this before goal difference).
+  "h2h"  — a mini-table among only the tied teams: head-to-head points, then
+           head-to-head goal difference, then head-to-head goals for.
+  "gd"   — overall goal difference.
+  "gf"   — overall goals for.
 
 Spain (La Liga) and Italy (Serie A) apply head-to-head *before* overall goal
-difference; England, Germany and France use overall goal difference first.
-The final, always-deterministic fallback is ascending team id.
+difference; England, Germany and France use overall goal difference first; MLS
+uses wins before goal difference. The final, always-deterministic fallback is
+ascending team id.
 """
 
 from __future__ import annotations
@@ -37,10 +39,18 @@ class LeagueConfig:
     openfootball_path: str         # e.g. "en.1" -> <season>/en.1.json on the mirror
     fbref_league: str              # soccerdata league id, e.g. "ENG-Premier League"
     # Table semantics --------------------------------------------------------
-    ucl_slots: int                 # top-N qualify for the Champions League
-    relegation_slots: int          # bottom-R are relegated
+    ucl_slots: int                 # top-N qualify for the primary continental cup
+    relegation_slots: int          # bottom-R are relegated (0 = no relegation)
     tiebreakers: tuple[str, ...]   # ordered chain from the vocabulary above
-    europa_slots: int = 0          # informational band shown in the report
+    europa_slots: int = 0          # informational second band shown in the report
+    default_season: str = "2025-26"  # season slug used by update.py when none is given
+    # Report display labels (European defaults; leagues like MLS override) ----
+    title_label: str = "Title"     # header for the finish-1st column
+    qual_label: str = "UCL"        # header for the top-`ucl_slots` band
+    qual2_label: str = "Europe"    # header for the top-`ucl_slots+europa_slots` band
+    drop_label: str = "Rel"        # header for the bottom-`relegation_slots` band
+    qual_name: str = "Champions League"  # prose name of the qualification band
+    drop_name: str = "relegation"        # prose name of the drop band
 
     @property
     def total_matches(self) -> int:
@@ -79,6 +89,21 @@ LEAGUES: dict[str, LeagueConfig] = {
         openfootball_path="fr.1", fbref_league="FRA-Ligue 1",
         ucl_slots=4, europa_slots=2, relegation_slots=2,  # +1 relegation playoff, not modeled
         tiebreakers=("pts", "gd", "gf", "h2h"),
+    ),
+    # Major League Soccer. Modeled as a single 30-team table (Supporters'
+    # Shield race + playoff qualification); the two conferences and the MLS Cup
+    # playoff bracket are not modeled. The season is a calendar year ("2025"),
+    # and MLS breaks ties by wins before goal difference. `ucl_slots=18`
+    # approximates the 18-team playoff field (9 per conference) on a single
+    # table; there is no relegation.
+    "mls": LeagueConfig(
+        key="mls", name="MLS", country="USA", n_teams=30,
+        openfootball_path="mls", fbref_league="USA-Major League Soccer",
+        default_season="2025",
+        ucl_slots=18, europa_slots=0, relegation_slots=0,
+        tiebreakers=("pts", "wins", "gd", "gf"),
+        title_label="Shield", qual_label="Playoff",
+        qual_name="playoff", drop_name="",
     ),
 }
 

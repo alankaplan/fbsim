@@ -1,9 +1,9 @@
 # fbsim
 
-A **domestic-league season simulator** for the big-five European leagues. Team
-strengths are fit as attack/defense Poisson ratings from FBref expected-goals
-(xG) data (falling back to actual goals), and full seasons are run by Monte
-Carlo to produce title, European-qualification and relegation probabilities.
+A **domestic-league season simulator** for the big-five European leagues and
+MLS. Team strengths are fit as attack/defense Poisson ratings from FBref
+expected-goals (xG) data (falling back to actual goals), and full seasons are
+run by Monte Carlo to produce title, qualification and relegation probabilities.
 
 A match scoreline is two independent Poisson draws, and win/draw/loss
 probabilities come from the outer product of the two Poisson PMFs.
@@ -26,8 +26,8 @@ One command refreshes data, re-simulates the leagues whose data changed, and
 rebuilds the report:
 
 ```bash
-# Fetch fresh results for every league, simulate what changed, rebuild the page:
-venv/bin/python -m leagues.update --season 2024-25 --open
+# Refresh every league at its own current season (Euro 2025-26 + MLS 2025):
+venv/bin/python -m leagues.update --refresh --open
 
 # Re-simulate stale leagues from the CSVs already on disk (no network):
 venv/bin/python -m leagues.update
@@ -38,10 +38,14 @@ and a league is re-simulated only when its `matches.csv` is newer than its
 `sim_results.json` (or the result is missing, or you pass `--force`). Re-running
 when nothing has changed does no simulation work and just rebuilds `leagues.html`.
 
-Useful flags: `--season <s>` (ingest first; omit to skip the network),
-`--source`, `--sims`, `--seed`, `--force`, `--no-page`, `--open`, and an
-optional list of league keys (default: all). The three stages below can also be
-run individually.
+Because MLS runs on a calendar-year season (`2025`) while the European leagues
+use `2025-26`, `--refresh` ingests each league at its own default season. Use
+`--season <s>` to pin one season across the leagues it applies to.
+
+Useful flags: `--refresh` / `--season <s>` (ingest first; omit both to skip the
+network), `--source`, `--sims`, `--seed`, `--force`, `--no-page`, `--open`, and
+an optional list of league keys (default: all). The three stages below can also
+be run individually.
 
 ## Overview
 
@@ -59,9 +63,19 @@ A layered pipeline under `leagues/`:
 | `update.py` | One command: ingest → simulate what changed → rebuild the report |
 
 Supported leagues (keys): `eng` (Premier League), `esp` (La Liga),
-`ita` (Serie A), `de` (Bundesliga), `fr` (Ligue 1). Slot counts and tiebreaker
-order are per-league — Spain and Italy apply head-to-head before overall goal
-difference; England, Germany and France use overall goal difference first.
+`ita` (Serie A), `de` (Bundesliga), `fr` (Ligue 1), `mls` (MLS). Slot counts and
+tiebreaker order are per-league — Spain and Italy apply head-to-head before
+overall goal difference; England, Germany and France use overall goal difference
+first; MLS ranks on wins before goal difference.
+
+**MLS notes.** MLS is modeled as a single 30-team table producing the
+Supporters' Shield race and playoff qualification (top-18 as a single-table
+approximation of the 9-per-conference field). The two conferences and the MLS
+Cup playoff bracket are not modeled, and there is no relegation, so its report
+shows **Shield%** and **Playoff%** columns instead of Champions League / Europe /
+relegation. Its season is a calendar year (`--season 2025`), and the openfootball
+MLS feed is partial and goals-only, so results are projections from the games
+recorded so far.
 
 ### 1. Ingest data
 
@@ -81,7 +95,7 @@ venv/bin/python -m leagues.ingest eng --season 2024-25 --source openfootball
 ```
 
 You can also hand-author CSVs in the canonical schema (the `data/leagues/`
-directory already ships with sample data for all five leagues). Unplayed
+directory already ships with sample data for all six leagues). Unplayed
 fixtures have empty goal/xG fields and `played = False`.
 
 ### 2. Fit and simulate a season

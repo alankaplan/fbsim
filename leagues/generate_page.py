@@ -176,11 +176,28 @@ const LEAGUES = __DATA_PLACEHOLDER__;
   }
 
   // ---- Standings odds table ----
-  const COLS = [
-    ["cur_rank","#"], ["name","Team"], ["played","Pld"], ["cur_pts","Pts"], ["cur_gd","GD"],
-    ["proj_pts","Proj"], ["title_pct","Title%"], ["ucl_pct","UCL%"], ["europe_pct","Europe%"],
-    ["releg_pct","Rel%"], ["exp_rank","xRank"],
-  ];
+  // Columns are built per league so the odds headers carry league-specific
+  // labels (Title vs Shield, UCL vs Playoff) and the Europe / relegation bands
+  // are dropped for leagues that don't have them (e.g. MLS).
+  function columnsFor(L, barFn) {
+    const g = L.league;
+    const cols = [
+      ["cur_rank","#", r=>`<td class="pos">${r.cur_rank}</td>`],
+      ["name","Team", r=>`<td><a data-team="${r.code}">${esc(r.name)}</a></td>`],
+      ["played","Pld", r=>`<td>${r.played}</td>`],
+      ["cur_pts","Pts", r=>`<td>${r.cur_pts}</td>`],
+      ["cur_gd","GD", r=>`<td>${r.cur_gd>0?'+':''}${r.cur_gd}</td>`],
+      ["proj_pts","Proj", r=>`<td>${r.proj_pts.toFixed(1)}</td>`],
+      ["title_pct",g.title_label+"%", r=>`<td>${barFn(r)}${pct(r.title_pct)}</td>`],
+      ["ucl_pct",g.qual_label+"%", r=>`<td class="ucl">${pct(r.ucl_pct)}</td>`],
+    ];
+    if (g.europa_slots>0)
+      cols.push(["europe_pct",g.qual2_label+"%", r=>`<td class="eur">${pct(r.europe_pct)}</td>`]);
+    if (g.relegation_slots>0)
+      cols.push(["releg_pct",g.drop_label+"%", r=>`<td class="rel">${pct(r.releg_pct)}</td>`]);
+    cols.push(["exp_rank","xRank", r=>`<td>${r.exp_rank.toFixed(2)}</td>`]);
+    return cols;
+  }
   function sortedTeams() {
     const rows = LEAGUES[cur].teams.filter(r =>
       !filter || r.name.toLowerCase().includes(filter) || r.code.toLowerCase().includes(filter));
@@ -192,28 +209,21 @@ const LEAGUES = __DATA_PLACEHOLDER__;
     return rows;
   }
   function renderMain() {
-    const L = LEAGUES[cur];
+    const L = LEAGUES[cur], g = L.league;
     const maxTitle = Math.max(...L.teams.map(t=>t.title_pct), 1);
-    const th = COLS.map(([c,l]) =>
+    const barFn = r => `<span class="bar-track"><span class="bar-fill" style="width:${(r.title_pct/maxTitle*100).toFixed(1)}%"></span></span>`;
+    const cols = columnsFor(L, barFn);
+    const th = cols.map(([c,l]) =>
       `<th data-col="${c}" class="${c===sortCol?(sortAsc?'sort-asc':'sort-desc'):''}">${l}</th>`).join("");
-    const body = sortedTeams().map(r => {
-      const bar = `<span class="bar-track"><span class="bar-fill" style="width:${(r.title_pct/maxTitle*100).toFixed(1)}%"></span></span>`;
-      return `<tr>
-        <td class="pos">${r.cur_rank}</td>
-        <td><a data-team="${r.code}">${esc(r.name)}</a></td>
-        <td>${r.played}</td><td>${r.cur_pts}</td><td>${r.cur_gd>0?'+':''}${r.cur_gd}</td>
-        <td>${r.proj_pts.toFixed(1)}</td>
-        <td>${bar}${pct(r.title_pct)}</td>
-        <td class="ucl">${pct(r.ucl_pct)}</td>
-        <td class="eur">${pct(r.europe_pct)}</td>
-        <td class="rel">${pct(r.releg_pct)}</td>
-        <td>${r.exp_rank.toFixed(2)}</td></tr>`;
-    }).join("");
+    const body = sortedTeams().map(r =>
+      `<tr>${cols.map(([,,cell]) => cell(r)).join("")}</tr>`).join("");
+    const bands = [`<b>${g.title_label}%</b> finish 1st`,
+                   `<b>${g.qual_label}%</b> top ${g.ucl_slots}`];
+    if (g.europa_slots>0) bands.push(`<b>${g.qual2_label}%</b> top ${g.ucl_slots+g.europa_slots}`);
+    if (g.relegation_slots>0) bands.push(`<b>${g.drop_label}%</b> bottom ${g.relegation_slots}`);
     $("main-view").innerHTML =
       `<input type="search" id="flt" placeholder="filter teams…" value="${esc(filter)}">
-       <div class="legend"><b>Proj</b> mean final points ·
-         <b>Title/UCL/Europe/Rel%</b> chance of finishing 1st / top ${L.league.ucl_slots} /
-         top ${L.league.ucl_slots+L.league.europa_slots} / bottom ${L.league.relegation_slots} ·
+       <div class="legend"><b>Proj</b> mean final points · ${bands.join(" · ")} ·
          <b>xRank</b> expected finishing position</div>
        <div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
     $("flt").oninput = (e) => { filter = e.target.value.toLowerCase(); renderMain(); };
@@ -243,10 +253,13 @@ const LEAGUES = __DATA_PLACEHOLDER__;
       }).join("");
       return `<tr><td class="name"><a data-team="${r.code}">${esc(r.name)}</a></td>${cells}</tr>`;
     }).join("");
+    const g = L.league;
+    let note = `Columns left of the line are ${g.qual_name} places`;
+    if (g.relegation_slots>0) note += `, right are ${g.drop_name}`;
+    note += ".";
     $("matrix-view").innerHTML =
       `<div class="legend">Each cell = probability (%) a team finishes in that position.
-        Darker = more likely. Columns left of the line are Champions League places,
-        right are relegation.</div>
+        Darker = more likely. ${note}</div>
        <div class="wrap"><table class="matrix"><thead><tr>${hdr}</tr></thead><tbody>${body}</tbody></table></div>`;
     $("matrix-view").querySelectorAll("a[data-team]").forEach(a =>
       a.onclick = () => { teamCode = a.dataset.team; setView("team"); });

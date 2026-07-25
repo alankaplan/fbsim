@@ -66,6 +66,8 @@ def _rank_cluster(cluster: list[int],
         key_fn = lambda tid: key[tid]
     elif crit == "pts":
         key_fn = lambda tid: stats[tid]["pts"]
+    elif crit == "wins":
+        key_fn = lambda tid: stats[tid]["wins"]
     elif crit == "gd":
         key_fn = lambda tid: stats[tid]["gf"] - stats[tid]["ga"]
     elif crit == "gf":
@@ -135,10 +137,11 @@ def _accumulate(home, away, hg, ag, n, team_ids) -> dict[int, dict[str, int]]:
     draw = (hg == ag).astype(int)
     pts = np.bincount(home, 3 * home_win + draw, minlength=n) \
         + np.bincount(away, 3 * away_win + draw, minlength=n)
+    wins = np.bincount(home, home_win, minlength=n) + np.bincount(away, away_win, minlength=n)
     gf = np.bincount(home, hg, minlength=n) + np.bincount(away, ag, minlength=n)
     ga = np.bincount(home, ag, minlength=n) + np.bincount(away, hg, minlength=n)
     played = np.bincount(home, minlength=n) + np.bincount(away, minlength=n)
-    return {team_ids[i]: {"pts": int(pts[i]), "gf": int(gf[i]),
+    return {team_ids[i]: {"pts": int(pts[i]), "wins": int(wins[i]), "gf": int(gf[i]),
                           "ga": int(ga[i]), "played": int(played[i])}
             for i in range(n)}
 

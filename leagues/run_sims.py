@@ -132,7 +132,10 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
         "league": {"key": cfg.key, "name": cfg.name, "country": cfg.country,
                    "n_teams": n, "ucl_slots": cfg.ucl_slots,
                    "europa_slots": cfg.europa_slots, "relegation_slots": cfg.relegation_slots,
-                   "tiebreakers": list(cfg.tiebreakers)},
+                   "tiebreakers": list(cfg.tiebreakers),
+                   "title_label": cfg.title_label, "qual_label": cfg.qual_label,
+                   "qual2_label": cfg.qual2_label, "drop_label": cfg.drop_label,
+                   "qual_name": cfg.qual_name, "drop_name": cfg.drop_name},
         "meta": {"n_sims": n_sims, "seed": seed, "used_xg": model.used_xg,
                  "home_adv": round(model.home_adv, 4),
                  "n_played": int(fx.played.sum()), "n_remaining": int((~fx.played).sum())},
@@ -171,11 +174,12 @@ def main() -> None:
           f"{m['n_remaining']} remaining"
           + (f" (as-of MD{args.as_of})" if args.as_of else "")
           + f" [{'xG' if m['used_xg'] else 'goals'}] -> {out}")
-    print("\nTitle race (top 6 by expected rank):")
-    print(f"  {'Team':<24}{'Pld':>4}{'Pts':>5}{'Proj':>7}{'Title%':>8}{'UCL%':>7}{'Rel%':>7}")
+    print(f"\n{cfg.title_label} race (top 6 by expected rank):")
+    print(f"  {'Team':<24}{'Pld':>4}{'Pts':>5}{'Proj':>7}"
+          f"{cfg.title_label+'%':>9}{cfg.qual_label+'%':>9}{cfg.drop_label+'%':>7}")
     for r in payload["teams"][:6]:
         print(f"  {r['name'][:23]:<24}{r['played']:>4}{r['cur_pts']:>5}{r['proj_pts']:>7}"
-              f"{r['title_pct']:>8}{r['ucl_pct']:>7}{r['releg_pct']:>7}")
+              f"{r['title_pct']:>9}{r['ucl_pct']:>9}{r['releg_pct']:>7}")
 
 
 if __name__ == "__main__":

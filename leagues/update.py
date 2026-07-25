@@ -17,8 +17,12 @@ Usage
     # Re-simulate stale leagues from existing CSVs and rebuild the page (no network):
     venv/bin/python -m leagues.update
 
-    # Fetch fresh data for every league, then simulate only what changed:
-    venv/bin/python -m leagues.update --season 2024-25
+    # Refresh every league at its own current season (Euro 2025-26 + MLS 2025):
+    venv/bin/python -m leagues.update --refresh
+
+    # Fetch a specific season for the leagues it applies to, then simulate:
+    venv/bin/python -m leagues.update eng esp --season 2024-25
+    venv/bin/python -m leagues.update mls --season 2025
 
     # Specific leagues, more sims, force a re-run, open the page:
     venv/bin/python -m leagues.update eng esp --sims 50000 --force --open
@@ -125,12 +129,17 @@ def main() -> None:
     ap = argparse.ArgumentParser(
         description="One command: refresh data, simulate what changed, rebuild the report.")
     ap.add_argument("leagues", nargs="*", default=None,
-                    help="league keys (default: all — eng, esp, ita, de, fr)")
+                    help="league keys (default: all — eng, esp, ita, de, fr, mls)")
     ap.add_argument("--season", default=None,
-                    help="if set, ingest this season first (e.g. 2024-25); "
-                         "omit to simulate from the CSVs already on disk")
+                    help="ingest this season for every selected league before "
+                         "simulating (e.g. 2024-25); omit to simulate from the "
+                         "CSVs already on disk")
+    ap.add_argument("--refresh", action="store_true",
+                    help="ingest each league at its own default season "
+                         "(handles mixed formats, e.g. Euro 2025-26 + MLS 2025); "
+                         "ignored when --season is given")
     ap.add_argument("--source", default="openfootball", choices=list(SOURCES),
-                    help="ingest source when --season is given (default: openfootball)")
+                    help="ingest source for --season / --refresh (default: openfootball)")
     ap.add_argument("--sims", type=int, default=20000, help="simulations per league")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--reg", type=float, default=0.05, help="model L2 shrinkage")
@@ -151,9 +160,10 @@ def main() -> None:
         data_dir = DATA_ROOT / cfg.key
         matches_csv = data_dir / "matches.csv"
 
-        if args.season:
+        season = args.season or (cfg.default_season if args.refresh else None)
+        if season:
             try:
-                ingest_league(cfg, args.season, args.source)
+                ingest_league(cfg, season, args.source)
             except Exception as exc:  # network/source failure — keep existing data
                 print(f"  [ingest] skipped: {exc}")
 
