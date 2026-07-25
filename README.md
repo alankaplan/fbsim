@@ -11,18 +11,19 @@ probabilities come from the outer product of the two Poisson PMFs.
 ## Requirements
 
 - Python 3.10+
-- `numpy`, `pandas`, `scipy`, `lxml`
-- `lxml` powers `pandas.read_html` for the default **fbref-http** source, which
-  pulls current data + xG from `fbref.com` over plain HTTP (no browser). fbref
-  is behind Cloudflare and rate-limits, so a plain request is occasionally
-  blocked — see the sources below for the fallbacks.
+- `numpy`, `pandas`, `scipy`
+- `curl_cffi` + `lxml` — for the default **fbref-http** source, which pulls
+  current data + xG from `fbref.com` over plain HTTP (no browser). `curl_cffi`
+  impersonates a browser's TLS fingerprint to clear Cloudflare (a plain
+  `requests`/`urllib` call is fingerprinted and dropped as a bot); `lxml` powers
+  `pandas.read_html`. fbref still rate-limits (~20 req/min).
 - `soccerdata` *(optional)* — only for `--source fbref`, which fetches the same
-  fbref data through an undetected **Chrome/Chromium** browser that reliably
-  clears Cloudflare (a visible browser window opens while it scrapes).
+  fbref data through an undetected **Chrome/Chromium** browser (a visible browser
+  window opens while it scrapes). A fallback for when `fbref-http` is blocked.
 
 ```bash
 python -m venv venv
-venv/bin/pip install numpy pandas scipy lxml
+venv/bin/pip install numpy pandas scipy curl_cffi lxml
 venv/bin/pip install soccerdata   # optional, for the browser-based --source fbref
 ```
 
@@ -113,7 +114,7 @@ Data sources (all write the same canonical CSVs):
 
 | `--source` | Browser? | xG? | Current data? | Notes |
 |---|---|---|---|---|
-| `fbref-http` *(default)* | no | yes | yes | plain HTTP + `read_html`; Cloudflare may block it |
+| `fbref-http` *(default)* | no | yes | yes | `curl_cffi` (TLS-impersonation) + `read_html`; rate-limited |
 | `fbref` | yes (Chrome) | yes | yes | soccerdata; reliably clears Cloudflare |
 | `openfootball` | no | no | no (lags) | static mirror; offline, no dependencies |
 

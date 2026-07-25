@@ -177,7 +177,10 @@ def main() -> None:
         if season:
             try:
                 ingest_league(cfg, season, args.source)
-            except Exception as exc:  # network/source failure — keep existing data
+            # SystemExit (a BaseException) is what the source functions raise for
+            # a missing dependency / Cloudflare block, so catch it too and keep
+            # the existing data instead of aborting the whole refresh.
+            except (Exception, SystemExit) as exc:
                 print(f"  [ingest] skipped: {exc}")
 
         if not matches_csv.exists():

@@ -16,11 +16,13 @@ simulator draws those, and fixes played ones to their recorded score.
 Sources
 -------
 * ``fbref-http``  — the default, xG-bearing source. Fetches fbref's Scores &
-                    Fixtures page over plain HTTP (no browser) and parses it with
-                    ``pandas.read_html`` (needs ``lxml``). fbref is behind
-                    Cloudflare and rate-limits, so a plain request can be blocked;
-                    when that happens it raises a clear error pointing at the
-                    fallbacks.
+                    Fixtures page over plain HTTP (no browser) via ``curl_cffi``
+                    with ``impersonate="chrome"`` — which spoofs a browser's TLS
+                    fingerprint to clear Cloudflare (a plain ``requests``/
+                    ``urllib`` call is dropped by TLS fingerprinting regardless of
+                    User-Agent) — and parses it with ``pandas.read_html`` (needs
+                    ``lxml``). fbref still rate-limits (~20/min); on a block it
+                    raises a clear error pointing at the fallbacks.
 * ``fbref``       — same data via the ``soccerdata`` package, which drives an
                     undetected browser that reliably clears Cloudflare (at the
                     cost of a visible Chrome window). Leagues soccerdata doesn't
@@ -49,7 +51,6 @@ import os
 import re
 import sys
 import time
-import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -60,10 +61,7 @@ OPENFOOTBALL_BASE = (
     "https://raw.githubusercontent.com/openfootball/football.json/master"
 )
 FBREF_BASE = "https://fbref.com"
-# A real browser User-Agent; fbref rejects obvious bot agents outright.
-FBREF_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
-FBREF_DELAY = 4.0  # seconds to pause between fbref requests (they rate-limit)
+FBREF_DELAY = 4.0  # seconds to pause between fbref requests (~20/min limit)
 
 TEAM_FIELDS = ["id", "team_name", "code"]
 MATCH_FIELDS = [
@@ -351,14 +349,24 @@ def _parse_fbref_schedule(df, cfg: LeagueConfig) -> tuple[list[dict], list[dict]
 
 def from_fbref_http(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[dict]]:
     """
-    Return (teams, matches) by scraping fbref's Scores & Fixtures page over plain
+    Return (teams, matches) by fetching fbref's Scores & Fixtures page over plain
     HTTP (no browser) and parsing it with ``pandas.read_html``.
 
-    fbref sits behind Cloudflare and rate-limits, so a plain request can be
-    blocked; when that happens this raises ``SystemExit`` pointing at the
-    ``fbref`` (browser) or ``openfootball`` fallbacks. Needs ``lxml`` for
-    ``read_html``.
+    fbref's Cloudflare fingerprints the TLS handshake, so a normal ``requests``/
+    ``urllib`` call is dropped as a bot regardless of User-Agent. We use
+    ``curl_cffi`` with ``impersonate="chrome"``, which mimics a real browser's
+    TLS fingerprint and gets through. Still rate-limited (~20 req/min), so a
+    delay follows each request. Needs ``curl_cffi`` and ``lxml``.
     """
+    try:
+        from curl_cffi import requests as cffi_requests
+    except ImportError as exc:  # pragma: no cover
+        raise SystemExit(
+            "The 'fbref-http' source needs curl_cffi (and lxml):\n"
+            "    venv/bin/pip install curl_cffi lxml\n"
+            "curl_cffi impersonates a browser's TLS fingerprint to clear fbref's "
+            "Cloudflare without a real browser. Or use --source fbref / openfootball."
+        ) from exc
     try:
         import pandas as pd
     except ImportError as exc:  # pragma: no cover
@@ -366,20 +374,29 @@ def from_fbref_http(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[di
 
     url = (f"{FBREF_BASE}/en/comps/{cfg.fbref_comp_id}/{season}/schedule/"
            f"{season}-{cfg.fbref_slug}-Scores-and-Fixtures")
-    req = urllib.request.Request(url, headers={"User-Agent": FBREF_UA})
     try:
-        with urllib.request.urlopen(req, timeout=45) as resp:
-            html = resp.read().decode("utf-8", "replace")
-    except urllib.error.HTTPError as exc:
-        if exc.code in (403, 429, 503):
-            raise SystemExit(
-                f"fbref blocked the request (HTTP {exc.code}) — likely Cloudflare "
-                "or rate limiting. Retry later, or use --source fbref (browser) "
-                "or --source openfootball."
-            ) from exc
-        raise
-    time.sleep(FBREF_DELAY)  # be polite; fbref asks for ~1 request / few seconds
+        resp = cffi_requests.get(url, impersonate="chrome", timeout=45)
+    except Exception as exc:  # network error
+        raise SystemExit(
+            f"fbref request failed: {exc}. Retry later, or use --source fbref "
+            "(browser) or --source openfootball."
+        ) from exc
+    time.sleep(FBREF_DELAY)  # be polite; fbref rate-limits (~20 requests/minute)
 
+    if resp.status_code == 429:
+        raise SystemExit(
+            "fbref rate-limited the request (HTTP 429). Wait ~a minute and retry; "
+            "keep to ~20 requests/minute."
+        )
+    if resp.status_code in (403, 503):
+        raise SystemExit(
+            f"fbref blocked the request (HTTP {resp.status_code}) — Cloudflare. "
+            "Retry later, or use --source fbref (browser) or --source openfootball."
+        )
+    if resp.status_code != 200:
+        raise SystemExit(f"fbref returned HTTP {resp.status_code} for {url}.")
+
+    html = resp.text
     if any(m in html.lower()[:4000] for m in _CF_MARKERS):
         raise SystemExit(
             "fbref returned a Cloudflare challenge page instead of data. "
