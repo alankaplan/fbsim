@@ -1,0 +1,9 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Generated artifacts
+leagues.html
+data/leagues/*/sim_results.json

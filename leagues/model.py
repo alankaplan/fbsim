@@ -27,9 +27,9 @@ has three convenient properties:
 Optional exponential recency weighting up-weights recent form.
 
 The fitted model exposes :meth:`expected_goals`, which returns ``(λ_home,
-λ_away)`` for any fixture — the exact input the reused World Cup Poisson
-primitives (:func:`wc26_simulation.simulate_match_score` /
-:func:`wc26_simulation.get_match_probabilities`) expect.
+λ_away)`` for any fixture — the exact input the Poisson match primitive
+(:func:`leagues.match.get_match_probabilities`) and the simulator's
+``rng.poisson`` scoreline draws expect.
 """
 
 from __future__ import annotations

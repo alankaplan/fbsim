@@ -6,9 +6,9 @@ Render a self-contained ``leagues.html`` report from every
 ``data/leagues/<key>/sim_results.json`` produced by ``run_sims.py``. No server
 or dependencies — open the file directly in a browser.
 
-Reuses the World Cup page's patterns: a hash/state-routed single-page app, the
-sortable/filterable table (``data-col`` + ``sortCol``/``sortAsc``), and JSON
-embedded as a JS global via ``__PLACEHOLDER__`` replacement.
+A hash/state-routed single-page app with a sortable/filterable table
+(``data-col`` + ``sortCol``/``sortAsc``) and the simulation JSON embedded as a
+JS global via ``__PLACEHOLDER__`` replacement.
 
 Views: a league switcher across all simulated leagues, plus
   * Standings odds — projected points, title / Champions-League / any-Europe /

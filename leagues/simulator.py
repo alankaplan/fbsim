@@ -3,20 +3,17 @@ simulator.py
 ------------
 Single-pool round-robin season engine.
 
-This is the World Cup group-stage engine with the group partition removed: it
-plays a full home/away fixture list, fixes any already-played match to its
+It plays a full home/away fixture list, fixes any already-played match to its
 recorded score, draws the rest from the fitted :class:`LeagueModel`, then ranks
 all teams in one table using the league's configured tiebreaker chain.
 
-The tiebreaker resolver generalises the World Cup's FIFA-2026 logic
-(`tournament_simulator._rank_cluster`/`_h2h_table`) so that the criterion order
-comes from :class:`LeagueConfig` — Spain/Italy apply head-to-head before overall
+The tiebreaker resolver takes its criterion order from :class:`LeagueConfig`,
+so ties are broken per league — Spain/Italy apply head-to-head before overall
 goal difference, England/Germany/France the reverse.
 
 For the Monte Carlo hot path, unplayed-fixture expected goals are computed once
-and scorelines are drawn vectorised with ``rng.poisson`` (identical distribution
-to :func:`wc26_simulation.simulate_match_score`, just batched); standings are
-accumulated with ``np.bincount``.
+and scorelines are drawn vectorised with ``rng.poisson`` (two independent
+Poisson counts per match); standings are accumulated with ``np.bincount``.
 """
 
 from __future__ import annotations

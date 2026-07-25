@@ -32,7 +32,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from wc26_simulation import get_match_probabilities
+from .match import get_match_probabilities
 from .config import LeagueConfig, get_league
 from .ingest import DATA_ROOT
 from .model import fit_model, LeagueModel

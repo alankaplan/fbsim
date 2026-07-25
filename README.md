@@ -1,20 +1,12 @@
 # fbsim
 
-Poisson-based football match and season simulators. Two engines share a common
-statistical core:
+A **domestic-league season simulator** for the big-five European leagues. Team
+strengths are fit as attack/defense Poisson ratings from FBref expected-goals
+(xG) data (falling back to actual goals), and full seasons are run by Monte
+Carlo to produce title, European-qualification and relegation probabilities.
 
-- **`wc26_simulation.py`** — a 2026 FIFA World Cup match simulator using an
-  **Elo-difference Poisson model**: each team's expected goals scale
-  exponentially with the Elo gap between the two sides.
-- **`leagues/`** — a **domestic-league season simulator** for the big-five
-  European leagues. Team strengths are fit as attack/defense Poisson ratings
-  from FBref expected-goals (xG) data (falling back to actual goals), and full
-  seasons are run by Monte Carlo to produce title, European-qualification and
-  relegation probabilities.
-
-Both use the same match primitives — a scoreline is two independent Poisson
-draws, and win/draw/loss probabilities come from the outer product of the two
-Poisson PMFs.
+A match scoreline is two independent Poisson draws, and win/draw/loss
+probabilities come from the outer product of the two Poisson PMFs.
 
 ## Requirements
 
@@ -28,42 +20,16 @@ venv/bin/pip install numpy pandas scipy
 venv/bin/pip install soccerdata   # optional, for the fbref ingest source
 ```
 
-## The World Cup simulator
+## Overview
 
-A standalone, dependency-light match model.
-
-```bash
-venv/bin/python wc26_simulation.py
-```
-
-The model (`wc26_simulation.py`):
-
-```
-λ_A = exp(α + β · (Elo_A − Elo_B))
-λ_B = exp(α + β · (Elo_B − Elo_A))
-```
-
-with `α = 0.26` (≈1.3 baseline goals), `β = 0.003` (each 100 Elo points ≈
-1.35× goals) and a `+100` Elo home bonus for host nations. Key functions:
-
-| Function | Purpose |
-|---|---|
-| `calculate_expected_goals` | Elo → (λ_home, λ_away) |
-| `get_match_probabilities` | (λ_a, λ_b) → win/draw/loss probabilities |
-| `simulate_match_score` | Draw a random scoreline (Poisson) |
-| `elo_update` | Post-match Elo update, K=40 group / K=50 knockout |
-
-These same primitives are reused by the league engine.
-
-## The league simulator
-
-A layered pipeline under `leagues/`, mirroring the World Cup package:
+A layered pipeline under `leagues/`:
 
 | Module | Role |
 |---|---|
 | `config.py` | Per-league definitions: team count, European/relegation slots, tiebreaker chain |
 | `ingest.py` | Pluggable data ingestion → canonical CSVs in `data/leagues/<key>/` |
 | `model.py` | Attack/defense Poisson strengths fit from xG (or goals) |
+| `match.py` | Poisson match primitive: (λ_home, λ_away) → win/draw/loss probabilities |
 | `simulator.py` | Single-pool round-robin season engine + configurable standings |
 | `run_sims.py` | Monte Carlo driver → `sim_results.json` |
 | `generate_page.py` | Self-contained `leagues.html` report |
@@ -146,11 +112,11 @@ form.
 ## Layout
 
 ```
-wc26_simulation.py        World Cup Elo-difference Poisson match model
 leagues/
   config.py               per-league definitions & tiebreakers
   ingest.py               fbref / openfootball / manual → canonical CSVs
   model.py                attack/defense Poisson fit
+  match.py                Poisson match primitive (λ → W/D/L probabilities)
   simulator.py            round-robin season engine + tiebreaker resolver
   run_sims.py             Monte Carlo driver
   generate_page.py        HTML report generator
