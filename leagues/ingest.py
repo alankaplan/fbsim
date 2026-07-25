@@ -15,28 +15,30 @@ simulator draws those, and fixes played ones to their recorded score.
 
 Sources
 -------
-* ``fbref``       — the default, xG-bearing source, via the ``soccerdata``
-                    package. It drives a real (undetected) Chrome to clear fbref's
-                    Cloudflare, which now blocks every plain-HTTP client. On Linux
-                    the window is hidden by running the browser in a virtual
-                    display (``pyvirtualdisplay`` + Xvfb; see ``_hidden_display``);
-                    set ``FBSIM_SHOW_BROWSER=1`` to show it. Leagues soccerdata
-                    doesn't ship natively (e.g. MLS) are auto-registered.
-* ``fbref-http``  — fetches the same page over plain HTTP via ``curl_cffi``
-                    (TLS impersonation) + ``pandas.read_html``. No browser, but
-                    fbref's Cloudflare **currently blocks it** (managed 403);
-                    kept in case that eases.
+* ``fixturedownload`` — the default. A free fixturedownload.com JSON feed
+                    (schedules + final scores, **no xG**) fetched with a plain
+                    request: no browser, no auth, no extra packages, and current
+                    seasons. The reliable everyday source; the model falls back to
+                    goals.
+* ``fbref``       — xG-bearing, via the ``soccerdata`` package. It drives a real
+                    (undetected) Chrome to clear fbref's Cloudflare, which blocks
+                    every plain-HTTP client. On Linux the window is hidden with a
+                    virtual display (``pyvirtualdisplay`` + Xvfb; see
+                    ``_hidden_display``); ``FBSIM_SHOW_BROWSER=1`` shows it. Use it
+                    when you want xG. Leagues soccerdata doesn't ship natively
+                    (e.g. MLS) are auto-registered.
+* ``fbref-http``  — the same page over plain HTTP via ``curl_cffi`` (TLS
+                    impersonation) + ``pandas.read_html``. No browser, but fbref's
+                    Cloudflare **currently blocks it**; kept in case that eases.
 * ``openfootball``— the openfootball GitHub JSON mirror (schedules + scores,
-                    **no xG**). Reachable from restricted environments and needs
-                    no extra packages, so it's the offline fallback. xg columns
-                    are left empty and the model falls back to goals.
+                    **no xG**); offline-friendly but lags live seasons.
 * manual          — drop hand-made CSVs in the canonical schema; nothing to do.
 
 Usage
 -----
-    venv/bin/python -m leagues.ingest eng --season 2025-2026            # fbref (default)
+    venv/bin/python -m leagues.ingest eng --season 2025      # fixturedownload (default)
     venv/bin/python -m leagues.ingest mls --season 2026
-    venv/bin/python -m leagues.ingest eng --season 2024-25 --source openfootball
+    venv/bin/python -m leagues.ingest eng --season 2025-2026 --source fbref   # +xG (browser)
 """
 
 from __future__ import annotations
@@ -61,6 +63,7 @@ OPENFOOTBALL_BASE = (
 )
 FBREF_BASE = "https://fbref.com"
 FBREF_DELAY = 4.0  # seconds to pause between fbref requests (~20/min limit)
+FIXTUREDOWNLOAD_BASE = "https://fixturedownload.com/feed/json"
 
 TEAM_FIELDS = ["id", "team_name", "code"]
 MATCH_FIELDS = [
@@ -97,8 +100,10 @@ def _make_code(name: str, taken: set[str]) -> str:
 # openfootball source (GitHub mirror; schedules + scores, no xG)
 # ---------------------------------------------------------------------------
 
-def _fetch_json(url: str) -> dict:
-    with urllib.request.urlopen(url, timeout=45) as resp:
+def _fetch_json(url: str):
+    """GET a URL and parse JSON (a dict or a list, depending on the endpoint)."""
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=45) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 
@@ -162,6 +167,65 @@ def from_openfootball(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[
         })
 
     return teams, matches
+
+
+# ---------------------------------------------------------------------------
+# fixturedownload.com source (plain JSON feed; schedules + scores, no xG)
+# ---------------------------------------------------------------------------
+
+def _parse_fixturedownload(items: list[dict]) -> tuple[list[dict], list[dict]]:
+    """Parse a fixturedownload.com JSON feed into canonical (teams, matches).
+
+    Each item has ``HomeTeam``, ``AwayTeam``, ``RoundNumber``, ``DateUtc``
+    ("2025-08-15 19:00:00Z") and ``HomeTeamScore``/``AwayTeamScore`` (null until
+    played). No xG in this feed.
+    """
+    name_to_id: dict[str, int] = {}
+    codes_taken: set[str] = set()
+    teams: list[dict] = []
+
+    def team_id(name: str) -> int:
+        if name not in name_to_id:
+            tid = len(name_to_id) + 1
+            name_to_id[name] = tid
+            teams.append({"id": tid, "team_name": name,
+                          "code": _make_code(name, codes_taken)})
+        return name_to_id[name]
+
+    matches: list[dict] = []
+    for i, f in enumerate(items, start=1):
+        home, away = f.get("HomeTeam"), f.get("AwayTeam")
+        if not home or not away:
+            continue
+        hid, aid = team_id(str(home).strip()), team_id(str(away).strip())
+        hs, as_ = f.get("HomeTeamScore"), f.get("AwayTeamScore")
+        played = hs is not None and as_ is not None
+        matches.append({
+            "match_number": i,
+            "matchday": f.get("RoundNumber", ""),
+            "date": str(f.get("DateUtc", ""))[:10],
+            "home_team_id": hid,
+            "away_team_id": aid,
+            "home_goals": int(hs) if played else "",
+            "away_goals": int(as_) if played else "",
+            "xg_home": "",   # fixturedownload carries no xG
+            "xg_away": "",
+            "played": played,
+        })
+    return teams, matches
+
+
+def from_fixturedownload(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[dict]]:
+    """Return (teams, matches) from a fixturedownload.com JSON feed.
+
+    Plain JSON over HTTP — no browser, no auth. Season is the start year, e.g.
+    "2025" (2025-26) for the European leagues or "2026" for MLS. No xG.
+    """
+    url = f"{FIXTUREDOWNLOAD_BASE}/{cfg.fixturedownload_slug}-{season}"
+    items = _fetch_json(url)
+    if not isinstance(items, list):
+        raise SystemExit(f"Unexpected fixturedownload response at {url} (not a list).")
+    return _parse_fixturedownload(items)
 
 
 # ---------------------------------------------------------------------------
@@ -470,7 +534,8 @@ def write_league(cfg: LeagueConfig, teams: list[dict], matches: list[dict]) -> P
 
 
 SOURCES = {
-    "fbref": from_fbref,             # default: soccerdata browser (hidden via xvfb), xG
+    "fixturedownload": from_fixturedownload,  # default: plain JSON, no browser, no xG
+    "fbref": from_fbref,             # soccerdata browser (hidden via xvfb); has xG
     "fbref-http": from_fbref_http,   # plain HTTP + read_html; currently Cloudflare-blocked
     "openfootball": from_openfootball,  # offline mirror, no xG, no dependencies
 }
@@ -480,11 +545,12 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Ingest league fixtures/results into canonical CSVs.")
     ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls)")
     ap.add_argument("--season", required=True,
-                    help="season, e.g. 2025-2026 / 2026 (fbref sources) or 2024-25 (openfootball)")
-    ap.add_argument("--source", default="fbref", choices=list(SOURCES),
-                    help="data source (default: fbref — current data + xG via a browser, "
-                         "hidden with a virtual display on Linux; 'openfootball' is the "
-                         "offline fallback; 'fbref-http' is currently Cloudflare-blocked)")
+                    help="season: start year (fixturedownload, e.g. 2025 / 2026), "
+                         "2025-2026 (fbref), or 2024-25 (openfootball)")
+    ap.add_argument("--source", default="fixturedownload", choices=list(SOURCES),
+                    help="data source (default: fixturedownload — current data, no browser, "
+                         "no xG; 'fbref' adds xG via a browser; 'openfootball' is the "
+                         "offline fallback)")
     args = ap.parse_args()
 
     cfg = get_league(args.league)

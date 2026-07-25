@@ -17,13 +17,12 @@ Usage
     # Re-simulate stale leagues from existing CSVs and rebuild the page (no network):
     venv/bin/python -m leagues.update
 
-    # Refresh every league at its current season via fbref (Euro 2025-2026 + MLS
-    # 2026, with xG). Uses a browser, hidden in a virtual display on Linux
-    # (pyvirtualdisplay + Xvfb); set FBSIM_SHOW_BROWSER=1 to show it:
+    # Refresh every league at its current season via fixturedownload (plain JSON,
+    # no browser; Euro 2025, MLS 2026; goals only, no xG):
     venv/bin/python -m leagues.update --refresh
 
-    # From the offline openfootball mirror instead (no xG, lags live seasons):
-    venv/bin/python -m leagues.update --refresh --source openfootball
+    # Add xG via fbref (browser, hidden on Linux; may hit a Cloudflare captcha):
+    venv/bin/python -m leagues.update --refresh --source fbref
 
     # Fetch a specific season for the leagues it applies to, then simulate:
     venv/bin/python -m leagues.update eng esp --season 2025-2026
@@ -143,11 +142,11 @@ def main() -> None:
                     help="ingest each league at its own current season "
                          "(handles mixed formats, e.g. Euro 2025-2026 + MLS 2026); "
                          "ignored when --season is given")
-    ap.add_argument("--source", default="fbref", choices=list(SOURCES),
-                    help="ingest source for --season / --refresh (default: fbref — "
-                         "current data + xG via a browser, hidden with a virtual "
-                         "display on Linux; 'openfootball' is the offline fallback; "
-                         "'fbref-http' is currently Cloudflare-blocked)")
+    ap.add_argument("--source", default="fixturedownload", choices=list(SOURCES),
+                    help="ingest source for --season / --refresh (default: "
+                         "fixturedownload — current data, no browser, no xG; "
+                         "'fbref' adds xG via a browser; 'openfootball' is the "
+                         "offline fallback)")
     ap.add_argument("--sims", type=int, default=20000, help="simulations per league")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--reg", type=float, default=0.05, help="model L2 shrinkage")

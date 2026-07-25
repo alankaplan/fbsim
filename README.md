@@ -12,21 +12,20 @@ probabilities come from the outer product of the two Poisson PMFs.
 
 - Python 3.10+
 - `numpy`, `pandas`, `scipy`
-- `soccerdata` + a **Chrome/Chromium** browser — for the default **fbref**
-  source (current data + xG). fbref's Cloudflare now blocks every plain-HTTP
-  client, so soccerdata drives a real (undetected) browser to get through.
-- `pyvirtualdisplay` + the `xvfb` system package *(Linux, recommended)* — hides
-  the browser window: the tool runs the browser in a virtual display so nothing
-  pops up. Without them the browser is visible (or wrap the command in
-  `xvfb-run`). Set `FBSIM_SHOW_BROWSER=1` to force the window (e.g. to solve a
-  one-off Cloudflare captcha).
-- `curl_cffi` + `lxml` *(optional)* — only for `--source fbref-http` (browser-free
-  HTTP via TLS impersonation), which fbref's Cloudflare **currently blocks**.
+- That's it for the default **fixturedownload** source — it fetches free
+  fixturedownload.com JSON feeds over plain HTTP (no browser, no auth, no extra
+  packages) and covers current seasons. It carries scores but **no xG**, so the
+  model falls back to goals.
+- *Optional, only for xG via `--source fbref`:* `soccerdata` + a
+  **Chrome/Chromium** browser (fbref's Cloudflare blocks plain-HTTP clients, so
+  soccerdata drives a real browser); plus `pyvirtualdisplay` + the `xvfb` package
+  on Linux to hide the window (or `xvfb-run`; `FBSIM_SHOW_BROWSER=1` shows it).
 
 ```bash
 python -m venv venv
-venv/bin/pip install numpy pandas scipy soccerdata pyvirtualdisplay
-sudo apt install xvfb          # Linux: run the browser hidden
+venv/bin/pip install numpy pandas scipy
+# optional, only for xG via --source fbref:
+venv/bin/pip install soccerdata pyvirtualdisplay   # + `sudo apt install xvfb` on Linux
 ```
 
 ## Quick start
@@ -35,9 +34,8 @@ One command refreshes data, re-simulates the leagues whose data changed, and
 rebuilds the report:
 
 ```bash
-# Refresh every league at its current season via fbref (current data + xG),
-# simulate what changed, and open the page. Uses a browser, hidden in a virtual
-# display on Linux (pyvirtualdisplay + Xvfb); set FBSIM_SHOW_BROWSER=1 to show it:
+# Refresh every league at its current season via fixturedownload (plain JSON,
+# no browser), simulate what changed, and open the page:
 venv/bin/python -m leagues.update --refresh --open
 
 # Re-simulate stale leagues from the CSVs already on disk (no network):
@@ -50,9 +48,10 @@ and a league is re-simulated only when its `matches.csv` is newer than its
 when nothing has changed does no simulation work and just rebuilds `leagues.html`.
 
 `--refresh` ingests each league at its own current season, so it handles the
-different formats (European leagues on `2025-2026`, MLS on the calendar-year
-`2026`). Use `--season <s>` to pin one season across the leagues it applies to,
-and `--source openfootball` for the offline mirror (no xG, lags live seasons).
+different formats (fixturedownload uses the start year — European leagues on
+`2025`, MLS on `2026`). Use `--season <s>` to pin one season across the leagues
+it applies to, `--source fbref` to add xG (browser), or `--source openfootball`
+for the offline mirror.
 
 Useful flags: `--refresh` / `--season <s>` (ingest first; omit both to skip the
 network), `--source`, `--sims`, `--seed`, `--force`, `--no-page`, `--open`, and
@@ -85,11 +84,10 @@ Supporters' Shield race and playoff qualification (top-18 as a single-table
 approximation of the 9-per-conference field). The two conferences and the MLS
 Cup playoff bracket are not modeled, and there is no relegation, so its report
 shows **Shield%** and **Playoff%** columns instead of Champions League / Europe /
-relegation. Its season is a calendar year (`--season 2026`). The openfootball
-MLS feed is stale (its 2025 file stops in May 2025 and there's no 2026), so use
-a fbref source for current MLS data. (For the browser-based `--source fbref`,
-MLS isn't one of soccerdata's built-in leagues, so it's auto-registered as a
-custom league on first use — best-effort.)
+relegation. Its season is a calendar year (`--season 2026`). The default
+fixturedownload source covers the current MLS season (`mls-2026`). If you want
+xG via `--source fbref`, note MLS isn't one of soccerdata's built-in leagues, so
+it's auto-registered as a custom league on first use (best-effort).
 
 ### 1. Ingest data
 
@@ -101,9 +99,12 @@ source-agnostic:
   home_team_id, away_team_id, home_goals, away_goals, xg_home, xg_away, played`
 
 ```bash
-# fbref (default) — current data + xG via a browser (hidden on Linux via Xvfb)
-venv/bin/python -m leagues.ingest eng --season 2025-2026
+# fixturedownload (default) — current fixtures + scores, plain JSON, no browser
+venv/bin/python -m leagues.ingest eng --season 2025
 venv/bin/python -m leagues.ingest mls --season 2026
+
+# fbref via soccerdata — adds xG, through a browser (hidden on Linux via Xvfb)
+venv/bin/python -m leagues.ingest eng --season 2025-2026 --source fbref
 
 # openfootball GitHub mirror (schedules + scores, no xG) — works offline/sandboxed
 venv/bin/python -m leagues.ingest eng --season 2024-25 --source openfootball
@@ -113,9 +114,10 @@ Data sources (all write the same canonical CSVs):
 
 | `--source` | Browser? | xG? | Current data? | Notes |
 |---|---|---|---|---|
-| `fbref` *(default)* | yes (Chrome) | yes | yes | soccerdata; clears Cloudflare; window hidden via Xvfb on Linux |
-| `fbref-http` | no | yes | yes | `curl_cffi` + `read_html`; **currently blocked by fbref's Cloudflare** |
-| `openfootball` | no | no | no (lags) | static mirror; offline, no dependencies |
+| `fixturedownload` *(default)* | no | no | yes | free JSON feed; reliable, no dependencies |
+| `fbref` | yes (Chrome) | yes | yes | soccerdata; clears Cloudflare; hidden via Xvfb; may hit a captcha |
+| `fbref-http` | no | yes | yes | `curl_cffi` + `read_html`; **currently blocked by Cloudflare** |
+| `openfootball` | no | no | no (lags) | static mirror; offline |
 
 You can also hand-author CSVs in the canonical schema (the `data/leagues/`
 directory already ships with sample data for all six leagues). Unplayed
@@ -175,7 +177,7 @@ form.
 ```
 leagues/
   config.py               per-league definitions & tiebreakers
-  ingest.py               fbref-http / fbref / openfootball → canonical CSVs
+  ingest.py               fixturedownload / fbref / openfootball → canonical CSVs
   model.py                attack/defense Poisson fit
   match.py                Poisson match primitive (λ → W/D/L probabilities)
   simulator.py            round-robin season engine + tiebreaker resolver
