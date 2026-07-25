@@ -20,4 +20,6 @@ Layers:
                  standings.
   run_sims.py  — Monte Carlo driver → sim_results.json.
   generate_page.py — self-contained leagues.html report.
+  update.py    — one command: refresh data, re-simulate what changed, and
+                 rebuild the report.
 """

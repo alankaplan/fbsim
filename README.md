@@ -20,6 +20,29 @@ venv/bin/pip install numpy pandas scipy
 venv/bin/pip install soccerdata   # optional, for the fbref ingest source
 ```
 
+## Quick start
+
+One command refreshes data, re-simulates the leagues whose data changed, and
+rebuilds the report:
+
+```bash
+# Fetch fresh results for every league, simulate what changed, rebuild the page:
+venv/bin/python -m leagues.update --season 2024-25 --open
+
+# Re-simulate stale leagues from the CSVs already on disk (no network):
+venv/bin/python -m leagues.update
+```
+
+It's incremental: ingested CSVs are only rewritten when they actually differ,
+and a league is re-simulated only when its `matches.csv` is newer than its
+`sim_results.json` (or the result is missing, or you pass `--force`). Re-running
+when nothing has changed does no simulation work and just rebuilds `leagues.html`.
+
+Useful flags: `--season <s>` (ingest first; omit to skip the network),
+`--source`, `--sims`, `--seed`, `--force`, `--no-page`, `--open`, and an
+optional list of league keys (default: all). The three stages below can also be
+run individually.
+
 ## Overview
 
 A layered pipeline under `leagues/`:
@@ -33,6 +56,7 @@ A layered pipeline under `leagues/`:
 | `simulator.py` | Single-pool round-robin season engine + configurable standings |
 | `run_sims.py` | Monte Carlo driver → `sim_results.json` |
 | `generate_page.py` | Self-contained `leagues.html` report |
+| `update.py` | One command: ingest → simulate what changed → rebuild the report |
 
 Supported leagues (keys): `eng` (Premier League), `esp` (La Liga),
 `ita` (Serie A), `de` (Bundesliga), `fr` (Ligue 1). Slot counts and tiebreaker
@@ -120,5 +144,6 @@ leagues/
   simulator.py            round-robin season engine + tiebreaker resolver
   run_sims.py             Monte Carlo driver
   generate_page.py        HTML report generator
+  update.py               one-command ingest + simulate + report
 data/leagues/<key>/       teams.csv, matches.csv (+ generated sim_results.json)
 ```
