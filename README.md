@@ -12,19 +12,21 @@ probabilities come from the outer product of the two Poisson PMFs.
 
 - Python 3.10+
 - `numpy`, `pandas`, `scipy`
-- `curl_cffi` + `lxml` — for the default **fbref-http** source, which pulls
-  current data + xG from `fbref.com` over plain HTTP (no browser). `curl_cffi`
-  impersonates a browser's TLS fingerprint to clear Cloudflare (a plain
-  `requests`/`urllib` call is fingerprinted and dropped as a bot); `lxml` powers
-  `pandas.read_html`. fbref still rate-limits (~20 req/min).
-- `soccerdata` *(optional)* — only for `--source fbref`, which fetches the same
-  fbref data through an undetected **Chrome/Chromium** browser (a visible browser
-  window opens while it scrapes). A fallback for when `fbref-http` is blocked.
+- `soccerdata` + a **Chrome/Chromium** browser — for the default **fbref**
+  source (current data + xG). fbref's Cloudflare now blocks every plain-HTTP
+  client, so soccerdata drives a real (undetected) browser to get through.
+- `pyvirtualdisplay` + the `xvfb` system package *(Linux, recommended)* — hides
+  the browser window: the tool runs the browser in a virtual display so nothing
+  pops up. Without them the browser is visible (or wrap the command in
+  `xvfb-run`). Set `FBSIM_SHOW_BROWSER=1` to force the window (e.g. to solve a
+  one-off Cloudflare captcha).
+- `curl_cffi` + `lxml` *(optional)* — only for `--source fbref-http` (browser-free
+  HTTP via TLS impersonation), which fbref's Cloudflare **currently blocks**.
 
 ```bash
 python -m venv venv
-venv/bin/pip install numpy pandas scipy curl_cffi lxml
-venv/bin/pip install soccerdata   # optional, for the browser-based --source fbref
+venv/bin/pip install numpy pandas scipy soccerdata pyvirtualdisplay
+sudo apt install xvfb          # Linux: run the browser hidden
 ```
 
 ## Quick start
@@ -33,8 +35,9 @@ One command refreshes data, re-simulates the leagues whose data changed, and
 rebuilds the report:
 
 ```bash
-# Refresh every league at its current season via fbref-http (current data + xG,
-# no browser), simulate what changed, and open the page:
+# Refresh every league at its current season via fbref (current data + xG),
+# simulate what changed, and open the page. Uses a browser, hidden in a virtual
+# display on Linux (pyvirtualdisplay + Xvfb); set FBSIM_SHOW_BROWSER=1 to show it:
 venv/bin/python -m leagues.update --refresh --open
 
 # Re-simulate stale leagues from the CSVs already on disk (no network):
@@ -48,9 +51,8 @@ when nothing has changed does no simulation work and just rebuilds `leagues.html
 
 `--refresh` ingests each league at its own current season, so it handles the
 different formats (European leagues on `2025-2026`, MLS on the calendar-year
-`2026`). Use `--season <s>` to pin one season across the leagues it applies to.
-If fbref's Cloudflare blocks the default `fbref-http` source, fall back to
-`--source fbref` (browser) or `--source openfootball` (offline, no xG).
+`2026`). Use `--season <s>` to pin one season across the leagues it applies to,
+and `--source openfootball` for the offline mirror (no xG, lags live seasons).
 
 Useful flags: `--refresh` / `--season <s>` (ingest first; omit both to skip the
 network), `--source`, `--sims`, `--seed`, `--force`, `--no-page`, `--open`, and
@@ -99,12 +101,9 @@ source-agnostic:
   home_team_id, away_team_id, home_goals, away_goals, xg_home, xg_away, played`
 
 ```bash
-# fbref-http (default) — current data + xG over plain HTTP, no browser (needs lxml)
+# fbref (default) — current data + xG via a browser (hidden on Linux via Xvfb)
 venv/bin/python -m leagues.ingest eng --season 2025-2026
 venv/bin/python -m leagues.ingest mls --season 2026
-
-# fbref via soccerdata — same data through a browser that clears Cloudflare
-venv/bin/python -m leagues.ingest eng --season 2025-2026 --source fbref
 
 # openfootball GitHub mirror (schedules + scores, no xG) — works offline/sandboxed
 venv/bin/python -m leagues.ingest eng --season 2024-25 --source openfootball
@@ -114,8 +113,8 @@ Data sources (all write the same canonical CSVs):
 
 | `--source` | Browser? | xG? | Current data? | Notes |
 |---|---|---|---|---|
-| `fbref-http` *(default)* | no | yes | yes | `curl_cffi` (TLS-impersonation) + `read_html`; rate-limited |
-| `fbref` | yes (Chrome) | yes | yes | soccerdata; reliably clears Cloudflare |
+| `fbref` *(default)* | yes (Chrome) | yes | yes | soccerdata; clears Cloudflare; window hidden via Xvfb on Linux |
+| `fbref-http` | no | yes | yes | `curl_cffi` + `read_html`; **currently blocked by fbref's Cloudflare** |
 | `openfootball` | no | no | no (lags) | static mirror; offline, no dependencies |
 
 You can also hand-author CSVs in the canonical schema (the `data/leagues/`

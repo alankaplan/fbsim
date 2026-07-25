@@ -15,18 +15,17 @@ simulator draws those, and fixes played ones to their recorded score.
 
 Sources
 -------
-* ``fbref-http``  — the default, xG-bearing source. Fetches fbref's Scores &
-                    Fixtures page over plain HTTP (no browser) via ``curl_cffi``
-                    with ``impersonate="chrome"`` — which spoofs a browser's TLS
-                    fingerprint to clear Cloudflare (a plain ``requests``/
-                    ``urllib`` call is dropped by TLS fingerprinting regardless of
-                    User-Agent) — and parses it with ``pandas.read_html`` (needs
-                    ``lxml``). fbref still rate-limits (~20/min); on a block it
-                    raises a clear error pointing at the fallbacks.
-* ``fbref``       — same data via the ``soccerdata`` package, which drives an
-                    undetected browser that reliably clears Cloudflare (at the
-                    cost of a visible Chrome window). Leagues soccerdata doesn't
-                    ship natively (e.g. MLS) are auto-registered.
+* ``fbref``       — the default, xG-bearing source, via the ``soccerdata``
+                    package. It drives a real (undetected) Chrome to clear fbref's
+                    Cloudflare, which now blocks every plain-HTTP client. On Linux
+                    the window is hidden by running the browser in a virtual
+                    display (``pyvirtualdisplay`` + Xvfb; see ``_hidden_display``);
+                    set ``FBSIM_SHOW_BROWSER=1`` to show it. Leagues soccerdata
+                    doesn't ship natively (e.g. MLS) are auto-registered.
+* ``fbref-http``  — fetches the same page over plain HTTP via ``curl_cffi``
+                    (TLS impersonation) + ``pandas.read_html``. No browser, but
+                    fbref's Cloudflare **currently blocks it** (managed 403);
+                    kept in case that eases.
 * ``openfootball``— the openfootball GitHub JSON mirror (schedules + scores,
                     **no xG**). Reachable from restricted environments and needs
                     no extra packages, so it's the offline fallback. xg columns
@@ -35,10 +34,9 @@ Sources
 
 Usage
 -----
-    venv/bin/python -m leagues.ingest eng --season 2025-2026            # fbref-http (default)
+    venv/bin/python -m leagues.ingest eng --season 2025-2026            # fbref (default)
     venv/bin/python -m leagues.ingest mls --season 2026
-    venv/bin/python -m leagues.ingest eng --season 2025-2026 --source fbref       # browser
-    venv/bin/python -m leagues.ingest eng --season 2024-25   --source openfootball
+    venv/bin/python -m leagues.ingest eng --season 2024-25 --source openfootball
 """
 
 from __future__ import annotations
@@ -52,6 +50,7 @@ import re
 import sys
 import time
 import urllib.request
+from contextlib import contextmanager
 from pathlib import Path
 
 from .config import LeagueConfig, get_league
@@ -215,13 +214,49 @@ def _ensure_fbref_league(sd, cfg: LeagueConfig) -> None:
             live[cfg.fbref_league] = entry
 
 
+@contextmanager
+def _hidden_display():
+    """Run soccerdata's browser inside a virtual X display so no window appears.
+
+    soccerdata drives a real (non-headless) Chrome to clear fbref's Cloudflare —
+    headless mode gets re-detected, so we can't just hide it that way. Instead we
+    start an Xvfb virtual display (via ``pyvirtualdisplay``) that the browser
+    renders into: invisible, but still a genuine browser to Cloudflare.
+
+    Safe and optional — yields without a display (visible browser, today's
+    behavior) when ``FBSIM_SHOW_BROWSER`` is set, when not on Linux, when
+    ``pyvirtualdisplay``/Xvfb aren't available, or if the display fails to start.
+    """
+    if os.environ.get("FBSIM_SHOW_BROWSER") or sys.platform != "linux":
+        yield
+        return
+    try:
+        from pyvirtualdisplay import Display
+    except ImportError:
+        yield  # not installed -> visible browser (works via xvfb-run, or just shows)
+        return
+    disp = None
+    try:
+        disp = Display(visible=False, size=(1920, 1080))
+        disp.start()
+    except Exception:
+        yield  # Xvfb binary missing / failed -> visible browser
+        return
+    try:
+        yield
+    finally:
+        disp.stop()
+
+
 def from_fbref(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[dict]]:
     """
     Return (teams, matches) rows from FBref via the soccerdata package.
 
-    Requires ``pip install soccerdata`` and outbound access to fbref.com.
-    Season is FBref-style, e.g. "2025-2026" or "2526". Leagues soccerdata does
-    not know natively (e.g. MLS) are auto-registered via ``_ensure_fbref_league``.
+    Requires ``pip install soccerdata`` and a Chrome/Chromium browser (soccerdata
+    drives an undetected browser to clear fbref's Cloudflare). On Linux the window
+    is hidden via a virtual display when ``pyvirtualdisplay`` + Xvfb are installed
+    (see ``_hidden_display``). Season is FBref-style, e.g. "2025-2026" or "2526".
+    Leagues soccerdata doesn't know natively (e.g. MLS) are auto-registered.
     """
     try:
         import soccerdata as sd
@@ -229,13 +264,14 @@ def from_fbref(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[dict]]:
         raise SystemExit(
             "The 'fbref' source needs the soccerdata package:\n"
             "    venv/bin/pip install soccerdata\n"
-            "and outbound access to fbref.com. In a network-restricted "
+            "and a Chrome/Chromium browser. In a network-restricted "
             "environment use --source openfootball instead."
         ) from exc
 
     _ensure_fbref_league(sd, cfg)
-    fbref = sd.FBref(leagues=cfg.fbref_league, seasons=season)
-    schedule = fbref.read_schedule().reset_index()
+    with _hidden_display():
+        fbref = sd.FBref(leagues=cfg.fbref_league, seasons=season)
+        schedule = fbref.read_schedule().reset_index()
 
     # soccerdata column names: 'home_team','away_team','score','date','week',
     # 'home_xg','away_xg' (xg present for played games).
@@ -434,8 +470,8 @@ def write_league(cfg: LeagueConfig, teams: list[dict], matches: list[dict]) -> P
 
 
 SOURCES = {
-    "fbref-http": from_fbref_http,   # default: plain HTTP + read_html, xG, no browser
-    "fbref": from_fbref,             # soccerdata (browser); reliably clears Cloudflare
+    "fbref": from_fbref,             # default: soccerdata browser (hidden via xvfb), xG
+    "fbref-http": from_fbref_http,   # plain HTTP + read_html; currently Cloudflare-blocked
     "openfootball": from_openfootball,  # offline mirror, no xG, no dependencies
 }
 
@@ -445,10 +481,10 @@ def main() -> None:
     ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls)")
     ap.add_argument("--season", required=True,
                     help="season, e.g. 2025-2026 / 2026 (fbref sources) or 2024-25 (openfootball)")
-    ap.add_argument("--source", default="fbref-http", choices=list(SOURCES),
-                    help="data source (default: fbref-http — current data + xG, no browser; "
-                         "'fbref' uses a browser to clear Cloudflare; "
-                         "'openfootball' is the offline fallback)")
+    ap.add_argument("--source", default="fbref", choices=list(SOURCES),
+                    help="data source (default: fbref — current data + xG via a browser, "
+                         "hidden with a virtual display on Linux; 'openfootball' is the "
+                         "offline fallback; 'fbref-http' is currently Cloudflare-blocked)")
     args = ap.parse_args()
 
     cfg = get_league(args.league)
