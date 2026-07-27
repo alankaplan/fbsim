@@ -17,8 +17,9 @@ Usage
     # Re-simulate stale leagues from existing CSVs and rebuild the page (no network):
     venv/bin/python -m leagues.update
 
-    # Refresh every league at its current season via fixturedownload (plain JSON,
-    # no browser; Euro 2025, MLS 2026; goals only, no xG):
+    # Refresh every league at its current season (auto-detected from today's
+    # date) via fixturedownload (plain JSON, no browser, goals only). A season
+    # that hasn't started yet auto-builds a preseason prior from last season:
     venv/bin/python -m leagues.update --refresh
 
     # Add xG via fbref (browser, hidden on Linux; may hit a Cloudflare captcha):
@@ -47,7 +48,7 @@ import pandas as pd
 from .config import LEAGUES, LeagueConfig, get_league
 from .ingest import DATA_ROOT, MATCH_FIELDS, SOURCES, TEAM_FIELDS
 from .model import fit_model
-from .prior import load_prior
+from .prior import build_prior, load_prior, _prev_season
 from .run_sims import run
 from .generate_page import OUT, build
 
@@ -98,12 +99,30 @@ def needs_sim(matches_csv: Path, sim_json: Path, force: bool) -> bool:
     return matches_csv.stat().st_mtime > sim_json.stat().st_mtime
 
 
+def _played_count(matches: pd.DataFrame) -> int:
+    return int((matches["played"].astype(str).isin(["True", "true", "1"])
+               | (matches["played"] == True)).sum())  # noqa: E712
+
+
 def simulate_league(cfg: LeagueConfig, n_sims: int, seed: int,
-                    reg: float, recency_halflife: float | None) -> None:
+                    reg: float, recency_halflife: float | None,
+                    source: str, no_prior: bool) -> None:
     data_dir = DATA_ROOT / cfg.key
     teams = pd.read_csv(data_dir / "teams.csv")
     matches = pd.read_csv(data_dir / "matches.csv")
-    prior = load_prior(cfg)
+    prior = None if no_prior else load_prior(cfg)
+
+    # A not-yet-started season (0 games) has nothing to fit — auto-build a prior
+    # from last season so it yields a real preseason projection, not a flat table.
+    if prior is None and not no_prior and _played_count(matches) == 0:
+        prev = _prev_season(source, cfg.season_for(source))
+        try:
+            build_prior(cfg, source, prev)
+            prior = load_prior(cfg)
+            print(f"  [prior] built from {prev} [{source}]")
+        except Exception as exc:  # network/source failure — fall back to flat model
+            print(f"  [prior] skipped: {exc}")
+
     model = fit_model(teams, matches, reg=reg, recency_halflife=recency_halflife, prior=prior)
     payload = run(cfg, teams, matches, model, n_sims, seed)
     payload["meta"]["as_of"] = None
@@ -143,9 +162,8 @@ def main() -> None:
                          "simulating (e.g. 2024-25); omit to simulate from the "
                          "CSVs already on disk")
     ap.add_argument("--refresh", action="store_true",
-                    help="ingest each league at its own current season "
-                         "(handles mixed formats, e.g. Euro 2025-2026 + MLS 2026); "
-                         "ignored when --season is given")
+                    help="ingest each league at its current season (auto-detected "
+                         "from today's date); ignored when --season is given")
     ap.add_argument("--source", default="fixturedownload", choices=list(SOURCES),
                     help="ingest source for --season / --refresh (default: "
                          "fixturedownload — current data, no browser, no xG; "
@@ -156,6 +174,8 @@ def main() -> None:
     ap.add_argument("--reg", type=float, default=0.05, help="model L2 shrinkage")
     ap.add_argument("--recency-halflife", type=float, default=None,
                     help="down-weight older matches (in played-match count)")
+    ap.add_argument("--no-prior", action="store_true",
+                    help="ignore/skip the preseason prior (prior.json)")
     ap.add_argument("--force", action="store_true",
                     help="re-simulate even when the data hasn't changed")
     ap.add_argument("--no-page", action="store_true", help="skip rebuilding leagues.html")
@@ -192,7 +212,8 @@ def main() -> None:
             continue
 
         if needs_sim(matches_csv, data_dir / "sim_results.json", args.force):
-            simulate_league(cfg, args.sims, args.seed, args.reg, args.recency_halflife)
+            simulate_league(cfg, args.sims, args.seed, args.reg, args.recency_halflife,
+                            args.source, args.no_prior)
             simulated.append(cfg.key)
         else:
             print("  [sim] up to date — skipping (use --force to re-run).")

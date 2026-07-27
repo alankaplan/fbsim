@@ -47,11 +47,13 @@ and a league is re-simulated only when its `matches.csv` is newer than its
 `sim_results.json` (or the result is missing, or you pass `--force`). Re-running
 when nothing has changed does no simulation work and just rebuilds `leagues.html`.
 
-`--refresh` ingests each league at its own current season, so it handles the
-different formats (fixturedownload uses the start year — European leagues on
-`2025`, MLS on `2026`). Use `--season <s>` to pin one season across the leagues
-it applies to, `--source fbref` to add xG (browser), or `--source openfootball`
-for the offline mirror.
+`--refresh` ingests each league at its **current season, auto-detected from
+today's date** — European leagues roll to the new season in July (so they track
+2026-27 from mid-2026), and MLS uses the calendar year. A season that hasn't
+kicked off yet has no games to fit, so `update` auto-builds a preseason prior
+from last season and shows a projection instead of crashing (see below).
+Use `--season <s>` to pin a specific season, `--source fbref` to add xG
+(browser), or `--source openfootball` for the offline mirror.
 
 Useful flags: `--refresh` / `--season <s>` (ingest first; omit both to skip the
 network), `--source`, `--sims`, `--seed`, `--force`, `--no-page`, `--open`, and
@@ -85,10 +87,10 @@ Supporters' Shield race and playoff qualification (top-18 as a single-table
 approximation of the 9-per-conference field). The two conferences and the MLS
 Cup playoff bracket are not modeled, and there is no relegation, so its report
 shows **Shield%** and **Playoff%** columns instead of Champions League / Europe /
-relegation. Its season is a calendar year (`--season 2026`). The default
-fixturedownload source covers the current MLS season (`mls-2026`). If you want
-xG via `--source fbref`, note MLS isn't one of soccerdata's built-in leagues, so
-it's auto-registered as a custom league on first use (best-effort).
+relegation. Its season is a calendar year (auto-detected — e.g. `mls-2026` in
+2026). If you want xG via `--source fbref`, note MLS isn't one of soccerdata's
+built-in leagues, so it's auto-registered as a custom league on first use
+(best-effort).
 
 ### 1. Ingest data
 
@@ -148,12 +150,15 @@ unplayed, for forecasting or backtesting), `--reg` (L2 shrinkage),
 #### Preseason priors
 
 By default a team's rating is fit only from *this* season's played matches, so
-at the very start of a season there's nothing to fit. Seed the model with **last
-season's ratings** instead:
+at the very start of a season there's nothing to fit. The model can instead be
+seeded with **last season's ratings**. `update --refresh` does this for you: for
+a season with no games played yet it auto-builds the prior from last season, so a
+brand-new season shows a real projection out of the box. You can also build it
+explicitly:
 
 ```bash
 venv/bin/python -m leagues.prior eng     # snapshot the previous season -> prior.json
-venv/bin/python -m leagues.update --refresh   # (and run_sims) now use it automatically
+venv/bin/python -m leagues.update --refresh   # (and run_sims) use it automatically
 ```
 
 `leagues.prior` fits the season before the current one (any `--source`, in
@@ -163,7 +168,7 @@ attack/defense toward its prior (weight `--prior-weight`, ~that many
 pseudo-matches) instead of toward league average. So early on the table reflects
 last season, and the prior washes out over the first few weeks as real results
 accumulate. Teams with no prior (promoted) start at league average, and a
-**not-yet-started season** now produces a sensible preseason table instead of
+**not-yet-started season** produces a sensible preseason table instead of
 crashing. `--no-prior` restores the pure single-season fit.
 
 ### 3. Generate the report

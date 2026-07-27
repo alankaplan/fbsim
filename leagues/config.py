@@ -27,6 +27,7 @@ ascending team id.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 
 
 @dataclass(frozen=True)
@@ -43,8 +44,7 @@ class LeagueConfig:
     relegation_slots: int          # bottom-R are relegated (0 = no relegation)
     tiebreakers: tuple[str, ...]   # ordered chain from the vocabulary above
     europa_slots: int = 0          # informational second band shown in the report
-    default_season: str = "2025-26"  # openfootball season slug (dir name on the mirror)
-    fbref_season: str = "2025-2026"  # fbref season for the current campaign (fbref + fbref-http)
+    calendar_year: bool = False    # True for calendar-year leagues (MLS); else split-year
     fbref_comp_id: int = 0         # fbref.com competition id, e.g. 9 (Premier League)
     fbref_slug: str = ""           # fbref URL slug, e.g. "Premier-League"
     fixturedownload_slug: str = "" # fixturedownload.com feed slug, e.g. "epl"
@@ -65,13 +65,28 @@ class LeagueConfig:
     def total_matches(self) -> int:
         return self.n_teams * (self.n_teams - 1)
 
-    def season_for(self, source: str) -> str:
-        """The season string for this league in the given source's format."""
+    def season_start_year(self, today: date | None = None) -> int:
+        """Start year of the season current *today* for this league.
+
+        Calendar-year leagues (MLS) use the current year. Split-year (European)
+        leagues roll over to the new season in July — it kicks off in August —
+        so Jan–Jun still resolves to the season that started the previous year.
+        """
+        today = today or date.today()
+        if self.calendar_year:
+            return today.year
+        return today.year if today.month >= 7 else today.year - 1
+
+    def season_for(self, source: str, today: date | None = None) -> str:
+        """The current season string for this league in the given source's format."""
+        y = self.season_start_year(today)
+        if self.calendar_year:
+            return str(y)                        # MLS: same across sources (e.g. 2026)
         if source == "openfootball":
-            return self.default_season
+            return f"{y}-{(y + 1) % 100:02d}"    # e.g. 2026-27
         if source == "fixturedownload":
-            return self.fbref_season[:4]  # feed uses the start year, e.g. 2025 / 2026
-        return self.fbref_season  # fbref + fbref-http share fbref's season format
+            return str(y)                        # feed uses the start year, e.g. 2026
+        return f"{y}-{y + 1}"                    # fbref / fbref-http, e.g. 2026-2027
 
 
 # The current big-five European leagues. Slot counts reflect the 2025-26
@@ -114,15 +129,15 @@ LEAGUES: dict[str, LeagueConfig] = {
     ),
     # Major League Soccer. Modeled as a single 30-team table (Supporters'
     # Shield race + playoff qualification); the two conferences and the MLS Cup
-    # playoff bracket are not modeled. The season is a calendar year ("2025"),
-    # and MLS breaks ties by wins before goal difference. `ucl_slots=18`
+    # playoff bracket are not modeled. The season is a calendar year
+    # (calendar_year=True), and MLS breaks ties by wins before GD. `ucl_slots=18`
     # approximates the 18-team playoff field (9 per conference) on a single
     # table; there is no relegation.
     "mls": LeagueConfig(
         key="mls", name="MLS", country="USA", n_teams=30,
         openfootball_path="mls", fbref_league="USA-Major League Soccer",
         fbref_comp_id=22, fbref_slug="Major-League-Soccer", fixturedownload_slug="mls",
-        default_season="2025", fbref_season="2026",
+        calendar_year=True,
         # MLS isn't a built-in soccerdata FBref league; from_fbref registers it.
         fbref_name="Major League Soccer", season_start="Feb", season_end="Dec",
         ucl_slots=18, europa_slots=0, relegation_slots=0,
