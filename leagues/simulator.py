@@ -150,8 +150,13 @@ def _accumulate(home, away, hg, ag, n, team_ids) -> dict[int, dict[str, int]]:
 # One simulated season
 # ---------------------------------------------------------------------------
 
-def simulate_one(fx: SeasonFixtures, rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray]:
-    """Simulate a full season; return (rank[i], pts[i]) for team index i (rank 1=top)."""
+def simulate_one(fx: SeasonFixtures, rng: np.random.Generator,
+                 return_outcomes: bool = False):
+    """Simulate a full season; return (rank[i], pts[i]) for team index i (rank 1=top).
+
+    With ``return_outcomes=True`` also return an int8 array of outcomes for the
+    unplayed fixtures (in ``~fx.played`` order): 0 home win, 1 draw, 2 away win.
+    """
     hg = fx.fixed_hg.copy()
     ag = fx.fixed_ag.copy()
     todo = ~fx.played
@@ -170,7 +175,11 @@ def simulate_one(fx: SeasonFixtures, rng: np.random.Generator) -> tuple[np.ndarr
         rank[fx.idx[tid]] = pos
     for i, tid in enumerate(fx.team_ids):
         pts[i] = stats[tid]["pts"]
-    return rank, pts
+    if not return_outcomes:
+        return rank, pts
+    dh, da = hg[todo], ag[todo]
+    outc = np.where(dh > da, 0, np.where(dh == da, 1, 2)).astype(np.int8)
+    return rank, pts, outc
 
 
 def simulate_season(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,

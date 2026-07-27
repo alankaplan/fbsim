@@ -128,6 +128,7 @@ const LEAGUES = __DATA_PLACEHOLDER__;
   let cur = keys[0];
   let view = "main";
   let sortCol = "exp_rank", sortAsc = true;
+  let fixtSortCol = "kickoff", fixtSortAsc = true;
   let filter = "";
   let teamCode = null;
 
@@ -266,33 +267,59 @@ const LEAGUES = __DATA_PLACEHOLDER__;
   }
 
   // ---- Remaining fixtures ----
+  function kickoff(f) {  // UTC timestamp -> Pacific date+time; date-only fallback
+    if (f.datetime_utc) {
+      const d = new Date(f.datetime_utc);
+      if (!isNaN(d)) return d.toLocaleString("en-US", { timeZone: "America/Los_Angeles",
+        month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    }
+    return f.date || "";
+  }
+  function fixtureCols() {
+    // [key, label, align, cell(f), sortVal(f)]
+    return [
+      ["kickoff", "Kickoff", "left",   f => esc(kickoff(f)),                 f => f.datetime_utc || f.date || ""],
+      ["home",    "Home",    "right",  f => esc(f.home_name),                f => f.home_name],
+      ["xg",      "xG",      "center", f => `<span style="color:#8b949e">${f.lam_home.toFixed(1)}–${f.lam_away.toFixed(1)}</span>`, f => f.lam_home - f.lam_away],
+      ["away",    "Away",    "left",   f => esc(f.away_name),                f => f.away_name],
+      ["wdl",     "W / D / L","center",f => `<span class="wdl"><span class="w" style="width:${f.win*100}%"></span><span class="d" style="width:${f.draw*100}%"></span><span class="l" style="width:${f.loss*100}%"></span></span>`, f => f.win],
+      ["win",     "H",       "right",  f => `${(f.win*100).toFixed(0)}%`,    f => f.win],
+      ["draw",    "D",       "right",  f => `${(f.draw*100).toFixed(0)}%`,   f => f.draw],
+      ["loss",    "A",       "right",  f => `${(f.loss*100).toFixed(0)}%`,   f => f.loss],
+      ["info_pct","Info%",   "right",  f => `${f.info_pct.toFixed(2)}%`,     f => f.info_pct],
+    ];
+  }
   function renderFixtures() {
     const L = LEAGUES[cur];
     if (!L.fixtures.length) {
       $("fixtures-view").innerHTML = `<div class="legend">Season complete — no remaining fixtures.</div>`;
       return;
     }
-    const body = L.fixtures.map(f => {
-      const w=f.win*100, d=f.draw*100, l=f.loss*100;
-      return `<tr>
-        <td class="pos">${f.match_number}</td>
-        <td style="text-align:right">${esc(f.home_name)}</td>
-        <td style="text-align:center;color:#8b949e">${f.lam_home.toFixed(1)}–${f.lam_away.toFixed(1)}</td>
-        <td style="text-align:left">${esc(f.away_name)}</td>
-        <td style="text-align:center"><span class="wdl">
-          <span class="w" style="width:${w}%"></span><span class="d" style="width:${d}%"></span>
-          <span class="l" style="width:${l}%"></span></span></td>
-        <td>${w.toFixed(0)}%</td><td class="pos">${d.toFixed(0)}%</td><td>${l.toFixed(0)}%</td></tr>`;
-    }).join("");
+    const cols = fixtureCols();
+    const sv = (cols.find(c => c[0] === fixtSortCol) || cols[0])[4];
+    const rows = L.fixtures.slice().sort((a, b) => {
+      let x = sv(a), y = sv(b);
+      if (typeof x === "string") return fixtSortAsc ? String(x).localeCompare(y) : String(y).localeCompare(x);
+      return fixtSortAsc ? x - y : y - x;
+    });
+    const th = cols.map(([c, l, al]) =>
+      `<th data-col="${c}" style="text-align:${al}" class="${c===fixtSortCol?(fixtSortAsc?'sort-asc':'sort-desc'):''}">${l}</th>`).join("");
+    const body = rows.map(f =>
+      `<tr>${cols.map(([, , al, cell]) => `<td style="text-align:${al}">${cell(f)}</td>`).join("")}</tr>`).join("");
     $("fixtures-view").innerHTML =
-      `<div class="legend">Remaining fixtures with model expected goals and
-        <span style="color:#3fb950">home win</span> /
-        <span style="color:#8b949e">draw</span> /
-        <span style="color:#f85149">away win</span> probabilities.</div>
-       <div class="wrap"><table><thead><tr><th>#</th><th style="text-align:right">Home</th>
-         <th style="text-align:center">xG</th><th style="text-align:left">Away</th>
-         <th style="text-align:center">W / D / L</th><th>H</th><th>D</th><th>A</th></tr></thead>
-         <tbody>${body}</tbody></table></div>`;
+      `<div class="legend">Remaining fixtures with kickoff (US Pacific), model expected goals,
+        <span style="color:#3fb950">home</span> / <span style="color:#8b949e">draw</span> /
+        <span style="color:#f85149">away</span> win probabilities, and
+        <b>Info%</b> — the expected % drop in the title race's uncertainty (entropy) once the
+        result is known. Click a header to sort.</div>
+       <div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
+    $("fixtures-view").querySelectorAll("th[data-col]").forEach(h =>
+      h.onclick = () => {
+        const c = h.dataset.col;
+        if (c === fixtSortCol) fixtSortAsc = !fixtSortAsc;
+        else { fixtSortCol = c; fixtSortAsc = (c === "kickoff" || c === "home" || c === "away"); }
+        renderFixtures();
+      });
   }
 
   // ---- Team detail ----

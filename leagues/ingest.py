@@ -67,8 +67,8 @@ FIXTUREDOWNLOAD_BASE = "https://fixturedownload.com/feed/json"
 
 TEAM_FIELDS = ["id", "team_name", "code"]
 MATCH_FIELDS = [
-    "match_number", "matchday", "date", "home_team_id", "away_team_id",
-    "home_goals", "away_goals", "xg_home", "xg_away", "played",
+    "match_number", "matchday", "date", "datetime_utc", "home_team_id",
+    "away_team_id", "home_goals", "away_goals", "xg_home", "xg_away", "played",
 ]
 
 
@@ -200,10 +200,12 @@ def _parse_fixturedownload(items: list[dict]) -> tuple[list[dict], list[dict]]:
         hid, aid = team_id(str(home).strip()), team_id(str(away).strip())
         hs, as_ = f.get("HomeTeamScore"), f.get("AwayTeamScore")
         played = hs is not None and as_ is not None
+        du = str(f.get("DateUtc", "")).strip()   # "2025-08-15 19:00:00Z"
         matches.append({
             "match_number": i,
             "matchday": f.get("RoundNumber", ""),
-            "date": str(f.get("DateUtc", ""))[:10],
+            "date": du[:10],
+            "datetime_utc": du.replace(" ", "T") if du else "",  # ISO for JS Date()
             "home_team_id": hid,
             "away_team_id": aid,
             "home_goals": int(hs) if played else "",

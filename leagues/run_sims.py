@@ -40,6 +40,17 @@ from .prior import load_prior
 from .simulator import SeasonFixtures, simulate_one, _rank_cluster, _accumulate
 
 
+def _entropy(p: np.ndarray) -> float:
+    """Shannon entropy (nats) of a probability vector, ignoring zero entries."""
+    p = p[p > 0]
+    return float(-(p * np.log(p)).sum())
+
+
+def _clean_str(v) -> str:
+    s = str(v)
+    return "" if s in ("", "nan", "NaN", "NaT", "None") else s
+
+
 def apply_as_of(matches: pd.DataFrame, as_of: int | None) -> pd.DataFrame:
     """Return a copy with matches after ``as_of`` matchday marked unplayed."""
     m = matches.copy()
@@ -73,14 +84,19 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
     n = fx.n
     rng = np.random.default_rng(seed)
 
+    R = int((~fx.played).sum())                     # number of remaining fixtures
     pos_counts = np.zeros((n, n), dtype=np.int64)   # pos_counts[team_idx, position-1]
     pts_sum = np.zeros(n)
     pts_samples = np.zeros((n_sims, n), dtype=np.int32)
+    champ = np.empty(n_sims, dtype=np.int32)         # champion (rank-1) team index per sim
+    outc = np.empty((n_sims, R), dtype=np.int8)      # unplayed-fixture outcome per sim
     for s in range(n_sims):
-        rank, pts = simulate_one(fx, rng)
+        rank, pts, out_s = simulate_one(fx, rng, return_outcomes=True)
         pos_counts[np.arange(n), rank - 1] += 1
         pts_sum += pts
         pts_samples[s] = pts
+        champ[s] = int(np.argmin(rank))              # rank 1 is the champion
+        outc[s] = out_s
 
     live = current_table(fx)
     name_of = dict(zip(teams["id"].astype(int), teams["team_name"]))
@@ -113,21 +129,49 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
         })
     team_rows.sort(key=lambda r: r["exp_rank"])
 
-    # Remaining-fixture analytic W/D/L from the model.
+    # Per-fixture informativeness: expected % drop in the entropy of the
+    # champion (title) distribution once this fixture's result is known
+    # (mutual information between the fixture outcome and the champion identity).
+    H = _entropy(pos_counts[:, 0] / n_sims)
+    info_pct = np.zeros(R)
+    if H > 1e-12:
+        for j in range(R):
+            col = outc[:, j]
+            hcond = 0.0
+            for x in (0, 1, 2):
+                mask = col == x
+                cnt = int(mask.sum())
+                if cnt:
+                    cond = np.bincount(champ[mask], minlength=n).astype(float) / cnt
+                    hcond += (cnt / n_sims) * _entropy(cond)
+            info_pct[j] = max(H - hcond, 0.0) / H * 100.0
+
+    # Kickoff date/time lookups (datetime_utc present only for sources that carry it).
+    date_of = dict(zip(matches["match_number"].astype(int), matches["date"]))
+    dt_of = (dict(zip(matches["match_number"].astype(int), matches["datetime_utc"]))
+             if "datetime_utc" in matches.columns else {})
+
+    # Remaining-fixture analytic W/D/L from the model (aligned to `outc` columns).
     fixtures = []
+    j = 0
     for k in range(len(fx.home)):
         if fx.played[k]:
             continue
         hid = fx.team_ids[fx.home[k]]
         aid = fx.team_ids[fx.away[k]]
+        mn = int(fx.match_numbers[k])
         p = get_match_probabilities(float(fx.lam_h[k]), float(fx.lam_a[k]))
         fixtures.append({
-            "match_number": int(fx.match_numbers[k]),
+            "match_number": mn,
+            "date": _clean_str(date_of.get(mn, "")),
+            "datetime_utc": _clean_str(dt_of.get(mn, "")),
             "home": code_of.get(hid, ""), "away": code_of.get(aid, ""),
             "home_name": name_of.get(hid, ""), "away_name": name_of.get(aid, ""),
             "lam_home": round(float(fx.lam_h[k]), 2), "lam_away": round(float(fx.lam_a[k]), 2),
             "win": round(p["win_a"], 3), "draw": round(p["draw"], 3), "loss": round(p["win_b"], 3),
+            "info_pct": round(float(info_pct[j]), 2),
         })
+        j += 1
 
     return {
         "league": {"key": cfg.key, "name": cfg.name, "country": cfg.country,
