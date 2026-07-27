@@ -36,6 +36,7 @@ from .match import get_match_probabilities
 from .config import LeagueConfig, get_league
 from .ingest import DATA_ROOT
 from .model import fit_model, LeagueModel
+from .prior import load_prior
 from .simulator import SeasonFixtures, simulate_one, _rank_cluster, _accumulate
 
 
@@ -154,6 +155,10 @@ def main() -> None:
     ap.add_argument("--reg", type=float, default=0.05, help="model L2 shrinkage")
     ap.add_argument("--recency-halflife", type=float, default=None,
                     help="down-weight older matches (in played-match count)")
+    ap.add_argument("--no-prior", action="store_true",
+                    help="ignore the preseason prior (prior.json) if present")
+    ap.add_argument("--prior-weight", type=float, default=3.0,
+                    help="strength of the preseason prior (~pseudo-matches)")
     args = ap.parse_args()
 
     cfg = get_league(args.league)
@@ -162,9 +167,12 @@ def main() -> None:
     matches = pd.read_csv(data_dir / "matches.csv")
     matches = apply_as_of(matches, args.as_of)
 
-    model = fit_model(teams, matches, reg=args.reg, recency_halflife=args.recency_halflife)
+    prior = None if args.no_prior else load_prior(cfg)
+    model = fit_model(teams, matches, reg=args.reg, recency_halflife=args.recency_halflife,
+                      prior=prior, prior_weight=args.prior_weight)
     payload = run(cfg, teams, matches, model, args.sims, args.seed)
     payload["meta"]["as_of"] = args.as_of
+    payload["meta"]["used_prior"] = prior is not None
 
     out = data_dir / "sim_results.json"
     out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

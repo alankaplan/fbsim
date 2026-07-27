@@ -66,7 +66,8 @@ A layered pipeline under `leagues/`:
 |---|---|
 | `config.py` | Per-league definitions: team count, European/relegation slots, tiebreaker chain |
 | `ingest.py` | Pluggable data ingestion → canonical CSVs in `data/leagues/<key>/` |
-| `model.py` | Attack/defense Poisson strengths fit from xG (or goals) |
+| `model.py` | Attack/defense Poisson strengths fit from xG (or goals), optionally shrunk toward a preseason prior |
+| `prior.py` | Build/load a preseason prior from last season's ratings |
 | `match.py` | Poisson match primitive: (λ_home, λ_away) → win/draw/loss probabilities |
 | `simulator.py` | Single-pool round-robin season engine + configurable standings |
 | `run_sims.py` | Monte Carlo driver → `sim_results.json` |
@@ -140,8 +141,30 @@ derived title / Champions-League / any-Europe / relegation percentages. It also
 prints a title-race summary to the console.
 
 Useful flags: `--sims`, `--seed`, `--as-of <matchday>` (treat later matches as
-unplayed, for forecasting or backtesting), `--reg` (L2 shrinkage), and
-`--recency-halflife` (down-weight older matches).
+unplayed, for forecasting or backtesting), `--reg` (L2 shrinkage),
+`--recency-halflife` (down-weight older matches), and `--no-prior` /
+`--prior-weight` (see below).
+
+#### Preseason priors
+
+By default a team's rating is fit only from *this* season's played matches, so
+at the very start of a season there's nothing to fit. Seed the model with **last
+season's ratings** instead:
+
+```bash
+venv/bin/python -m leagues.prior eng     # snapshot the previous season -> prior.json
+venv/bin/python -m leagues.update --refresh   # (and run_sims) now use it automatically
+```
+
+`leagues.prior` fits the season before the current one (any `--source`, in
+memory — it doesn't touch your `matches.csv`) and writes
+`data/leagues/<key>/prior.json`. When present, `fit_model` shrinks each team's
+attack/defense toward its prior (weight `--prior-weight`, ~that many
+pseudo-matches) instead of toward league average. So early on the table reflects
+last season, and the prior washes out over the first few weeks as real results
+accumulate. Teams with no prior (promoted) start at league average, and a
+**not-yet-started season** now produces a sensible preseason table instead of
+crashing. `--no-prior` restores the pure single-season fit.
 
 ### 3. Generate the report
 
@@ -178,7 +201,8 @@ form.
 leagues/
   config.py               per-league definitions & tiebreakers
   ingest.py               fixturedownload / fbref / openfootball → canonical CSVs
-  model.py                attack/defense Poisson fit
+  model.py                attack/defense Poisson fit (+ preseason prior)
+  prior.py                build/load last-season prior
   match.py                Poisson match primitive (λ → W/D/L probabilities)
   simulator.py            round-robin season engine + tiebreaker resolver
   run_sims.py             Monte Carlo driver

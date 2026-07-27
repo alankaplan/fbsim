@@ -47,6 +47,7 @@ import pandas as pd
 from .config import LEAGUES, LeagueConfig, get_league
 from .ingest import DATA_ROOT, MATCH_FIELDS, SOURCES, TEAM_FIELDS
 from .model import fit_model
+from .prior import load_prior
 from .run_sims import run
 from .generate_page import OUT, build
 
@@ -102,14 +103,17 @@ def simulate_league(cfg: LeagueConfig, n_sims: int, seed: int,
     data_dir = DATA_ROOT / cfg.key
     teams = pd.read_csv(data_dir / "teams.csv")
     matches = pd.read_csv(data_dir / "matches.csv")
-    model = fit_model(teams, matches, reg=reg, recency_halflife=recency_halflife)
+    prior = load_prior(cfg)
+    model = fit_model(teams, matches, reg=reg, recency_halflife=recency_halflife, prior=prior)
     payload = run(cfg, teams, matches, model, n_sims, seed)
     payload["meta"]["as_of"] = None
+    payload["meta"]["used_prior"] = prior is not None
     out = data_dir / "sim_results.json"
     out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     m = payload["meta"]
     print(f"  [sim] {n_sims} sims, {m['n_played']} played / {m['n_remaining']} "
-          f"remaining [{'xG' if m['used_xg'] else 'goals'}] -> {out.name}")
+          f"remaining [{'xG' if m['used_xg'] else 'goals'}]"
+          f"{' +prior' if prior is not None else ''} -> {out.name}")
 
 
 def build_page(open_browser: bool) -> bool:

@@ -14,7 +14,9 @@ Layers:
                  data/leagues/<key>/. Sources: FBref (via soccerdata), a
                  manual CSV drop, or the openfootball GitHub mirror (used for
                  offline/sandbox validation — schedules + scores, no xG).
-  model.py     — attack/defense Poisson strengths fit from xG (or goals).
+  model.py     — attack/defense Poisson strengths fit from xG (or goals),
+                 optionally shrunk toward a preseason prior.
+  prior.py     — build/load a preseason prior from last season's ratings.
   match.py     — Poisson match primitive: (λ_home, λ_away) → W/D/L probs.
   simulator.py — single-pool round-robin season engine + configurable
                  standings.

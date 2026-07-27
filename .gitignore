@@ -7,6 +7,7 @@ venv/
 # Generated artifacts
 leagues.html
 data/leagues/*/sim_results.json
+data/leagues/*/prior.json
 
 # soccerdata / seleniumbase scraping side-effects (fbref source)
 downloaded_files/
