@@ -179,8 +179,9 @@ venv/bin/python -m leagues.generate_page --open   # and open in a browser
 ```
 
 Produces a self-contained `leagues.html` (no server, no dependencies) with a
-league switcher and four views: standings odds, a position-probability heatmap,
-remaining fixtures, and per-team finishing distributions.
+league switcher and five views: standings odds, a position-probability heatmap,
+remaining fixtures, a cross-league **Top games** schedule, and per-team
+finishing distributions.
 
 The **fixtures** view has sortable columns (click any header) and shows, per
 remaining game: kickoff in **US Pacific time** (from the fixturedownload feed;
@@ -189,6 +190,11 @@ probabilities, and **Info%** — how much that fixture is expected to decide the
 title, measured as the percent drop in the entropy of the champion distribution
 once its result is known (the mutual information between the game's outcome and
 who wins the league). Sort by Info% to surface the season's most decisive games.
+
+The **Top games** view merges the most title-decisive upcoming games *across all
+leagues* into one schedule. A per-league number input sets how many top games
+(ranked by Info%) each league contributes; the combined list is sortable and
+defaults to chronological order — a quick "what should I watch" board.
 
 ## The model
 

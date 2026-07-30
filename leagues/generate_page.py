@@ -14,7 +14,10 @@ Views: a league switcher across all simulated leagues, plus
   * Standings odds — projected points, title / Champions-League / any-Europe /
     relegation probabilities (sortable, filterable);
   * Position matrix — a heatmap of P(finish in each position);
-  * Fixtures — remaining games with win/draw/loss probabilities;
+  * Fixtures — remaining games with kickoff (US Pacific), W/D/L, and Info%
+    (each game's title-race informativeness), sortable;
+  * Top games — a cross-league schedule of the top-N most decisive games per
+    league (N selectable per league);
   * Team detail — a team's full finishing-position distribution.
 
 Usage
@@ -59,6 +62,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .lg-btn { padding: 5px 12px; border: 1px solid #30363d; border-radius: 6px;
     background: #161b22; color: #c9d1d9; cursor: pointer; font-size: 13px; }
   .lg-btn.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  .topn-row { display: flex; flex-wrap: wrap; gap: 10px 14px; margin: 12px 0 4px; }
+  .topn { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #8b949e; }
+  .topn input { width: 52px; background: #0d1117; color: #e6edf3; border: 1px solid #30363d;
+    border-radius: 6px; padding: 3px 6px; font-size: 13px; }
   nav { display: flex; gap: 4px; }
   nav a { padding: 8px 14px; color: #8b949e; border-bottom: 2px solid transparent; font-size: 13px; }
   nav a.active { color: #e6edf3; border-bottom-color: #f78166; }
@@ -112,6 +119,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <a data-view="main" class="active">Standings odds</a>
     <a data-view="matrix">Position matrix</a>
     <a data-view="fixtures">Fixtures</a>
+    <a data-view="schedule">Top games</a>
     <a data-view="team" id="nav-team" style="display:none">Team</a>
   </nav>
 </header>
@@ -119,6 +127,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <div id="main-view"></div>
   <div id="matrix-view" style="display:none"></div>
   <div id="fixtures-view" style="display:none"></div>
+  <div id="schedule-view" style="display:none"></div>
   <div id="team-view" style="display:none"></div>
 </main>
 <script>
@@ -129,6 +138,9 @@ const LEAGUES = __DATA_PLACEHOLDER__;
   let view = "main";
   let sortCol = "exp_rank", sortAsc = true;
   let fixtSortCol = "kickoff", fixtSortAsc = true;
+  let schedSortCol = "kickoff", schedSortAsc = true;
+  let topN = {};                                   // top games per league (schedule view)
+  keys.forEach(k => topN[k] = 3);
   let filter = "";
   let teamCode = null;
 
@@ -153,6 +165,14 @@ const LEAGUES = __DATA_PLACEHOLDER__;
   }
 
   function head() {
+    if (view === "schedule") {  // cross-league view: no single league applies
+      $("hdr-badge").innerHTML = "";
+      $("league-tabs").style.display = "none";
+      $("hdr-sub").textContent =
+        `Top games across ${keys.length} leagues · kickoff in US Pacific time`;
+      return;
+    }
+    $("league-tabs").style.display = "";
     const L = LEAGUES[cur], m = L.meta;
     $("hdr-badge").innerHTML = m.used_xg
       ? '<span class="badge xg">FBref xG</span>' : '<span class="badge">goals model</span>';
@@ -164,7 +184,7 @@ const LEAGUES = __DATA_PLACEHOLDER__;
 
   function setView(v) {
     view = v;
-    ["main","matrix","fixtures","team"].forEach(x =>
+    ["main","matrix","fixtures","schedule","team"].forEach(x =>
       $(x+"-view").style.display = (x===v ? "" : "none"));
     $("nav").querySelectorAll("a").forEach(a =>
       a.classList.toggle("active", a.dataset.view===v));
@@ -173,6 +193,7 @@ const LEAGUES = __DATA_PLACEHOLDER__;
     if (v==="main") renderMain();
     else if (v==="matrix") renderMatrix();
     else if (v==="fixtures") renderFixtures();
+    else if (v==="schedule") renderSchedule();
     else if (v==="team") renderTeam();
   }
 
@@ -286,7 +307,7 @@ const LEAGUES = __DATA_PLACEHOLDER__;
       ["win",     "H",       "right",  f => `${(f.win*100).toFixed(0)}%`,    f => f.win],
       ["draw",    "D",       "right",  f => `${(f.draw*100).toFixed(0)}%`,   f => f.draw],
       ["loss",    "A",       "right",  f => `${(f.loss*100).toFixed(0)}%`,   f => f.loss],
-      ["info_pct","Info%",   "right",  f => `${f.info_pct.toFixed(2)}%`,     f => f.info_pct],
+      ["info_pct","Info%",   "right",  f => `${(f.info_pct ?? 0).toFixed(2)}%`, f => (f.info_pct ?? 0)],
     ];
   }
   function renderFixtures() {
@@ -319,6 +340,75 @@ const LEAGUES = __DATA_PLACEHOLDER__;
         if (c === fixtSortCol) fixtSortAsc = !fixtSortAsc;
         else { fixtSortCol = c; fixtSortAsc = (c === "kickoff" || c === "home" || c === "away"); }
         renderFixtures();
+      });
+  }
+
+  // ---- Top games (cross-league schedule) ----
+  function scheduleCols() {
+    return [
+      ["kickoff", "Kickoff", "left",   f => esc(kickoff(f)),  f => f.datetime_utc || f.date || ""],
+      ["league",  "League",  "left",   f => esc(f._league),   f => f._league],
+      ["home",    "Home",    "right",  f => esc(f.home_name), f => f.home_name],
+      ["xg",      "xG",      "center", f => `<span style="color:#8b949e">${f.lam_home.toFixed(1)}–${f.lam_away.toFixed(1)}</span>`, f => f.lam_home - f.lam_away],
+      ["away",    "Away",    "left",   f => esc(f.away_name), f => f.away_name],
+      ["wdl",     "W / D / L","center",f => `<span class="wdl"><span class="w" style="width:${f.win*100}%"></span><span class="d" style="width:${f.draw*100}%"></span><span class="l" style="width:${f.loss*100}%"></span></span>`, f => f.win],
+      ["win",     "H",       "right",  f => `${(f.win*100).toFixed(0)}%`,  f => f.win],
+      ["draw",    "D",       "right",  f => `${(f.draw*100).toFixed(0)}%`, f => f.draw],
+      ["loss",    "A",       "right",  f => `${(f.loss*100).toFixed(0)}%`, f => f.loss],
+      ["info_pct","Info%",   "right",  f => `${(f.info_pct ?? 0).toFixed(2)}%`, f => (f.info_pct ?? 0)],
+    ];
+  }
+  function renderSchedule() {
+    // Per-league "top N games" controls.
+    const controls = keys.map(k => {
+      const max = LEAGUES[k].fixtures.length;
+      return `<label class="topn"><span>${esc(LEAGUES[k].league.name)}</span>
+        <input type="number" min="0" max="${max}" value="${Math.min(topN[k], max)}" data-k="${k}"></label>`;
+    }).join("");
+
+    // Selected games: each league's top-N remaining fixtures by Info%.
+    let rows = [];
+    keys.forEach(k => {
+      const picked = LEAGUES[k].fixtures.slice()
+        .sort((a, b) => (b.info_pct ?? 0) - (a.info_pct ?? 0))
+        .slice(0, topN[k])
+        .map(f => Object.assign({ _league: LEAGUES[k].league.name }, f));
+      rows = rows.concat(picked);
+    });
+
+    const cols = scheduleCols();
+    const sv = (cols.find(c => c[0] === schedSortCol) || cols[0])[4];
+    rows.sort((a, b) => {
+      let x = sv(a), y = sv(b);
+      if (typeof x === "string") return schedSortAsc ? String(x).localeCompare(y) : String(y).localeCompare(x);
+      return schedSortAsc ? x - y : y - x;
+    });
+
+    const th = cols.map(([c, l, al]) =>
+      `<th data-col="${c}" style="text-align:${al}" class="${c===schedSortCol?(schedSortAsc?'sort-asc':'sort-desc'):''}">${l}</th>`).join("");
+    const body = rows.length
+      ? rows.map(f => `<tr>${cols.map(([, , al, cell]) => `<td style="text-align:${al}">${cell(f)}</td>`).join("")}</tr>`).join("")
+      : `<tr><td colspan="${cols.length}" style="color:#8b949e;padding:16px">No games selected — raise a league's count above, or no remaining fixtures.</td></tr>`;
+
+    $("schedule-view").innerHTML =
+      `<div class="legend">The most title-decisive upcoming games per league (top by
+        <b>Info%</b> — expected % drop in that league's title-race entropy), merged into one
+        schedule. Set how many per league, then click a header to sort.</div>
+       <div class="topn-row">${controls}</div>
+       <div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
+
+    $("schedule-view").querySelectorAll("input[data-k]").forEach(inp =>
+      inp.onchange = () => {
+        const v = parseInt(inp.value, 10);
+        topN[inp.dataset.k] = isNaN(v) ? 0 : Math.max(0, v);
+        renderSchedule();
+      });
+    $("schedule-view").querySelectorAll("th[data-col]").forEach(h =>
+      h.onclick = () => {
+        const c = h.dataset.col;
+        if (c === schedSortCol) schedSortAsc = !schedSortAsc;
+        else { schedSortCol = c; schedSortAsc = (c === "kickoff" || c === "league" || c === "home" || c === "away"); }
+        renderSchedule();
       });
   }
 
