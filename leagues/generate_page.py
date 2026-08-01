@@ -16,9 +16,9 @@ Views: a league switcher across all simulated leagues, plus
   * Position matrix — a heatmap of P(finish in each position);
   * Fixtures — remaining games with kickoff (US Pacific), W/D/L, and Info%
     (each game's title-race informativeness), sortable;
-  * Top games — a cross-league schedule of the top-N most decisive games per
-    league (N selectable per league), plus every remaining game of any teams
-    picked from a checkbox dropdown;
+  * Top games — a cross-league schedule where each league contributes just enough
+    of its most decisive games to fall below a shared title-race entropy threshold
+    (in bits), plus every remaining game of any teams followed from a dropdown;
   * Team detail — a team's full finishing-position distribution.
 
 Usage
@@ -154,8 +154,23 @@ const LEAGUES = __DATA_PLACEHOLDER__;
   let sortCol = "exp_rank", sortAsc = true;
   let fixtSortCol = "kickoff", fixtSortAsc = true;
   let schedSortCol = "kickoff", schedSortAsc = true;
-  let topN = {};                                   // top games per league (schedule view)
-  keys.forEach(k => topN[k] = 3);
+  // Top games: one champion-entropy threshold (bits) for all leagues; each league
+  // shows just enough of its most-decisive games to fall below it. Default ~ the
+  // median league baseline, floored, and remembered across visits (localStorage).
+  const round1 = (x) => Math.round(x * 10) / 10;
+  let threshold;
+  {
+    const h0 = keys.map(k => (LEAGUES[k].meta.champ_entropy_bits ?? 0)).sort((a, b) => a - b);
+    const med = h0.length ? h0[Math.floor((h0.length - 1) / 2)] : 1;
+    threshold = Math.max(0.5, round1(med));
+    try {
+      const s = parseFloat(localStorage.getItem("fbsim.entropyThreshold"));
+      if (isFinite(s) && s >= 0) threshold = s;
+    } catch (e) {}
+  }
+  function saveThreshold() {
+    try { localStorage.setItem("fbsim.entropyThreshold", String(threshold)); } catch (e) {}
+  }
   const teamKey = (k, name) => k + "\t" + name;
   let selectedTeams = new Set();                   // "<leagueKey>\t<team name>" (schedule view)
   try {                                            // restore picked teams (localStorage; file:// ok)
@@ -208,9 +223,11 @@ const LEAGUES = __DATA_PLACEHOLDER__;
     $("hdr-badge").innerHTML = m.used_xg
       ? '<span class="badge xg">FBref xG</span>' : '<span class="badge">goals model</span>';
     const asOf = m.as_of ? ` · forecast from matchday ${m.as_of}` : "";
+    const ent = (m.champ_entropy_bits == null) ? ""
+      : ` · ${L.league.title_label} race entropy ${m.champ_entropy_bits.toFixed(1)} bits`;
     $("hdr-sub").textContent =
       `${L.league.name} (${L.league.country}) · ${m.n_played} played, ${m.n_remaining} remaining · `
-      + `${m.n_sims.toLocaleString()} simulations${asOf}`;
+      + `${m.n_sims.toLocaleString()} simulations${asOf}${ent}`;
   }
 
   function setView(v) {
@@ -418,25 +435,49 @@ const LEAGUES = __DATA_PLACEHOLDER__;
       l.style.display = (!q || l.dataset.name.includes(q)) ? "" : "none");
     $("team-panel").querySelectorAll(".tp-grp").forEach(g => g.style.display = q ? "none" : "");
   }
-  function renderSchedule() {
-    const controls = keys.map(k => {
-      const max = LEAGUES[k].fixtures.length;
-      return `<label class="topn"><span>${esc(LEAGUES[k].league.name)}</span>
-        <input type="number" min="0" max="${max}" value="${Math.min(topN[k], max)}" data-k="${k}"></label>`;
+  // A league's most-decisive upcoming games, in Info% order, taken until its
+  // champion-race entropy falls to/below the threshold (nothing if already below).
+  function topGamesFor(k) {
+    const H0 = (LEAGUES[k].meta.champ_entropy_bits ?? 0);
+    if (H0 <= threshold) return [];
+    const out = [];
+    LEAGUES[k].fixtures.slice()
+      .sort((a, b) => (a.info_rank ?? 1e9) - (b.info_rank ?? 1e9))
+      .some(f => { out.push(f); return (f.cum_bits ?? 0) <= threshold; });
+    return out;
+  }
+  function renderReadout() {
+    const el = $("sched-readout");
+    if (!el) return;
+    el.innerHTML = keys.map(k => {
+      const H0 = (LEAGUES[k].meta.champ_entropy_bits ?? 0);
+      const below = H0 <= threshold, n = topGamesFor(k).length;
+      return `<span class="topn"><b style="color:#e6edf3">${esc(LEAGUES[k].league.name)}</b> `
+        + `${H0.toFixed(1)}b ${below ? "· below threshold" : "→ " + n + (n === 1 ? " game" : " games")}</span>`;
     }).join("");
+  }
+  function renderSchedule() {
     $("schedule-view").innerHTML =
-      `<div class="legend">The most title-decisive upcoming games per league (top by
-        <b>Info%</b> — expected % drop in that league's title-race entropy), plus every
-        remaining game of any team you pick. Set counts / teams, then click a header to sort.</div>
-       <div class="topn-row">${controls}${teamDropdown()}</div>
+      `<div class="legend">Each league's most title-decisive upcoming games (ranked by
+        <b>Info%</b>) — just enough to pull its title-race <b>entropy</b> below the threshold you
+        set, so a league in a tight race contributes more games than a settled one — plus every
+        remaining game of any team you follow. Click a header to sort.</div>
+       <div class="topn-row">
+         <label class="topn"><span>Title-race entropy ≤</span>
+           <input type="number" min="0" step="0.1" value="${threshold}" id="thr-input">
+           <span>bits</span></label>
+         ${teamDropdown()}
+       </div>
+       <div id="sched-readout" class="topn-row"></div>
        <div id="sched-table" class="wrap"></div>`;
 
-    $("schedule-view").querySelectorAll("input[data-k]").forEach(inp =>
-      inp.onchange = () => {
-        const v = parseInt(inp.value, 10);
-        topN[inp.dataset.k] = isNaN(v) ? 0 : Math.max(0, v);
-        renderScheduleTable();
-      });
+    $("thr-input").oninput = (e) => {
+      const v = parseFloat(e.target.value);
+      threshold = (isFinite(v) && v >= 0) ? v : 0;
+      saveThreshold();
+      renderReadout();
+      renderScheduleTable();
+    };
     $("team-btn").onclick = () => {
       teamDDOpen = !teamDDOpen;
       $("team-panel").style.display = teamDDOpen ? "" : "none";
@@ -450,6 +491,7 @@ const LEAGUES = __DATA_PLACEHOLDER__;
         renderScheduleTable();
       });
     applyTeamFilter();
+    renderReadout();
     renderScheduleTable();
   }
   function renderScheduleTable() {
@@ -462,10 +504,8 @@ const LEAGUES = __DATA_PLACEHOLDER__;
       seen.add(id);
       rows.push(Object.assign({ _league: LEAGUES[k].league.name, _lk: k }, f));
     };
-    // (a) top-N by Info% per league
-    keys.forEach(k => LEAGUES[k].fixtures.slice()
-      .sort((a, b) => (b.info_pct ?? 0) - (a.info_pct ?? 0))
-      .slice(0, topN[k]).forEach(f => add(k, f)));
+    // (a) enough top games per league to pull it below the entropy threshold
+    keys.forEach(k => topGamesFor(k).forEach(f => add(k, f)));
     // (b) every remaining game of each selected team
     selectedTeams.forEach(key => {
       const [k, name] = key.split("\t");
@@ -485,7 +525,7 @@ const LEAGUES = __DATA_PLACEHOLDER__;
       `<th data-col="${c}" style="text-align:${al}" class="${c===schedSortCol?(schedSortAsc?'sort-asc':'sort-desc'):''}">${l}</th>`).join("");
     const bd = rows.length
       ? rows.map(f => `<tr>${cols.map(([, , al, cell]) => `<td style="text-align:${al}">${cell(f)}</td>`).join("")}</tr>`).join("")
-      : `<tr><td colspan="${cols.length}" style="color:#8b949e;padding:16px">No games selected — raise a league's count or pick a team above.</td></tr>`;
+      : `<tr><td colspan="${cols.length}" style="color:#8b949e;padding:16px">No games at this threshold — lower it to include more, or follow a team above.</td></tr>`;
     $("sched-table").innerHTML = `<table><thead><tr>${th}</tr></thead><tbody>${bd}</tbody></table>`;
     $("sched-table").querySelectorAll("th[data-col]").forEach(h =>
       h.onclick = () => {

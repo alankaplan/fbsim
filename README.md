@@ -183,6 +183,11 @@ league switcher and five views: standings odds, a position-probability heatmap,
 remaining fixtures, a cross-league **Top games** schedule, and per-team
 finishing distributions.
 
+Each league page also reports its **title-race entropy in bits** (in the header)
+— the Shannon entropy of the simulated champion distribution, i.e. how open the
+race still is (≈ 0 bits for a settled league, ≈ 2 bits for a roughly four-way
+race).
+
 The **fixtures** view has sortable columns (click any header) and shows, per
 remaining game: kickoff in **US Pacific time** (from the fixturedownload feed;
 date-only for sources without a timestamp), model expected goals, win/draw/loss
@@ -192,13 +197,17 @@ once its result is known (the mutual information between the game's outcome and
 who wins the league). Sort by Info% to surface the season's most decisive games.
 
 The **Top games** view (a top-level tab next to the league buttons) merges the
-most title-decisive upcoming games *across all leagues* into one schedule. A
-per-league number input sets how many top games (ranked by Info%) each league
-contributes, and a **team dropdown** (checkboxes, grouped by league, with a
-filter) adds *every* remaining game of any team you pick — a "follow my teams"
-list on top of the top-N picks; the picked teams are remembered across visits
-(`localStorage`). The combined list is sortable and defaults to chronological
-order — a quick "what should I watch" board.
+most title-decisive upcoming games *across all leagues* into one schedule. You
+set a single **title-race entropy threshold (in bits)** that applies to every
+league, and each league contributes just enough of its most decisive games
+(revealed in Info% order) to pull its champion-distribution entropy **below that
+threshold** — so a wide-open league shows more games than a nearly-settled one,
+and a league already below the threshold shows none. A **team dropdown**
+(checkboxes, grouped by league, with a filter) additionally adds *every*
+remaining game of any team you pick — a "follow my teams" list on top of the
+threshold picks. Both the threshold and the followed teams are remembered across
+visits (`localStorage`). The combined list is sortable and defaults to
+chronological order — a quick "what should I watch" board.
 
 ## The model
 

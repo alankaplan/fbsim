@@ -40,6 +40,9 @@ from .prior import load_prior
 from .simulator import SeasonFixtures, simulate_one, _rank_cluster, _accumulate
 
 
+LOG2 = np.log(2.0)
+
+
 def _entropy(p: np.ndarray) -> float:
     """Shannon entropy (nats) of a probability vector, ignoring zero entries."""
     p = p[p > 0]
@@ -146,6 +149,25 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
                     hcond += (cnt / n_sims) * _entropy(cond)
             info_pct[j] = max(H - hcond, 0.0) / H * 100.0
 
+    # Cumulative residual entropy of the champion (title) distribution as the
+    # remaining fixtures are revealed most-informative-first. Reveal games in
+    # descending Info% order and track the *joint* conditional entropy
+    # H(champ | outcomes revealed so far), in bits, so the report can pick, per
+    # league, just enough top games to drive the race below an entropy threshold.
+    info_rank = np.zeros(R, dtype=int)
+    cum_bits = np.zeros(R)
+    order = np.argsort(-info_pct, kind="stable")
+    cell = np.zeros(n_sims, dtype=np.int64)          # joint-outcome cell id per sim
+    for pos, j in enumerate(order):
+        # split each existing cell by this fixture's outcome, then compact ids
+        _, cell = np.unique(cell * 3 + outc[:, j].astype(np.int64), return_inverse=True)
+        comb = cell.astype(np.int64) * n + champ     # joint (cell, champion)
+        # H(champ | cell) = H(cell, champ) - H(cell), converted nats -> bits
+        hc = (_entropy(np.bincount(comb) / n_sims)
+              - _entropy(np.bincount(cell) / n_sims)) / LOG2
+        info_rank[j] = pos
+        cum_bits[j] = max(hc, 0.0)
+
     # Kickoff date/time lookups (datetime_utc present only for sources that carry it).
     date_of = dict(zip(matches["match_number"].astype(int), matches["date"]))
     dt_of = (dict(zip(matches["match_number"].astype(int), matches["datetime_utc"]))
@@ -170,6 +192,8 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
             "lam_home": round(float(fx.lam_h[k]), 2), "lam_away": round(float(fx.lam_a[k]), 2),
             "win": round(p["win_a"], 3), "draw": round(p["draw"], 3), "loss": round(p["win_b"], 3),
             "info_pct": round(float(info_pct[j]), 2),
+            "info_rank": int(info_rank[j]),
+            "cum_bits": round(float(cum_bits[j]), 3),
         })
         j += 1
 
@@ -183,6 +207,7 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
                    "qual_name": cfg.qual_name, "drop_name": cfg.drop_name},
         "meta": {"n_sims": n_sims, "seed": seed, "used_xg": model.used_xg,
                  "home_adv": round(model.home_adv, 4),
+                 "champ_entropy_bits": round(H / LOG2, 3),
                  "n_played": int(fx.played.sum()), "n_remaining": int((~fx.played).sum())},
         "teams": team_rows,
         "fixtures": fixtures,
