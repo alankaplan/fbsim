@@ -191,12 +191,14 @@ title, measured as the percent drop in the entropy of the champion distribution
 once its result is known (the mutual information between the game's outcome and
 who wins the league). Sort by Info% to surface the season's most decisive games.
 
-The **Top games** view merges the most title-decisive upcoming games *across all
-leagues* into one schedule. A per-league number input sets how many top games
-(ranked by Info%) each league contributes, and a **team dropdown** (checkboxes,
-grouped by league, with a filter) adds *every* remaining game of any team you
-pick — a "follow my teams" list on top of the top-N picks. The combined list is
-sortable and defaults to chronological order — a quick "what should I watch" board.
+The **Top games** view (a top-level tab next to the league buttons) merges the
+most title-decisive upcoming games *across all leagues* into one schedule. A
+per-league number input sets how many top games (ranked by Info%) each league
+contributes, and a **team dropdown** (checkboxes, grouped by league, with a
+filter) adds *every* remaining game of any team you pick — a "follow my teams"
+list on top of the top-N picks; the picked teams are remembered across visits
+(`localStorage`). The combined list is sortable and defaults to chronological
+order — a quick "what should I watch" board.
 
 ## The model
 

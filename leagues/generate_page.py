@@ -63,6 +63,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .lg-btn { padding: 5px 12px; border: 1px solid #30363d; border-radius: 6px;
     background: #161b22; color: #c9d1d9; cursor: pointer; font-size: 13px; }
   .lg-btn.active { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  .lg-btn.top { margin-left: 12px; }
   .topn-row { display: flex; flex-wrap: wrap; gap: 10px 14px; margin: 12px 0 4px; }
   .topn { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #8b949e; }
   .topn input { width: 52px; background: #0d1117; color: #e6edf3; border: 1px solid #30363d;
@@ -134,7 +135,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <a data-view="main" class="active">Standings odds</a>
     <a data-view="matrix">Position matrix</a>
     <a data-view="fixtures">Fixtures</a>
-    <a data-view="schedule">Top games</a>
     <a data-view="team" id="nav-team" style="display:none">Team</a>
   </nav>
 </header>
@@ -156,7 +156,17 @@ const LEAGUES = __DATA_PLACEHOLDER__;
   let schedSortCol = "kickoff", schedSortAsc = true;
   let topN = {};                                   // top games per league (schedule view)
   keys.forEach(k => topN[k] = 3);
+  const teamKey = (k, name) => k + "\t" + name;
   let selectedTeams = new Set();                   // "<leagueKey>\t<team name>" (schedule view)
+  try {                                            // restore picked teams (localStorage; file:// ok)
+    const valid = new Set();
+    keys.forEach(k => (LEAGUES[k].teams || []).forEach(t => valid.add(teamKey(k, t.name))));
+    JSON.parse(localStorage.getItem("fbsim.topTeams") || "[]")
+      .forEach(x => { if (valid.has(x)) selectedTeams.add(x); });
+  } catch (e) {}
+  function saveTeams() {
+    try { localStorage.setItem("fbsim.topTeams", JSON.stringify([...selectedTeams])); } catch (e) {}
+  }
   let teamDDOpen = false, teamFilter = "";
   let filter = "";
   let teamCode = null;
@@ -174,22 +184,26 @@ const LEAGUES = __DATA_PLACEHOLDER__;
   }
 
   function leagueTabs() {
-    $("league-tabs").innerHTML = keys.map(k =>
-      `<button class="lg-btn ${k===cur?'active':''}" data-k="${k}">${esc(LEAGUES[k].league.name)}</button>`
+    const lg = keys.map(k =>
+      `<button class="lg-btn ${(view!=='schedule'&&k===cur)?'active':''}" data-k="${k}">${esc(LEAGUES[k].league.name)}</button>`
     ).join("");
+    const top = `<button class="lg-btn top ${view==='schedule'?'active':''}" data-top="1">Top games</button>`;
+    $("league-tabs").innerHTML = lg + top;
     $("league-tabs").querySelectorAll("button").forEach(b =>
-      b.onclick = () => { cur = b.dataset.k; teamCode = null; setView(view==='team'?'main':view); });
+      b.onclick = () => {
+        if (b.dataset.top) { setView("schedule"); return; }
+        cur = b.dataset.k; teamCode = null;
+        setView((view==='schedule'||view==='team') ? 'main' : view);
+      });
   }
 
   function head() {
     if (view === "schedule") {  // cross-league view: no single league applies
       $("hdr-badge").innerHTML = "";
-      $("league-tabs").style.display = "none";
       $("hdr-sub").textContent =
         `Top games across ${keys.length} leagues · kickoff in US Pacific time`;
       return;
     }
-    $("league-tabs").style.display = "";
     const L = LEAGUES[cur], m = L.meta;
     $("hdr-badge").innerHTML = m.used_xg
       ? '<span class="badge xg">FBref xG</span>' : '<span class="badge">goals model</span>';
@@ -206,6 +220,7 @@ const LEAGUES = __DATA_PLACEHOLDER__;
     $("nav").querySelectorAll("a").forEach(a =>
       a.classList.toggle("active", a.dataset.view===v));
     $("nav-team").style.display = (v==="team") ? "" : "none";
+    $("nav").style.display = (v==="schedule") ? "none" : "";  // per-league tabs don't apply
     head(); leagueTabs();
     if (v==="main") renderMain();
     else if (v==="matrix") renderMatrix();
@@ -361,7 +376,6 @@ const LEAGUES = __DATA_PLACEHOLDER__;
   }
 
   // ---- Top games (cross-league schedule) ----
-  const teamKey = (k, name) => k + "\t" + name;
   function selName(f, name) {  // highlight a name when its team is selected
     const s = esc(name);
     return selectedTeams.has(teamKey(f._lk, name)) ? `<span class="sel">${s}</span>` : s;
@@ -431,6 +445,7 @@ const LEAGUES = __DATA_PLACEHOLDER__;
     $("team-panel").querySelectorAll("input[data-key]").forEach(cb =>
       cb.onchange = () => {
         if (cb.checked) selectedTeams.add(cb.dataset.key); else selectedTeams.delete(cb.dataset.key);
+        saveTeams();
         $("team-btn").textContent = `Teams (${selectedTeams.size}) ▾`;
         renderScheduleTable();
       });
