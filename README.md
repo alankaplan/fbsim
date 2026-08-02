@@ -186,15 +186,26 @@ finishing distributions.
 Each league page also reports its **title-race entropy in bits** (in the header)
 — the Shannon entropy of the simulated champion distribution, i.e. how open the
 race still is (≈ 0 bits for a settled league, ≈ 2 bits for a roughly four-way
-race).
+race). A **completed** season has a determined champion, so its entropy is
+exactly 0 and the header reads `0 bits (decided)` — this is expected, not a bug;
+an in-progress or preseason race shows a positive value.
 
 The **fixtures** view has sortable columns (click any header) and shows, per
 remaining game: kickoff in **US Pacific time** (from the fixturedownload feed;
 date-only for sources without a timestamp), model expected goals, win/draw/loss
-probabilities, and **Info%** — how much that fixture is expected to decide the
+probabilities, **Info%** — how much that fixture is expected to decide the
 title, measured as the percent drop in the entropy of the champion distribution
 once its result is known (the mutual information between the game's outcome and
-who wins the league). Sort by Info% to surface the season's most decisive games.
+who wins the league) — and **H after**, the expected title-race entropy (bits)
+that would remain once that one game's result is known. Sort by Info% (or H after)
+to surface the season's most decisive games.
+
+**Preseason ratings are regressed toward the mean.** Last season's attack/defense
+ratings are scaled toward league average before seeding a new season, so the
+defending champion starts as a *favorite* rather than a near-certainty and the
+title race carries realistic uncertainty out of the box (this washes out as real
+results accumulate). Tune it with `--prior-regression` on `update` / `run_sims`
+(default `0.70`; `1.0` disables regression, `0.0` starts everyone level).
 
 The **Top games** view (a top-level tab next to the league buttons) merges the
 most title-decisive upcoming games *across all leagues* into one schedule. You

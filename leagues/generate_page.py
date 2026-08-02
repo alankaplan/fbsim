@@ -188,6 +188,7 @@ const LEAGUES = __DATA_PLACEHOLDER__;
 
   const $ = (id) => document.getElementById(id);
   const pct = (x) => (x === 0 ? '<span class="zero">0</span>' : x.toFixed(1));
+  const fmtBits = (x) => String(+(+x).toFixed(2));   // trims zeros: 0.02, 0.5, 1.91
   const esc = (s) => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
   // Sequential blue heatmap for probabilities 0..pmax.
@@ -224,7 +225,8 @@ const LEAGUES = __DATA_PLACEHOLDER__;
       ? '<span class="badge xg">FBref xG</span>' : '<span class="badge">goals model</span>';
     const asOf = m.as_of ? ` · forecast from matchday ${m.as_of}` : "";
     const ent = (m.champ_entropy_bits == null) ? ""
-      : ` · ${L.league.title_label} race entropy ${m.champ_entropy_bits.toFixed(1)} bits`;
+      : ` · ${L.league.title_label} race entropy ${fmtBits(m.champ_entropy_bits)} bits`
+        + (m.n_remaining === 0 ? " (decided)" : "");
     $("hdr-sub").textContent =
       `${L.league.name} (${L.league.country}) · ${m.n_played} played, ${m.n_remaining} remaining · `
       + `${m.n_sims.toLocaleString()} simulations${asOf}${ent}`;
@@ -357,6 +359,7 @@ const LEAGUES = __DATA_PLACEHOLDER__;
       ["draw",    "D",       "right",  f => `${(f.draw*100).toFixed(0)}%`,   f => f.draw],
       ["loss",    "A",       "right",  f => `${(f.loss*100).toFixed(0)}%`,   f => f.loss],
       ["info_pct","Info%",   "right",  f => `${(f.info_pct ?? 0).toFixed(2)}%`, f => (f.info_pct ?? 0)],
+      ["post_bits","H after", "right",  f => `${fmtBits(f.post_bits ?? 0)}`,     f => (f.post_bits ?? 0)],
     ];
   }
   function renderFixtures() {
@@ -381,13 +384,14 @@ const LEAGUES = __DATA_PLACEHOLDER__;
         <span style="color:#3fb950">home</span> / <span style="color:#8b949e">draw</span> /
         <span style="color:#f85149">away</span> win probabilities, and
         <b>Info%</b> — the expected % drop in the title race's uncertainty (entropy) once the
-        result is known. Click a header to sort.</div>
+        result is known — and <b>H after</b>, the expected leftover title-race entropy (bits)
+        once that one game's result is known. Click a header to sort.</div>
        <div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
     $("fixtures-view").querySelectorAll("th[data-col]").forEach(h =>
       h.onclick = () => {
         const c = h.dataset.col;
         if (c === fixtSortCol) fixtSortAsc = !fixtSortAsc;
-        else { fixtSortCol = c; fixtSortAsc = (c === "kickoff" || c === "home" || c === "away"); }
+        else { fixtSortCol = c; fixtSortAsc = (c === "kickoff" || c === "home" || c === "away" || c === "post_bits"); }
         renderFixtures();
       });
   }
@@ -453,7 +457,7 @@ const LEAGUES = __DATA_PLACEHOLDER__;
       const H0 = (LEAGUES[k].meta.champ_entropy_bits ?? 0);
       const below = H0 <= threshold, n = topGamesFor(k).length;
       return `<span class="topn"><b style="color:#e6edf3">${esc(LEAGUES[k].league.name)}</b> `
-        + `${H0.toFixed(1)}b ${below ? "· below threshold" : "→ " + n + (n === 1 ? " game" : " games")}</span>`;
+        + `${fmtBits(H0)}b ${below ? "· below threshold" : "→ " + n + (n === 1 ? " game" : " games")}</span>`;
     }).join("");
   }
   function renderSchedule() {

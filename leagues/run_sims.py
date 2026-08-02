@@ -36,7 +36,7 @@ from .match import get_match_probabilities
 from .config import LeagueConfig, get_league
 from .ingest import DATA_ROOT
 from .model import fit_model, LeagueModel
-from .prior import load_prior
+from .prior import load_prior, PRIOR_REGRESSION
 from .simulator import SeasonFixtures, simulate_one, _rank_cluster, _accumulate
 
 
@@ -137,6 +137,7 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
     # (mutual information between the fixture outcome and the champion identity).
     H = _entropy(pos_counts[:, 0] / n_sims)
     info_pct = np.zeros(R)
+    post_nats = np.full(R, H)                        # residual entropy after each game
     if H > 1e-12:
         for j in range(R):
             col = outc[:, j]
@@ -147,6 +148,7 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
                 if cnt:
                     cond = np.bincount(champ[mask], minlength=n).astype(float) / cnt
                     hcond += (cnt / n_sims) * _entropy(cond)
+            post_nats[j] = hcond
             info_pct[j] = max(H - hcond, 0.0) / H * 100.0
 
     # Cumulative residual entropy of the champion (title) distribution as the
@@ -194,6 +196,7 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
             "info_pct": round(float(info_pct[j]), 2),
             "info_rank": int(info_rank[j]),
             "cum_bits": round(float(cum_bits[j]), 3),
+            "post_bits": round(float(post_nats[j] / LOG2), 3),
         })
         j += 1
 
@@ -228,6 +231,9 @@ def main() -> None:
                     help="ignore the preseason prior (prior.json) if present")
     ap.add_argument("--prior-weight", type=float, default=3.0,
                     help="strength of the preseason prior (~pseudo-matches)")
+    ap.add_argument("--prior-regression", type=float, default=PRIOR_REGRESSION,
+                    help="regress last season's ratings toward the mean "
+                         "(1.0 = off, 0.0 = flat league)")
     args = ap.parse_args()
 
     cfg = get_league(args.league)
@@ -236,7 +242,7 @@ def main() -> None:
     matches = pd.read_csv(data_dir / "matches.csv")
     matches = apply_as_of(matches, args.as_of)
 
-    prior = None if args.no_prior else load_prior(cfg)
+    prior = None if args.no_prior else load_prior(cfg, args.prior_regression)
     model = fit_model(teams, matches, reg=args.reg, recency_halflife=args.recency_halflife,
                       prior=prior, prior_weight=args.prior_weight)
     payload = run(cfg, teams, matches, model, args.sims, args.seed)

@@ -48,7 +48,7 @@ import pandas as pd
 from .config import LEAGUES, LeagueConfig, get_league
 from .ingest import DATA_ROOT, MATCH_FIELDS, SOURCES, TEAM_FIELDS
 from .model import fit_model
-from .prior import build_prior, load_prior, _prev_season
+from .prior import build_prior, load_prior, _prev_season, PRIOR_REGRESSION
 from .run_sims import run
 from .generate_page import OUT, build
 
@@ -106,11 +106,12 @@ def _played_count(matches: pd.DataFrame) -> int:
 
 def simulate_league(cfg: LeagueConfig, n_sims: int, seed: int,
                     reg: float, recency_halflife: float | None,
-                    source: str, no_prior: bool) -> None:
+                    source: str, no_prior: bool,
+                    prior_regression: float = PRIOR_REGRESSION) -> None:
     data_dir = DATA_ROOT / cfg.key
     teams = pd.read_csv(data_dir / "teams.csv")
     matches = pd.read_csv(data_dir / "matches.csv")
-    prior = None if no_prior else load_prior(cfg)
+    prior = None if no_prior else load_prior(cfg, prior_regression)
 
     # A not-yet-started season (0 games) has nothing to fit — auto-build a prior
     # from last season so it yields a real preseason projection, not a flat table.
@@ -118,7 +119,7 @@ def simulate_league(cfg: LeagueConfig, n_sims: int, seed: int,
         prev = _prev_season(source, cfg.season_for(source))
         try:
             build_prior(cfg, source, prev)
-            prior = load_prior(cfg)
+            prior = load_prior(cfg, prior_regression)
             print(f"  [prior] built from {prev} [{source}]")
         except Exception as exc:  # network/source failure — fall back to flat model
             print(f"  [prior] skipped: {exc}")
@@ -176,6 +177,9 @@ def main() -> None:
                     help="down-weight older matches (in played-match count)")
     ap.add_argument("--no-prior", action="store_true",
                     help="ignore/skip the preseason prior (prior.json)")
+    ap.add_argument("--prior-regression", type=float, default=PRIOR_REGRESSION,
+                    help="regress last season's ratings toward the mean "
+                         "(1.0 = off, 0.0 = flat league)")
     ap.add_argument("--force", action="store_true",
                     help="re-simulate even when the data hasn't changed")
     ap.add_argument("--no-page", action="store_true", help="skip rebuilding leagues.html")
@@ -213,7 +217,7 @@ def main() -> None:
 
         if needs_sim(matches_csv, data_dir / "sim_results.json", args.force):
             simulate_league(cfg, args.sims, args.seed, args.reg, args.recency_halflife,
-                            args.source, args.no_prior)
+                            args.source, args.no_prior, args.prior_regression)
             simulated.append(cfg.key)
         else:
             print("  [sim] up to date — skipping (use --force to re-run).")

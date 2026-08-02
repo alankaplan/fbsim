@@ -33,6 +33,12 @@ import pandas as pd
 from .config import LeagueConfig, get_league
 from .model import LeaguePrior, fit_model
 
+# How much of last season's attack/defense separation carries into a fresh
+# season. Ratings are centered near league average (0), so scaling them by this
+# factor regresses every team toward average — last season's champion becomes a
+# favorite, not a preseason lock. 1.0 = no regression, 0.0 = flat league.
+PRIOR_REGRESSION = 0.70
+
 
 def _prev_season(source: str, current: str) -> str:
     """The season before ``current`` in the given source's format."""
@@ -79,17 +85,24 @@ def build_prior(cfg: LeagueConfig, source: str, season: str) -> Path:
     return out
 
 
-def load_prior(cfg: LeagueConfig) -> LeaguePrior | None:
-    """Read ``prior.json`` into a LeaguePrior, or None if absent/unreadable."""
+def load_prior(cfg: LeagueConfig,
+               regression: float = PRIOR_REGRESSION) -> LeaguePrior | None:
+    """Read ``prior.json`` into a LeaguePrior, or None if absent/unreadable.
+
+    ``regression`` scales last season's attack/defense toward the league mean
+    (see :data:`PRIOR_REGRESSION`); the raw ``prior.json`` is left untouched so
+    the factor stays a run-time knob.
+    """
     path = prior_path(cfg)
     if not path.exists():
         return None
     try:
         d = json.loads(path.read_text(encoding="utf-8"))
         teams = d.get("teams", {})
+        k = float(regression)
         return LeaguePrior(
-            attack={name: float(v["attack"]) for name, v in teams.items()},
-            defense={name: float(v["defense"]) for name, v in teams.items()},
+            attack={name: k * float(v["attack"]) for name, v in teams.items()},
+            defense={name: k * float(v["defense"]) for name, v in teams.items()},
             intercept=float(d["intercept"]),
             home_adv=float(d["home_adv"]),
         )
