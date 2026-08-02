@@ -42,9 +42,9 @@ from .simulator import SeasonFixtures, simulate_one, _rank_cluster, _accumulate
 
 LOG2 = np.log(2.0)
 
-# Bump whenever the sim_results.json payload gains fields the report relies on,
-# so `update` re-simulates leagues whose on-disk result predates the change.
-SCHEMA_VERSION = 2
+# Bump whenever the sim_results.json payload gains/changes fields the report
+# relies on, so `update` re-simulates leagues whose on-disk result predates it.
+SCHEMA_VERSION = 3
 
 
 def _entropy(p: np.ndarray) -> float:
@@ -136,12 +136,16 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
         })
     team_rows.sort(key=lambda r: r["exp_rank"])
 
+    # Kickoff date/time lookups (datetime_utc present only for sources that carry it).
+    date_of = dict(zip(matches["match_number"].astype(int), matches["date"]))
+    dt_of = (dict(zip(matches["match_number"].astype(int), matches["datetime_utc"]))
+             if "datetime_utc" in matches.columns else {})
+
     # Per-fixture informativeness: expected % drop in the entropy of the
     # champion (title) distribution once this fixture's result is known
     # (mutual information between the fixture outcome and the champion identity).
     H = _entropy(pos_counts[:, 0] / n_sims)
     info_pct = np.zeros(R)
-    post_nats = np.full(R, H)                        # residual entropy after each game
     if H > 1e-12:
         for j in range(R):
             col = outc[:, j]
@@ -152,32 +156,41 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
                 if cnt:
                     cond = np.bincount(champ[mask], minlength=n).astype(float) / cnt
                     hcond += (cnt / n_sims) * _entropy(cond)
-            post_nats[j] = hcond
             info_pct[j] = max(H - hcond, 0.0) / H * 100.0
 
-    # Cumulative residual entropy of the champion (title) distribution as the
-    # remaining fixtures are revealed most-informative-first. Reveal games in
-    # descending Info% order and track the *joint* conditional entropy
-    # H(champ | outcomes revealed so far), in bits, so the report can pick, per
-    # league, just enough top games to drive the race below an entropy threshold.
-    info_rank = np.zeros(R, dtype=int)
-    cum_bits = np.zeros(R)
-    order = np.argsort(-info_pct, kind="stable")
-    cell = np.zeros(n_sims, dtype=np.int64)          # joint-outcome cell id per sim
-    for pos, j in enumerate(order):
-        # split each existing cell by this fixture's outcome, then compact ids
-        _, cell = np.unique(cell * 3 + outc[:, j].astype(np.int64), return_inverse=True)
-        comb = cell.astype(np.int64) * n + champ     # joint (cell, champion)
-        # H(champ | cell) = H(cell, champ) - H(cell), converted nats -> bits
-        hc = (_entropy(np.bincount(comb) / n_sims)
-              - _entropy(np.bincount(cell) / n_sims)) / LOG2
-        info_rank[j] = pos
-        cum_bits[j] = max(hc, 0.0)
+    def _reveal(order: np.ndarray) -> np.ndarray:
+        """Residual champion entropy (bits) after each fixture, revealing the
+        unplayed fixtures in ``order`` (a permutation of the outcome columns) and
+        tracking the *joint* conditional entropy H(champ | outcomes so far)."""
+        res = np.zeros(R)
+        cell = np.zeros(n_sims, dtype=np.int64)      # joint-outcome cell id per sim
+        for j in order:
+            # split each existing cell by this fixture's outcome, then compact ids
+            _, cell = np.unique(cell * 3 + outc[:, j].astype(np.int64), return_inverse=True)
+            comb = cell.astype(np.int64) * n + champ  # joint (cell, champion)
+            # H(champ | cell) = H(cell, champ) - H(cell), converted nats -> bits
+            hc = (_entropy(np.bincount(comb) / n_sims)
+                  - _entropy(np.bincount(cell) / n_sims)) / LOG2
+            res[j] = max(hc, 0.0)
+        return res
 
-    # Kickoff date/time lookups (datetime_utc present only for sources that carry it).
-    date_of = dict(zip(matches["match_number"].astype(int), matches["date"]))
-    dt_of = (dict(zip(matches["match_number"].astype(int), matches["datetime_utc"]))
-             if "datetime_utc" in matches.columns else {})
+    # (1) Most-informative-first: cum_bits + info_rank feed the Top-games entropy
+    # threshold (pick just enough top games to drive the race below a target).
+    info_order = np.argsort(-info_pct, kind="stable")
+    info_rank = np.zeros(R, dtype=int)
+    info_rank[info_order] = np.arange(R)
+    cum_bits = _reveal(info_order)
+
+    # (2) Chronological (kickoff order): the title-race entropy still remaining
+    # after each game is played — non-increasing through the season, reaching ~0
+    # once the final results are known (all games decided ⇒ champion determined).
+    col_mn = fx.match_numbers[~fx.played]
+    def _when(j: int):
+        mn = int(col_mn[j])
+        s = _clean_str(dt_of.get(mn, "")) or _clean_str(date_of.get(mn, ""))
+        return (s == "", s, mn)                      # undated last, then chronological
+    chrono_order = np.array(sorted(range(R), key=_when), dtype=int)
+    post_bits = _reveal(chrono_order)
 
     # Remaining-fixture analytic W/D/L from the model (aligned to `outc` columns).
     fixtures = []
@@ -200,7 +213,7 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
             "info_pct": round(float(info_pct[j]), 2),
             "info_rank": int(info_rank[j]),
             "cum_bits": round(float(cum_bits[j]), 3),
-            "post_bits": round(float(post_nats[j] / LOG2), 3),
+            "post_bits": round(float(post_bits[j]), 3),
         })
         j += 1
 

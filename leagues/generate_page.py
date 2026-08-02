@@ -384,14 +384,15 @@ const LEAGUES = __DATA_PLACEHOLDER__;
         <span style="color:#3fb950">home</span> / <span style="color:#8b949e">draw</span> /
         <span style="color:#f85149">away</span> win probabilities, and
         <b>Info%</b> — the expected % drop in the title race's uncertainty (entropy) once the
-        result is known — and <b>H after</b>, the expected leftover title-race entropy (bits)
-        once that one game's result is known. Click a header to sort.</div>
+        result is known — and <b>H after</b>, the title-race entropy (bits) still remaining once
+        this game (and everything before it) is played, falling to 0 by season's end. Sort by
+        Kickoff to watch H after tick down. Click a header to sort.</div>
        <div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
     $("fixtures-view").querySelectorAll("th[data-col]").forEach(h =>
       h.onclick = () => {
         const c = h.dataset.col;
         if (c === fixtSortCol) fixtSortAsc = !fixtSortAsc;
-        else { fixtSortCol = c; fixtSortAsc = (c === "kickoff" || c === "home" || c === "away" || c === "post_bits"); }
+        else { fixtSortCol = c; fixtSortAsc = (c === "kickoff" || c === "home" || c === "away"); }
         renderFixtures();
       });
   }
