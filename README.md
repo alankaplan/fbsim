@@ -44,8 +44,11 @@ venv/bin/python -m leagues.update
 
 It's incremental: ingested CSVs are only rewritten when they actually differ,
 and a league is re-simulated only when its `matches.csv` is newer than its
-`sim_results.json` (or the result is missing, or you pass `--force`). Re-running
-when nothing has changed does no simulation work and just rebuilds `leagues.html`.
+`sim_results.json` (or the result is missing, or its result predates the current
+output schema, or you pass `--force`). Re-running when nothing has changed does no
+simulation work and just rebuilds `leagues.html`. Pulling a new version that adds
+report fields therefore re-simulates each league automatically on the next
+`update` — no `--force` needed.
 
 `--refresh` ingests each league at its **current season, auto-detected from
 today's date** — European leagues roll to the new season in July (so they track

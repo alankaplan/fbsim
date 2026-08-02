@@ -49,7 +49,7 @@ from .config import LEAGUES, LeagueConfig, get_league
 from .ingest import DATA_ROOT, MATCH_FIELDS, SOURCES, TEAM_FIELDS
 from .model import fit_model
 from .prior import build_prior, load_prior, _prev_season, PRIOR_REGRESSION
-from .run_sims import run
+from .run_sims import run, SCHEMA_VERSION
 from .generate_page import OUT, build
 
 
@@ -90,11 +90,25 @@ def ingest_league(cfg: LeagueConfig, season: str, source: str) -> bool:
     return teams_changed or matches_changed
 
 
+def _result_schema(sim_json: Path) -> int:
+    """The schema_version stamped in an existing result, or 0 if absent/unreadable."""
+    try:
+        return int(json.loads(sim_json.read_text(encoding="utf-8"))
+                   .get("meta", {}).get("schema_version", 0))
+    except (OSError, ValueError, TypeError):
+        return 0
+
+
 def needs_sim(matches_csv: Path, sim_json: Path, force: bool) -> bool:
-    """Re-simulate when forced, when no prior result exists, or when data is newer."""
+    """Re-simulate when forced, when no result exists, when the data is newer, or
+    when the existing result predates the current output schema (so pulling new
+    code that adds fields self-heals without needing --force)."""
     if force:
         return True
     if not sim_json.exists():
+        return True
+    if _result_schema(sim_json) < SCHEMA_VERSION:
+        print("  [sim] result schema outdated — re-simulating")
         return True
     return matches_csv.stat().st_mtime > sim_json.stat().st_mtime
 

@@ -42,6 +42,10 @@ from .simulator import SeasonFixtures, simulate_one, _rank_cluster, _accumulate
 
 LOG2 = np.log(2.0)
 
+# Bump whenever the sim_results.json payload gains fields the report relies on,
+# so `update` re-simulates leagues whose on-disk result predates the change.
+SCHEMA_VERSION = 2
+
 
 def _entropy(p: np.ndarray) -> float:
     """Shannon entropy (nats) of a probability vector, ignoring zero entries."""
@@ -208,7 +212,8 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
                    "title_label": cfg.title_label, "qual_label": cfg.qual_label,
                    "qual2_label": cfg.qual2_label, "drop_label": cfg.drop_label,
                    "qual_name": cfg.qual_name, "drop_name": cfg.drop_name},
-        "meta": {"n_sims": n_sims, "seed": seed, "used_xg": model.used_xg,
+        "meta": {"schema_version": SCHEMA_VERSION,
+                 "n_sims": n_sims, "seed": seed, "used_xg": model.used_xg,
                  "home_adv": round(model.home_adv, 4),
                  "champ_entropy_bits": round(H / LOG2, 3),
                  "n_played": int(fx.played.sum()), "n_remaining": int((~fx.played).sum())},
