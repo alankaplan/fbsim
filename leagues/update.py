@@ -121,7 +121,8 @@ def _played_count(matches: pd.DataFrame) -> int:
 def simulate_league(cfg: LeagueConfig, n_sims: int, seed: int,
                     reg: float, recency_halflife: float | None,
                     source: str, no_prior: bool,
-                    prior_regression: float = PRIOR_REGRESSION) -> None:
+                    prior_regression: float = PRIOR_REGRESSION,
+                    resolution_sims: int = 250) -> None:
     data_dir = DATA_ROOT / cfg.key
     teams = pd.read_csv(data_dir / "teams.csv")
     matches = pd.read_csv(data_dir / "matches.csv")
@@ -139,7 +140,7 @@ def simulate_league(cfg: LeagueConfig, n_sims: int, seed: int,
             print(f"  [prior] skipped: {exc}")
 
     model = fit_model(teams, matches, reg=reg, recency_halflife=recency_halflife, prior=prior)
-    payload = run(cfg, teams, matches, model, n_sims, seed)
+    payload = run(cfg, teams, matches, model, n_sims, seed, resolution_sims=resolution_sims)
     payload["meta"]["as_of"] = None
     payload["meta"]["used_prior"] = prior is not None
     out = data_dir / "sim_results.json"
@@ -194,6 +195,9 @@ def main() -> None:
     ap.add_argument("--prior-regression", type=float, default=PRIOR_REGRESSION,
                     help="regress last season's ratings toward the mean "
                          "(1.0 = off, 0.0 = flat league)")
+    ap.add_argument("--resolution-sims", type=int, default=250,
+                    help="tail forecasts per history for the 'H after' resolution "
+                         "curve (0 disables it)")
     ap.add_argument("--force", action="store_true",
                     help="re-simulate even when the data hasn't changed")
     ap.add_argument("--no-page", action="store_true", help="skip rebuilding leagues.html")
@@ -231,7 +235,8 @@ def main() -> None:
 
         if needs_sim(matches_csv, data_dir / "sim_results.json", args.force):
             simulate_league(cfg, args.sims, args.seed, args.reg, args.recency_halflife,
-                            args.source, args.no_prior, args.prior_regression)
+                            args.source, args.no_prior, args.prior_regression,
+                            args.resolution_sims)
             simulated.append(cfg.key)
         else:
             print("  [sim] up to date — skipping (use --force to re-run).")

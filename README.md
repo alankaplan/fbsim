@@ -199,10 +199,12 @@ date-only for sources without a timestamp), model expected goals, win/draw/loss
 probabilities, **Info%** — how much that fixture is expected to decide the
 title, measured as the percent drop in the entropy of the champion distribution
 once its result is known (the mutual information between the game's outcome and
-who wins the league) — and **H after**, the running title-race entropy (bits)
-still remaining once that game and everything before it is played (chronological
-order), falling to 0 by season's end. Sort by Kickoff to watch H after tick down,
-or by Info% to surface the season's most decisive games.
+who wins the league) — and **H after**, the *expected* title-race entropy (bits)
+still remaining once that game's round is played, estimated by re-forecasting the
+rest of the season from sampled partial standings (`--resolution-sims`, `0`
+disables). It declines gradually across the season to 0 at the end — a genuine
+"how decided is the title" resolution curve. Sort by Kickoff to watch H after tick
+down, or by Info% to surface the season's most decisive single games.
 
 **Preseason ratings are regressed toward the mean.** Last season's attack/defense
 ratings are scaled toward league average before seeding a new season, so the

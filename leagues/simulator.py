@@ -131,6 +131,49 @@ class SeasonFixtures:
                            self.n, self.team_ids)
 
 
+def standings_batch(home: np.ndarray, away: np.ndarray,
+                    hg: np.ndarray, ag: np.ndarray, n: int):
+    """Vectorised standings for a batch of simulated seasons.
+
+    ``home``/``away`` are ``(G,)`` team indices; ``hg``/``ag`` are ``(B, G)``
+    goal arrays (B seasons, G games). Returns ``(pts, wins, gf, ga)`` each
+    ``(B, n)``. ``np.add.at`` accumulates unbuffered so a team's repeated games
+    all count.
+    """
+    B = hg.shape[0]
+    rows = np.arange(B)[:, None]
+    hcol = home[None, :]
+    acol = away[None, :]
+    hw = (hg > ag).astype(np.int32)
+    aw = (ag > hg).astype(np.int32)
+    dr = (hg == ag).astype(np.int32)
+    pts = np.zeros((B, n)); wins = np.zeros((B, n)); gf = np.zeros((B, n)); ga = np.zeros((B, n))
+    np.add.at(pts, (rows, hcol), 3 * hw + dr)
+    np.add.at(pts, (rows, acol), 3 * aw + dr)
+    np.add.at(wins, (rows, hcol), hw); np.add.at(wins, (rows, acol), aw)
+    np.add.at(gf, (rows, hcol), hg); np.add.at(gf, (rows, acol), ag)
+    np.add.at(ga, (rows, hcol), ag); np.add.at(ga, (rows, acol), hg)
+    return pts, wins, gf, ga
+
+
+def champion_batch(pts: np.ndarray, wins: np.ndarray, gd: np.ndarray,
+                   gf: np.ndarray, criteria: tuple[str, ...]) -> np.ndarray:
+    """Champion (rank-1) team index per row for a batch of final tables.
+
+    Applies the league's tiebreaker chain lexicographically over the available
+    per-team metrics; ``h2h`` (which needs each season's own match list) is
+    skipped as a negligible approximation for the rare teams tied at the very
+    top. Ties that survive resolve to the lowest index (deterministic).
+    """
+    metrics = {"pts": pts, "wins": wins, "gd": gd, "gf": gf}
+    seq = [metrics[c] for c in criteria if c in metrics] or [pts]
+    cand = np.ones(pts.shape, dtype=bool)
+    for met in seq:
+        masked = np.where(cand, met, -np.inf)
+        cand &= masked >= masked.max(axis=1, keepdims=True) - 1e-9
+    return cand.argmax(axis=1)
+
+
 def _accumulate(home, away, hg, ag, n, team_ids) -> dict[int, dict[str, int]]:
     home_win = (hg > ag).astype(int)
     away_win = (ag > hg).astype(int)

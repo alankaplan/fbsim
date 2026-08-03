@@ -37,14 +37,18 @@ from .config import LeagueConfig, get_league
 from .ingest import DATA_ROOT
 from .model import fit_model, LeagueModel
 from .prior import load_prior, PRIOR_REGRESSION
-from .simulator import SeasonFixtures, simulate_one, _rank_cluster, _accumulate
+from .simulator import (SeasonFixtures, simulate_one, _rank_cluster, _accumulate,
+                        standings_batch, champion_batch)
 
 
 LOG2 = np.log(2.0)
 
 # Bump whenever the sim_results.json payload gains/changes fields the report
 # relies on, so `update` re-simulates leagues whose on-disk result predates it.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
+
+RES_HISTORIES = 30      # sampled partial-season histories per round cutoff
+RES_MAXCUT = 18         # cap on distinct round cutoffs (interpolate the rest)
 
 
 def _entropy(p: np.ndarray) -> float:
@@ -85,8 +89,73 @@ def current_table(fx: SeasonFixtures) -> dict[int, dict]:
     return {tid: {**stats[tid], "rank": cur_rank[tid]} for tid in fx.team_ids}
 
 
+def _resolution_curve(fx: SeasonFixtures, round_val: np.ndarray,
+                      rng: np.random.Generator, n_fore: int,
+                      n_hist: int = RES_HISTORIES, maxcut: int = RES_MAXCUT) -> np.ndarray:
+    """Expected champion entropy (bits) remaining after each round is played.
+
+    For each round cutoff we sample ``n_hist`` partial-season histories (the games
+    in rounds ≤ cutoff), then for each history re-forecast the rest of the season
+    ``n_fore`` times and measure the entropy of the resulting champion
+    distribution; averaging over histories gives ``H(cutoff)``. Re-forecasting
+    (rather than binning the fixed sample) is what avoids the finite-sample
+    shattering that would otherwise drive the estimate to a false 0 after a few
+    games. Returns a value per remaining fixture (aligned to ``round_val``),
+    interpolated across cutoffs, declining from ≈ the baseline toward 0 at season's
+    end.
+    """
+    n = fx.n
+    R = round_val.shape[0]
+    if R == 0:
+        return np.zeros(0)
+    rem = ~fx.played
+    home_r, away_r = fx.home[rem], fx.away[rem]
+    lamh_r, lama_r = fx.lam_h[rem], fx.lam_a[rem]
+    criteria = fx.cfg.tiebreakers
+
+    # Fixed standings from already-played games (added into every history).
+    pl = fx.played
+    bp, bw, bgf, bga = standings_batch(fx.home[pl], fx.away[pl],
+                                       fx.fixed_hg[pl][None, :], fx.fixed_ag[pl][None, :], n)
+    base_pts, base_wins, base_gf, base_ga = bp[0], bw[0], bgf[0], bga[0]
+
+    rounds = np.unique(round_val)
+    if len(rounds) > maxcut:
+        rounds = np.unique(rounds[np.linspace(0, len(rounds) - 1, maxcut).round().astype(int)])
+    H_at = np.zeros(len(rounds))
+    for ci, c in enumerate(rounds):
+        hist, tail = round_val <= c, round_val > c
+        nh, nt = int(hist.sum()), int(tail.sum())
+        if nh:
+            hg = rng.poisson(lamh_r[hist], size=(n_hist, nh))
+            ag = rng.poisson(lama_r[hist], size=(n_hist, nh))
+            hp, hw, hgf, hga = standings_batch(home_r[hist], away_r[hist], hg, ag, n)
+        else:
+            hp = hw = hgf = hga = np.zeros((n_hist, n))
+        hp = hp + base_pts; hw = hw + base_wins; hgf = hgf + base_gf; hga = hga + base_ga
+        ents = np.zeros(n_hist)
+        for kk in range(n_hist):
+            if nt:
+                tg = rng.poisson(lamh_r[tail], size=(n_fore, nt))
+                ta = rng.poisson(lama_r[tail], size=(n_fore, nt))
+                tp, tw, tgf, tga = standings_batch(home_r[tail], away_r[tail], tg, ta, n)
+                pts, wins = tp + hp[kk], tw + hw[kk]
+                gf, ga = tgf + hgf[kk], tga + hga[kk]
+            else:                                     # nothing left ⇒ champion fixed
+                pts, wins = hp[kk][None, :], hw[kk][None, :]
+                gf, ga = hgf[kk][None, :], hga[kk][None, :]
+            champ = champion_batch(pts, wins, gf - ga, gf, criteria)
+            counts = np.bincount(champ, minlength=n).astype(float)
+            ents[kk] = _entropy(counts / counts.sum()) / LOG2
+        H_at[ci] = float(ents.mean())
+    # The true curve is non-increasing (more games played ⇒ no more uncertainty);
+    # clamp Monte-Carlo wobble so the displayed series never ticks back up.
+    H_at = np.minimum.accumulate(H_at)
+    return np.interp(round_val, rounds, H_at)
+
+
 def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
-        model: LeagueModel, n_sims: int, seed: int) -> dict:
+        model: LeagueModel, n_sims: int, seed: int, resolution_sims: int = 250) -> dict:
     fx = SeasonFixtures(cfg, teams, matches, model)
     n = fx.n
     rng = np.random.default_rng(seed)
@@ -181,16 +250,21 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
     info_rank[info_order] = np.arange(R)
     cum_bits = _reveal(info_order)
 
-    # (2) Chronological (kickoff order): the title-race entropy still remaining
-    # after each game is played — non-increasing through the season, reaching ~0
-    # once the final results are known (all games decided ⇒ champion determined).
+    # (2) Resolution curve (post_bits): the *expected* champion entropy still
+    # remaining after each round is played, estimated by re-forecasting the rest
+    # of the season from sampled partial standings. Unlike a per-game reveal of the
+    # fixed sample, this doesn't shatter into false-0 after a matchday — it declines
+    # gradually and only reaches ~0 near the end. Keyed by round (matchday), or by
+    # chronological order when the source carries no matchday.
     col_mn = fx.match_numbers[~fx.played]
-    def _when(j: int):
-        mn = int(col_mn[j])
-        s = _clean_str(dt_of.get(mn, "")) or _clean_str(date_of.get(mn, ""))
-        return (s == "", s, mn)                      # undated last, then chronological
-    chrono_order = np.array(sorted(range(R), key=_when), dtype=int)
-    post_bits = _reveal(chrono_order)
+    round_val = pd.to_numeric(matches["matchday"], errors="coerce").to_numpy()[~fx.played].astype(float)
+    if R and np.isnan(round_val).any():              # no matchdays: fall back to date order
+        keys = [(_clean_str(dt_of.get(int(mn), "")) or _clean_str(date_of.get(int(mn), "")), int(mn))
+                for mn in col_mn]
+        dense = {k: i for i, k in enumerate(sorted(set(keys)))}
+        round_val = np.array([dense[k] for k in keys], dtype=float)
+    post_bits = (_resolution_curve(fx, round_val, rng, resolution_sims)
+                 if (resolution_sims and R and H > 1e-12) else np.zeros(R))
 
     # Remaining-fixture analytic W/D/L from the model (aligned to `outc` columns).
     fixtures = []
@@ -252,6 +326,9 @@ def main() -> None:
     ap.add_argument("--prior-regression", type=float, default=PRIOR_REGRESSION,
                     help="regress last season's ratings toward the mean "
                          "(1.0 = off, 0.0 = flat league)")
+    ap.add_argument("--resolution-sims", type=int, default=250,
+                    help="tail forecasts per history for the 'H after' resolution "
+                         "curve (0 disables it)")
     args = ap.parse_args()
 
     cfg = get_league(args.league)
@@ -263,7 +340,8 @@ def main() -> None:
     prior = None if args.no_prior else load_prior(cfg, args.prior_regression)
     model = fit_model(teams, matches, reg=args.reg, recency_halflife=args.recency_halflife,
                       prior=prior, prior_weight=args.prior_weight)
-    payload = run(cfg, teams, matches, model, args.sims, args.seed)
+    payload = run(cfg, teams, matches, model, args.sims, args.seed,
+                  resolution_sims=args.resolution_sims)
     payload["meta"]["as_of"] = args.as_of
     payload["meta"]["used_prior"] = prior is not None
 
