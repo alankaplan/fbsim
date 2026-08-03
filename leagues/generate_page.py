@@ -19,7 +19,10 @@ Views: a league switcher across all simulated leagues, plus
   * Top games — a cross-league schedule where each league contributes just enough
     of its most decisive games to fall below a shared title-race entropy threshold
     (in bits), plus every remaining game of any teams followed from a dropdown;
-  * Team detail — a team's full finishing-position distribution.
+  * Team detail — a team's finishing-position distribution, its full schedule
+    (past results + upcoming games with predictions and per-game title/finish
+    swing), and an interactive branching tree of how its title odds (or expected
+    finish) shift as you walk a win/draw/loss path through its next games.
 
 Usage
 -----
@@ -124,6 +127,37 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .kpi { background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 10px 16px; }
   .kpi .v { font-size: 22px; font-weight: 600; }
   .kpi .k { color: #8b949e; font-size: 12px; }
+  .sec-h { font-size: 15px; font-weight: 600; margin: 22px 0 2px; }
+  .tsched td, .tsched th { text-align: left; }
+  .tsched tr.now td { border-top: 2px solid #f78166; }
+  .res { font-weight: 600; }
+  .res.w { color: #3fb950; } .res.d { color: #8b949e; } .res.l { color: #f85149; }
+  .swing b { font-weight: 600; margin-right: 10px; font-variant-numeric: tabular-nums; }
+  .sw-w { color: #3fb950; } .sw-d { color: #8b949e; } .sw-l { color: #f85149; }
+  .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 14px; }
+  .crumb { cursor: pointer; padding: 2px 9px; border: 1px solid #30363d; border-radius: 14px;
+    background: #161b22; font-size: 12px; color: #c9d1d9; }
+  .crumb:hover { border-color: #58a6ff; }
+  .crumb b { color: #e6edf3; }
+  .crumb-sep { color: #8b949e; }
+  .reset { margin-left: 4px; font-size: 12px; }
+  .next-game { color: #8b949e; font-size: 13px; margin-bottom: 8px; }
+  .next-game b { color: #e6edf3; }
+  .branches { display: flex; gap: 12px; flex-wrap: wrap; max-width: 620px; }
+  .branch { flex: 1; min-width: 150px; background: #161b22; border: 1px solid #30363d;
+    border-radius: 10px; padding: 12px 14px; cursor: pointer; }
+  .branch:hover { border-color: #58a6ff; }
+  .branch.win { box-shadow: inset 0 3px 0 #238636; }
+  .branch.draw { box-shadow: inset 0 3px 0 #6e7681; }
+  .branch.loss { box-shadow: inset 0 3px 0 #da3633; }
+  .branch.leaf, .branch.low { cursor: default; }
+  .branch.leaf:hover, .branch.low:hover { border-color: #30363d; }
+  .branch.low { opacity: .5; }
+  .branch .b-h { font-size: 12px; color: #8b949e; text-transform: uppercase; letter-spacing: .04em; }
+  .branch .b-v { font-size: 24px; font-weight: 600; margin: 2px 0; }
+  .branch .b-d { font-size: 12px; font-weight: 600; }
+  .branch .b-d.good { color: #3fb950; } .branch .b-d.bad { color: #f85149; }
+  .branch .b-s { font-size: 11px; color: #6e7681; margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -185,6 +219,7 @@ const LEAGUES = __DATA_PLACEHOLDER__;
   let teamDDOpen = false, teamFilter = "";
   let filter = "";
   let teamCode = null;
+  let treePath = [], treeTeam = null;              // odds-tree drill-down state
 
   const $ = (id) => document.getElementById(id);
   const pct = (x) => (x === 0 ? '<span class="zero">0</span>' : x.toFixed(1));
@@ -542,16 +577,74 @@ const LEAGUES = __DATA_PLACEHOLDER__;
   }
 
   // ---- Team detail ----
+  function teamSchedule(L, code) {              // past results + future fixtures for a team
+    const rows = [];
+    (L.results || []).forEach(f => {
+      if (f.home !== code && f.away !== code) return;
+      const home = f.home === code, gf = home ? f.home_goals : f.away_goals,
+            ga = home ? f.away_goals : f.home_goals;
+      rows.push({ past: true, sort: f.datetime_utc || f.date || "", f, home,
+                  opp: home ? f.away_name : f.home_name,
+                  gf, ga, res: gf > ga ? "W" : gf === ga ? "D" : "L" });
+    });
+    (L.fixtures || []).forEach(f => {
+      if (f.home !== code && f.away !== code) return;
+      const home = f.home === code;
+      rows.push({ past: false, sort: f.datetime_utc || f.date || "￿", f, home,
+                  opp: home ? f.away_name : f.home_name });
+    });
+    rows.sort((a, b) => a.sort < b.sort ? -1 : a.sort > b.sort ? 1 : 0);
+    return rows;
+  }
+
   function renderTeam() {
     const L = LEAGUES[cur];
     const r = L.teams.find(t => t.code===teamCode) || L.teams[0];
     const n = L.league.n_teams;
+    if (r.code !== treeTeam) { treePath = []; treeTeam = r.code; }
     const pmax = Math.max(...r.position_probs, 0.05);
     const bars = r.position_probs.map((p,i) =>
       `<div class="col" style="height:${(p/pmax*100).toFixed(1)}%"
         title="#${i+1}: ${(p*100).toFixed(1)}%"></div>`).join("");
     const labels = r.position_probs.map((_,i) =>
       `<div class="lbl" style="flex:1">${(i+1)%2===1||n<=20?i+1:""}</div>`).join("");
+
+    // Metric that drives the swings/tree: title% for contenders, else expected finish.
+    const useTitle = r.title_pct >= 1.0;
+    const minSup = Math.max(25, Math.round(L.meta.n_sims * 0.004));
+    const getV = nd => useTitle ? nd.title : nd.exp_finish;
+    const fmtV = v => v == null ? "–" : (useTitle ? v.toFixed(1) + "%" : v.toFixed(1));
+    const metricName = useTitle ? "title %" : "expected finish";
+
+    // Schedule table (past results + future predictions with per-game swing).
+    const sw = r.future_swings || {};
+    const swCell = f => {
+      const s = sw[f.match_number]; if (!s) return "";
+      const v = o => fmtV(useTitle ? s[o].title : s[o].exp_finish);
+      return `<span class="swing"><b class="sw-w">${v('w')}</b><b class="sw-d">${v('d')}</b><b class="sw-l">${v('l')}</b></span>`;
+    };
+    const sched = teamSchedule(L, r.code);
+    const firstFut = sched.findIndex(x => !x.past);
+    const schBody = sched.map((row, i) => {
+      const f = row.f, opp = `${esc(row.opp)} <span class="pos">(${row.home ? 'H' : 'A'})</span>`;
+      const nowCls = i === firstFut ? ' class="now"' : '';
+      if (row.past)
+        return `<tr${nowCls}><td>${esc(f.date || "")}</td><td>${opp}</td>`
+          + `<td><span class="res ${row.res.toLowerCase()}">${row.gf}–${row.ga} ${row.res}</span></td><td></td></tr>`;
+      const wdl = `<span class="wdl"><span class="w" style="width:${f.win*100}%"></span>`
+        + `<span class="d" style="width:${f.draw*100}%"></span><span class="l" style="width:${f.loss*100}%"></span></span>`;
+      return `<tr${nowCls}><td>${esc(kickoff(f))}</td><td>${opp}</td><td>${wdl}</td><td>${swCell(f)}</td></tr>`;
+    }).join("");
+    const schedHtml = sched.length
+      ? `<div class="sec-h">Schedule</div>
+         <div class="legend">Past results and upcoming games. For remaining games, the last column shows
+           this team's <b>${metricName}</b> if they <b class="sw-w">win</b> / <b class="sw-d">draw</b> /
+           <b class="sw-l">lose</b> that game (all else simulated).</div>
+         <div class="wrap"><table class="tsched"><thead><tr><th>When</th><th>Opponent</th>
+           <th>Result / W-D-L</th><th>${useTitle ? "title" : "finish"} if W / D / L</th></tr></thead>
+           <tbody>${schBody}</tbody></table></div>`
+      : "";
+
     $("team-view").innerHTML =
       `<h2 style="margin:0 0 2px">${esc(r.name)}</h2>
        <div class="sub">Currently ${r.cur_rank}${ord(r.cur_rank)} · ${r.cur_pts} pts from ${r.played} played</div>
@@ -564,7 +657,59 @@ const LEAGUES = __DATA_PLACEHOLDER__;
        </div>
        <div class="legend">Finishing-position distribution across ${L.meta.n_sims.toLocaleString()} simulations.</div>
        <div class="dist">${bars}</div>
-       <div style="display:flex">${labels}</div>`;
+       <div style="display:flex">${labels}</div>
+       ${schedHtml}
+       <div class="sec-h">Branching: ${metricName} after each game</div>
+       <div class="legend">Walk a scenario — click <b class="sw-w">Win</b>, <b class="sw-d">Draw</b> or
+         <b class="sw-l">Loss</b> to see this team's ${metricName} conditioned on that path over its next
+         few games (everything else simulated). Faint branches have too few matching simulations to trust.</div>
+       <div id="odds-tree"></div>`;
+
+    // Interactive drill-down tree over r.odds_tree, driven by treePath.
+    function renderTree() {
+      const el = $("odds-tree"); if (!el) return;
+      const root = r.odds_tree;
+      if (!root) { el.innerHTML = `<div class="legend">No games remaining.</div>`; return; }
+      const label = { win: "W", draw: "D", loss: "L" }, word = { win: "Win", draw: "Draw", loss: "Loss" };
+      let node = root;
+      const crumbs = [`<span class="crumb" data-i="0">Now <b>${fmtV(getV(root))}</b></span>`];
+      for (let i = 0; i < treePath.length && node.branches; i++) {
+        const g = node.game, o = treePath[i];
+        node = node.branches[o];
+        crumbs.push(`<span class="crumb-sep">→</span>`
+          + `<span class="crumb" data-i="${i+1}">${label[o]} v ${esc(g.opp)} <b>${fmtV(getV(node))}</b></span>`);
+      }
+      let body;
+      if (node.branches && node.game) {
+        const g = node.game, base = getV(node);
+        const cards = ["win", "draw", "loss"].map(o => {
+          const c = node.branches[o], v = getV(c), d = (v == null || base == null) ? 0 : v - base;
+          const good = useTitle ? d > 0 : d < 0;
+          const dStr = (d > 0 ? "+" : "") + (useTitle ? d.toFixed(1) + "pp" : d.toFixed(2));
+          const drillable = !!c.branches, low = c.support < minSup;
+          const cls = "branch " + o + (low ? " low" : (drillable ? "" : " leaf"));
+          return `<div class="${cls}" ${(drillable && !low) ? `data-o="${o}"` : ""}>
+              <div class="b-h">${word[o]}</div><div class="b-v">${fmtV(v)}</div>
+              <div class="b-d ${good ? "good" : "bad"}">${c.support ? dStr : ""}</div>
+              <div class="b-s">n=${c.support.toLocaleString()}</div></div>`;
+        }).join("");
+        body = `<div class="next-game">Next: <b>${esc(g.opp_name || g.opp)}</b> (${g.ha}) · ${esc(kickoff(g))}</div>
+                <div class="branches">${cards}</div>`;
+      } else {
+        body = `<div class="legend">${node.support < minSup
+          ? "Too few matching simulations to branch further along this path."
+          : "End of the branching horizon."}</div>`;
+      }
+      el.innerHTML = `<div class="crumbs">${crumbs.join(" ")}`
+        + `${treePath.length ? ' <a class="reset">reset</a>' : ''}</div>${body}`;
+      el.querySelectorAll(".branch[data-o]").forEach(b =>
+        b.onclick = () => { treePath.push(b.dataset.o); renderTree(); });
+      el.querySelectorAll(".crumb").forEach(c =>
+        c.onclick = () => { treePath = treePath.slice(0, +c.dataset.i); renderTree(); });
+      const rs = el.querySelector(".reset");
+      if (rs) rs.onclick = () => { treePath = []; renderTree(); };
+    }
+    renderTree();
   }
   function ord(n){ const s=["th","st","nd","rd"], v=n%100; return s[(v-20)%10]||s[v]||s[0]; }
 

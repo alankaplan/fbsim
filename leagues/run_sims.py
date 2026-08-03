@@ -45,10 +45,11 @@ LOG2 = np.log(2.0)
 
 # Bump whenever the sim_results.json payload gains/changes fields the report
 # relies on, so `update` re-simulates leagues whose on-disk result predates it.
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 RES_HISTORIES = 30      # sampled partial-season histories per round cutoff
 RES_MAXCUT = 18         # cap on distinct round cutoffs (interpolate the rest)
+TREE_DEPTH = 5          # games deep for the per-team title-odds drill-down tree
 
 
 def _entropy(p: np.ndarray) -> float:
@@ -166,11 +167,13 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
     pts_samples = np.zeros((n_sims, n), dtype=np.int32)
     champ = np.empty(n_sims, dtype=np.int32)         # champion (rank-1) team index per sim
     outc = np.empty((n_sims, R), dtype=np.int8)      # unplayed-fixture outcome per sim
+    rank_samples = np.empty((n_sims, n), dtype=np.int16)  # finishing position per team per sim
     for s in range(n_sims):
         rank, pts, out_s = simulate_one(fx, rng, return_outcomes=True)
         pos_counts[np.arange(n), rank - 1] += 1
         pts_sum += pts
         pts_samples[s] = pts
+        rank_samples[s] = rank
         champ[s] = int(np.argmin(rank))              # rank 1 is the champion
         outc[s] = out_s
 
@@ -291,6 +294,85 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
         })
         j += 1
 
+    # Played games (with final scores) — the team-detail schedule's "past" half.
+    results = []
+    for k in range(len(fx.home)):
+        if not fx.played[k]:
+            continue
+        hid, aid = fx.team_ids[fx.home[k]], fx.team_ids[fx.away[k]]
+        mn = int(fx.match_numbers[k])
+        results.append({
+            "match_number": mn,
+            "date": _clean_str(date_of.get(mn, "")),
+            "datetime_utc": _clean_str(dt_of.get(mn, "")),
+            "home": code_of.get(hid, ""), "away": code_of.get(aid, ""),
+            "home_name": name_of.get(hid, ""), "away_name": name_of.get(aid, ""),
+            "home_goals": int(fx.fixed_hg[k]), "away_goals": int(fx.fixed_ag[k]),
+        })
+
+    # Per-team title odds: how a team's championship chance (and expected finish)
+    # shifts with each upcoming result. Two robust reads, both from the existing
+    # sample: a per-game marginal *swing* (condition on one game — always dense) and
+    # a compounding *drill-down tree* over the next TREE_DEPTH games (condition on
+    # the team's own path; shallow, so cells stay dense and don't shatter).
+    def _kick(mn: int):
+        s = _clean_str(dt_of.get(mn, "")) or _clean_str(date_of.get(mn, ""))
+        return (s == "", s, mn)                      # undated last, then chronological
+
+    rem_list, jc = [], 0
+    for k in range(len(fx.home)):
+        if fx.played[k]:
+            continue
+        rem_list.append((jc, k, int(fx.match_numbers[k])))
+        jc += 1
+
+    min_support = max(30, int(0.004 * n_sims))
+    team_odds: dict[int, dict] = {}
+    for i, tid in enumerate(fx.team_ids):
+        games = [(jj, mn, bool(fx.home[k] == i),
+                  int(fx.away[k] if fx.home[k] == i else fx.home[k]))
+                 for (jj, k, mn) in rem_list if i in (fx.home[k], fx.away[k])]
+        games.sort(key=lambda g: _kick(g[1]))
+        if not games:
+            team_odds[tid] = {"future_swings": {}, "odds_tree": None}
+            continue
+        # team-perspective outcome per column: 0 win, 1 draw, 2 loss
+        tcol = {g[0]: (outc[:, g[0]] if g[2] else 2 - outc[:, g[0]]) for g in games}
+        is_champ, ranks_i = (champ == i), rank_samples[:, i]
+
+        def _stats(mask: np.ndarray) -> dict:
+            c = int(mask.sum())
+            if not c:
+                return {"title": None, "exp_finish": None, "support": 0}
+            return {"title": round(100 * float(is_champ[mask].mean()), 2),
+                    "exp_finish": round(float(ranks_i[mask].mean()), 2), "support": c}
+
+        future_swings = {str(mn): {key: _stats(tcol[jj] == o)
+                                   for key, o in (("w", 0), ("d", 1), ("l", 2))}
+                         for (jj, mn, _, _) in games}
+
+        def _node(mask: np.ndarray, depth: int) -> dict:
+            node = _stats(mask)
+            if depth < TREE_DEPTH and depth < len(games) and node["support"] >= min_support:
+                jj, mn, is_home, opp = games[depth]
+                otid = fx.team_ids[opp]
+                node["game"] = {"match_number": mn, "opp": code_of.get(otid, ""),
+                                "opp_name": name_of.get(otid, ""),
+                                "ha": "H" if is_home else "A",
+                                "date": _clean_str(date_of.get(mn, "")),
+                                "datetime_utc": _clean_str(dt_of.get(mn, ""))}
+                node["branches"] = {name: _node(mask & (tcol[jj] == o), depth + 1)
+                                    for name, o in (("win", 0), ("draw", 1), ("loss", 2))}
+            return node
+
+        team_odds[tid] = {"future_swings": future_swings,
+                          "odds_tree": _node(np.ones(n_sims, dtype=bool), 0)}
+
+    for row in team_rows:
+        o = team_odds.get(row["team_id"], {})
+        row["future_swings"] = o.get("future_swings", {})
+        row["odds_tree"] = o.get("odds_tree")
+
     return {
         "league": {"key": cfg.key, "name": cfg.name, "country": cfg.country,
                    "n_teams": n, "ucl_slots": cfg.ucl_slots,
@@ -306,6 +388,7 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
                  "n_played": int(fx.played.sum()), "n_remaining": int((~fx.played).sum())},
         "teams": team_rows,
         "fixtures": fixtures,
+        "results": results,
     }
 
 

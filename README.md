@@ -183,8 +183,8 @@ venv/bin/python -m leagues.generate_page --open   # and open in a browser
 
 Produces a self-contained `leagues.html` (no server, no dependencies) with a
 league switcher and five views: standings odds, a position-probability heatmap,
-remaining fixtures, a cross-league **Top games** schedule, and per-team
-finishing distributions.
+remaining fixtures, a cross-league **Top games** schedule, and a per-team detail
+view (finishing distribution, full schedule, and a branching title-odds explorer).
 
 Each league page also reports its **title-race entropy in bits** (in the header)
 — the Shannon entropy of the simulated champion distribution, i.e. how open the
@@ -225,6 +225,19 @@ remaining game of any team you pick — a "follow my teams" list on top of the
 threshold picks. Both the threshold and the followed teams are remembered across
 visits (`localStorage`). The combined list is sortable and defaults to
 chronological order — a quick "what should I watch" board.
+
+Clicking any team opens its **Team detail** view: the finishing-position
+distribution, the team's **full schedule** (past games with results, upcoming
+games with win/draw/loss predictions and — for each remaining game — how the
+team's title odds move if it wins, draws, or loses), and a **branching explorer**.
+The branch is interactive: click Win / Draw / Loss to walk a scenario across the
+team's next games and watch its title probability update along the chosen path,
+each node conditioned on that path (everything else simulated). For non-contenders
+the metric automatically switches from title % to **expected finishing position**,
+which stays meaningful mid-table. Branches with too few matching simulations to
+trust are faded out. Because each node re-reads the team's *own* results only
+(never a long joint sequence of every game), the estimates stay dense and reliable
+a handful of games deep rather than collapsing to spurious certainty.
 
 ## The model
 
