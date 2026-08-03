@@ -114,7 +114,7 @@ def main() -> None:
     from .ingest import SOURCES
     ap = argparse.ArgumentParser(
         description="Build a preseason prior from a league's previous season.")
-    ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls)")
+    ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls, nwsl, usl)")
     ap.add_argument("--source", default="fixturedownload", choices=list(SOURCES),
                     help="data source for the prior season (default: fixturedownload)")
     ap.add_argument("--season", default=None,

@@ -545,7 +545,7 @@ SOURCES = {
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Ingest league fixtures/results into canonical CSVs.")
-    ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls)")
+    ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls, nwsl, usl)")
     ap.add_argument("--season", required=True,
                     help="season: start year (fixturedownload, e.g. 2025 / 2026), "
                          "2025-2026 (fbref), or 2024-25 (openfootball)")

@@ -1,7 +1,8 @@
 # fbsim
 
-A **domestic-league season simulator** for the big-five European leagues and
-MLS. Team strengths are fit as attack/defense Poisson ratings from FBref
+A **domestic-league season simulator** for the big-five European leagues plus
+three North American ones (MLS, NWSL, USL Championship). Team strengths are fit as
+attack/defense Poisson ratings from FBref
 expected-goals (xG) data (falling back to actual goals), and full seasons are
 run by Monte Carlo to produce title, qualification and relegation probabilities.
 
@@ -80,20 +81,25 @@ A layered pipeline under `leagues/`:
 | `update.py` | One command: ingest → simulate what changed → rebuild the report |
 
 Supported leagues (keys): `eng` (Premier League), `esp` (La Liga),
-`ita` (Serie A), `de` (Bundesliga), `fr` (Ligue 1), `mls` (MLS). Slot counts and
-tiebreaker order are per-league — Spain and Italy apply head-to-head before
-overall goal difference; England, Germany and France use overall goal difference
-first; MLS ranks on wins before goal difference.
+`ita` (Serie A), `de` (Bundesliga), `fr` (Ligue 1), `mls` (MLS), `nwsl` (NWSL),
+`usl` (USL Championship). Slot counts and tiebreaker order are per-league — Spain
+and Italy apply head-to-head before overall goal difference; England, Germany and
+France use overall goal difference first; the US leagues rank on wins before goal
+difference.
 
-**MLS notes.** MLS is modeled as a single 30-team table producing the
-Supporters' Shield race and playoff qualification (top-18 as a single-table
-approximation of the 9-per-conference field). The two conferences and the MLS
-Cup playoff bracket are not modeled, and there is no relegation, so its report
-shows **Shield%** and **Playoff%** columns instead of Champions League / Europe /
-relegation. Its season is a calendar year (auto-detected — e.g. `mls-2026` in
-2026). If you want xG via `--source fbref`, note MLS isn't one of soccerdata's
-built-in leagues, so it's auto-registered as a custom league on first use
-(best-effort).
+**US-league notes.** MLS, NWSL and USL Championship are each modeled as a single
+calendar-year table producing a regular-season (**Shield**) race and **Playoff**
+qualification — a single-table approximation of a conference league (top-18 for
+MLS, top-8 for NWSL, top-16 for USL). The conferences and the playoff brackets are
+not modeled, and there is no relegation, so their reports show **Shield%** and
+**Playoff%** columns instead of Champions League / Europe / relegation. Seasons are
+calendar years (auto-detected — e.g. `2026` in 2026). None are soccerdata built-in
+leagues, so under `--source fbref` they're auto-registered as custom leagues on
+first use (best-effort). **Data sources differ:** MLS and NWSL are on the default
+free **fixturedownload** feed (no browser needed), but **USL Championship has no
+free feed — ingest it with `--source fbref`** (FBref comp 73, via soccerdata + a
+browser). NWSL is FBref comp 182 if you want its xG. Note both data hosts must be
+reachable from your network; a locked-down egress policy may block them.
 
 ### 1. Ingest data
 
@@ -108,6 +114,8 @@ source-agnostic:
 # fixturedownload (default) — current fixtures + scores, plain JSON, no browser
 venv/bin/python -m leagues.ingest eng --season 2025
 venv/bin/python -m leagues.ingest mls --season 2026
+venv/bin/python -m leagues.ingest nwsl --season 2026
+venv/bin/python -m leagues.ingest usl --season 2026 --source fbref  # USL: no free feed
 
 # fbref via soccerdata — adds xG, through a browser (hidden on Linux via Xvfb)
 venv/bin/python -m leagues.ingest eng --season 2025-2026 --source fbref

@@ -394,7 +394,7 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Monte Carlo league-season simulation.")
-    ap.add_argument("league", help="league key (eng, esp, ita, de, fr)")
+    ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls, nwsl, usl)")
     ap.add_argument("--sims", type=int, default=20000, help="number of simulations")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--as-of", type=int, default=None,

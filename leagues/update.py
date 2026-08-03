@@ -172,7 +172,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(
         description="One command: refresh data, simulate what changed, rebuild the report.")
     ap.add_argument("leagues", nargs="*", default=None,
-                    help="league keys (default: all — eng, esp, ita, de, fr, mls)")
+                    help="league keys (default: all — eng, esp, ita, de, fr, mls, nwsl, usl)")
     ap.add_argument("--season", default=None,
                     help="ingest this season for every selected league before "
                          "simulating (e.g. 2024-25); omit to simulate from the "
