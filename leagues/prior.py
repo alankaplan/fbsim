@@ -116,7 +116,8 @@ def load_prior(cfg: LeagueConfig,
 
 
 def main() -> None:
-    from .ingest import SOURCES
+    from .ingest import SOURCES, ensure_league_dict
+    ensure_league_dict()                            # register custom leagues before soccerdata import
     ap = argparse.ArgumentParser(
         description="Build a preseason prior from a league's previous season.")
     ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls, nwsl, usl)")

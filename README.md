@@ -94,13 +94,21 @@ MLS, top-8 for NWSL, top-16 for USL). The conferences and the playoff brackets a
 not modeled, and there is no relegation, so their reports show **Shield%** and
 **Playoff%** columns instead of Champions League / Europe / relegation. Seasons are
 calendar years (auto-detected — e.g. `2026` in 2026). None are soccerdata built-in
-leagues, so under `--source fbref` they're auto-registered as custom leagues on
-first use (best-effort). **Data sources differ (and each league picks its own by
-default):** MLS and NWSL default to the free **fixturedownload** feed (no browser),
-while **USL Championship has no free feed and defaults to `fbref`** (FBref comp 73,
-via soccerdata + a browser). NWSL is FBref comp 182 if you want its xG. Note the
-soccerdata hosts must be reachable from your network; a locked-down egress policy
-may block them.
+leagues; the CLIs register them in soccerdata's `league_dict.json` **before** it is
+imported, so `USA-NWSL` / `USA-USL Championship` resolve correctly. **Data sources
+differ (and each league picks its own by default):** MLS and NWSL default to the
+free **fixturedownload** feed (no browser), while **USL Championship has no free
+feed and defaults to `fbref`** (FBref comp 73, via soccerdata + a browser). NWSL is
+FBref comp 182 if you want its xG.
+
+**US-league FBref data is best-effort and needs a browser with a display.** The
+Big-5 (xG + players via Understat, no browser) and MLS/NWSL *fixtures* (via
+fixturedownload) work headless. But **USL fixtures and *all* US-league player stats
+come from FBref**, which throws a CAPTCHA its solver can't clear in headless mode —
+so on a headless server those are slow (CAPTCHA retries) and usually **skipped**
+(the run continues; nothing is lost). Run them on a desktop, or under `xvfb-run`
+with a real display so soccerdata's GUI CAPTCHA solver can engage. A locked-down
+egress policy also blocks the soccerdata hosts entirely.
 
 ### 1. Ingest data
 

@@ -55,7 +55,7 @@ import urllib.request
 from contextlib import contextmanager
 from pathlib import Path
 
-from .config import LeagueConfig, get_league
+from .config import LEAGUES, LeagueConfig, get_league
 
 DATA_ROOT = Path(__file__).resolve().parent.parent / "data" / "leagues"
 OPENFOOTBALL_BASE = (
@@ -313,33 +313,61 @@ def _parse_score(val) -> tuple[int, int] | None:
         return None
 
 
-def _ensure_fbref_league(sd, cfg: LeagueConfig) -> None:
-    """Register a league soccerdata doesn't ship natively (e.g. MLS).
-
-    soccerdata's FBref only ships the Big-5 leagues; others are added via
-    ``<SOCCERDATA_DIR or ~/soccerdata>/config/league_dict.json``, which it reads
-    **at import time**. So we do two things: persist the entry to that file (so
-    fresh processes pick it up) and patch the already-imported ``LEAGUE_DICT`` in
-    memory (so the current process sees it without a restart). Only our own key
-    is touched; the rest of the file is preserved.
-    """
+def _league_entry(cfg: LeagueConfig) -> dict | None:
+    """soccerdata league_dict.json entry for a custom (non-built-in) league, or None."""
     if not cfg.fbref_name:
-        return
+        return None
     entry = {"FBref": cfg.fbref_name}
     if cfg.season_start:
         entry["season_start"] = cfg.season_start
     if cfg.season_end:
         entry["season_end"] = cfg.season_end
+    return entry
 
-    cfg_dir = Path(os.environ.get("SOCCERDATA_DIR", Path.home() / "soccerdata")) / "config"
-    cfg_dir.mkdir(parents=True, exist_ok=True)
-    path = cfg_dir / "league_dict.json"
+
+def _league_dict_path() -> Path:
+    return Path(os.environ.get("SOCCERDATA_DIR", Path.home() / "soccerdata")) / "config" / "league_dict.json"
+
+
+def ensure_league_dict() -> None:
+    """Register every custom league (MLS/NWSL/USL) in soccerdata's league_dict.json.
+
+    soccerdata merges that file into its ``LEAGUE_DICT`` **only once, at import**
+    (``_config.py``), so a league added afterward isn't recognised. Call this at the
+    very start of a CLI ``main()`` — before soccerdata is imported (it's imported
+    lazily inside the source functions) — so the import-time merge picks up all
+    custom leagues. Pure JSON file I/O; merges with any existing entries.
+    """
+    entries = {cfg.fbref_league: e for cfg in LEAGUES.values()
+               if (e := _league_entry(cfg)) is not None}
+    if not entries:
+        return
+    path = _league_dict_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    if any(data.get(k) != v for k, v in entries.items()):
+        data.update(entries)
+        path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def _ensure_fbref_league(sd, cfg: LeagueConfig) -> None:
+    """Register a single custom league (redundant live-patch fallback to
+    :func:`ensure_league_dict`, which should already have run before import).
+
+    Persists the entry to ``league_dict.json`` (so fresh processes pick it up) and
+    patches the already-imported ``LEAGUE_DICT`` in memory. Only its own key is
+    touched; the rest of the file is preserved.
+    """
+    entry = _league_entry(cfg)
+    if entry is None:
+        return
+    path = _league_dict_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
     data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     if data.get(cfg.fbref_league) != entry:
         data[cfg.fbref_league] = entry
         path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
 
-    # soccerdata reads the file only at import; patch the live dicts too.
     for mod in ("_config", "_common"):
         live = getattr(getattr(sd, mod, None), "LEAGUE_DICT", None)
         if isinstance(live, dict):
@@ -682,6 +710,7 @@ def main() -> None:
                          "from Understat automatically.")
     args = ap.parse_args()
 
+    ensure_league_dict()                            # register custom leagues before soccerdata import
     cfg = get_league(args.league)
     source = args.source or cfg.default_source
     teams, matches, n_added = ingest_dataset(cfg, args.season, source, cfg.xg_source)

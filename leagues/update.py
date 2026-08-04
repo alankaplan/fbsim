@@ -46,7 +46,7 @@ from pathlib import Path
 import pandas as pd
 
 from .config import LEAGUES, LeagueConfig, get_league
-from .ingest import DATA_ROOT, MATCH_FIELDS, SOURCES, TEAM_FIELDS, ingest_dataset
+from .ingest import DATA_ROOT, MATCH_FIELDS, SOURCES, TEAM_FIELDS, ingest_dataset, ensure_league_dict
 from .model import fit_model
 from .prior import build_prior, load_prior, _prev_season, PRIOR_REGRESSION
 from .run_sims import run, SCHEMA_VERSION
@@ -214,6 +214,7 @@ def main() -> None:
     ap.add_argument("--open", action="store_true", help="open the page in a browser")
     args = ap.parse_args()
 
+    ensure_league_dict()                            # register custom leagues before soccerdata import
     keys = args.leagues or list(LEAGUES)
     cfgs = [get_league(k) for k in keys]
 

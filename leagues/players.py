@@ -39,7 +39,7 @@ from pathlib import Path
 import pandas as pd
 
 from .config import LeagueConfig, get_league
-from .ingest import DATA_ROOT
+from .ingest import DATA_ROOT, ensure_league_dict
 
 PLAYER_FIELDS = ["player_name", "team_name", "team_code", "position", "matches",
                  "minutes", "goals", "assists", "xg", "xa", "shots",
@@ -177,6 +177,7 @@ def main() -> None:
                          "for the Big-5, fbref for the US leagues)")
     args = ap.parse_args()
 
+    ensure_league_dict()                            # register custom leagues before soccerdata import
     cfg = get_league(args.league)
     source = args.source or cfg.player_source
     season = args.season or cfg.season_for(source)
