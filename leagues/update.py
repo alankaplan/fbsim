@@ -197,6 +197,9 @@ def main() -> None:
     ap.add_argument("--resolution-sims", type=int, default=250,
                     help="tail forecasts per history for the 'H after' resolution "
                          "curve (0 disables it)")
+    ap.add_argument("--players", action="store_true",
+                    help="also refresh individual player stats (players.csv) for each "
+                         "league via its player source (understat/fbref; browser for US)")
     ap.add_argument("--force", action="store_true",
                     help="re-simulate even when the data hasn't changed")
     ap.add_argument("--no-page", action="store_true", help="skip rebuilding leagues.html")
@@ -227,6 +230,17 @@ def main() -> None:
             # the existing data instead of aborting the whole refresh.
             except (Exception, SystemExit) as exc:
                 print(f"  [ingest] skipped: {exc}")
+
+        if args.players:
+            psource = cfg.player_source
+            pseason = args.season or cfg.season_for(psource)
+            try:
+                from .players import build_players
+                out = build_players(cfg, pseason, psource)
+                n = sum(1 for _ in out.read_text(encoding="utf-8").splitlines()) - 1
+                print(f"  [players] {pseason} [{psource}]: {max(n, 0)} players -> {out.name}")
+            except (Exception, SystemExit) as exc:
+                print(f"  [players] skipped: {exc}")
 
         if not matches_csv.exists():
             print("  [skip] no matches.csv — ingest data for this league first.")

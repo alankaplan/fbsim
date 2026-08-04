@@ -8,6 +8,7 @@ venv/
 leagues.html
 data/leagues/*/sim_results.json
 data/leagues/*/prior.json
+data/leagues/*/players.csv
 
 # soccerdata / seleniumbase scraping side-effects (fbref source)
 downloaded_files/

@@ -66,6 +66,12 @@ class LeagueConfig:
     def total_matches(self) -> int:
         return self.n_teams * (self.n_teams - 1)
 
+    @property
+    def player_source(self) -> str:
+        """Source for individual player stats. fixturedownload carries no player
+        data, so leagues on it fall back to FBref; Understat/FBref serve their own."""
+        return self.default_source if self.default_source in ("understat", "fbref") else "fbref"
+
     def season_start_year(self, today: date | None = None) -> int:
         """Start year of the season current *today* for this league.
 

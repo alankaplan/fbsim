@@ -125,6 +125,19 @@ venv/bin/python -m leagues.ingest eng --season 2024-25 --source openfootball  # 
 venv/bin/python -m leagues.ingest mls --season 2026 --source fbref            # add xG
 ```
 
+**Individual player stats** (informational; they don't feed the model) go into
+`data/leagues/<key>/players.csv` via a separate step, sourced per league — Understat
+for the Big-5 (no browser), FBref for the US leagues (browser, since fixturedownload
+has no player data):
+
+```bash
+venv/bin/python -m leagues.players eng           # -> understat (goals, assists, xG/xA)
+venv/bin/python -m leagues.players mls            # -> fbref (browser)
+venv/bin/python -m leagues.update --refresh --players   # refresh fixtures + players together
+```
+
+They surface as the report's **Top players** tab and each team's **Players** sub-tab.
+
 Data sources (all write the same canonical CSVs):
 
 | `--source` | Browser? | xG? | Coverage | Notes |
@@ -199,9 +212,10 @@ venv/bin/python -m leagues.generate_page --open   # and open in a browser
 ```
 
 Produces a self-contained `leagues.html` (no server, no dependencies) with a
-league switcher and five views: standings odds, a position-probability heatmap,
-remaining fixtures, a cross-league **Top games** schedule, and a per-team detail
-view (finishing distribution, full schedule, and a branching title-odds explorer).
+league switcher and six views: standings odds, a position-probability heatmap,
+remaining fixtures, a cross-league **Top games** schedule, a **Top players** table
+(individual season stats), and a per-team detail view (finishing distribution, full
+schedule, a branching title-odds explorer, and a squad **Players** sub-tab).
 
 Each league page also reports its **title-race entropy in bits** (in the header)
 — the Shannon entropy of the simulated champion distribution, i.e. how open the

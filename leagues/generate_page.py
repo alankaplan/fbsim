@@ -19,10 +19,12 @@ Views: a league switcher across all simulated leagues, plus
   * Top games — a cross-league schedule where each league contributes just enough
     of its most decisive games to fall below a shared title-race entropy threshold
     (in bits), plus every remaining game of any teams followed from a dropdown;
-  * Team detail — a team's finishing-position distribution, its full schedule
-    (past results + upcoming games with predictions and per-game title/finish
-    swing), and an interactive branching tree of how its title odds (or expected
-    finish) shift as you walk a win/draw/loss path through its next games.
+  * Top players — a league-wide, sortable table of individual player season stats
+    (goals, assists, xG/xA, minutes) from ``players.csv``, when present;
+  * Team detail — a Summary sub-tab (finishing-position distribution, full schedule
+    with per-game title/finish swing, and an interactive branching tree of how its
+    title odds shift along a win/draw/loss path) and a Players sub-tab (that club's
+    squad stats).
 
 Usage
 -----
@@ -33,6 +35,7 @@ Usage
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 import webbrowser
@@ -128,6 +131,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .kpi .v { font-size: 22px; font-weight: 600; }
   .kpi .k { color: #8b949e; font-size: 12px; }
   .sec-h { font-size: 15px; font-weight: 600; margin: 22px 0 2px; }
+  .subtabs { display: flex; gap: 4px; margin: 8px 0 16px; border-bottom: 1px solid #21262d; }
+  .subtabs a { padding: 6px 14px; color: #8b949e; cursor: pointer; font-size: 13px;
+    border-bottom: 2px solid transparent; }
+  .subtabs a.active { color: #e6edf3; border-bottom-color: #f78166; }
+  code { background: #161b22; border: 1px solid #21262d; border-radius: 4px; padding: 1px 5px; font-size: 12px; }
   .tsched td, .tsched th { text-align: left; }
   .tsched tr.now td { border-top: 2px solid #f78166; }
   .res { font-weight: 600; }
@@ -169,6 +177,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <a data-view="main" class="active">Standings odds</a>
     <a data-view="matrix">Position matrix</a>
     <a data-view="fixtures">Fixtures</a>
+    <a data-view="players">Top players</a>
     <a data-view="team" id="nav-team" style="display:none">Team</a>
   </nav>
 </header>
@@ -177,6 +186,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <div id="matrix-view" style="display:none"></div>
   <div id="fixtures-view" style="display:none"></div>
   <div id="schedule-view" style="display:none"></div>
+  <div id="players-view" style="display:none"></div>
   <div id="team-view" style="display:none"></div>
 </main>
 <script>
@@ -220,6 +230,8 @@ const LEAGUES = __DATA_PLACEHOLDER__;
   let filter = "";
   let teamCode = null;
   let treePath = [], treeTeam = null;              // odds-tree drill-down state
+  let teamTab = "summary";                         // team page sub-tab: summary | players
+  let plSort = "goals", plAsc = false;             // players-table sort
 
   const $ = (id) => document.getElementById(id);
   const pct = (x) => (x === 0 ? '<span class="zero">0</span>' : x.toFixed(1));
@@ -269,7 +281,7 @@ const LEAGUES = __DATA_PLACEHOLDER__;
 
   function setView(v) {
     view = v;
-    ["main","matrix","fixtures","schedule","team"].forEach(x =>
+    ["main","matrix","fixtures","schedule","players","team"].forEach(x =>
       $(x+"-view").style.display = (x===v ? "" : "none"));
     $("nav").querySelectorAll("a").forEach(a =>
       a.classList.toggle("active", a.dataset.view===v));
@@ -280,7 +292,63 @@ const LEAGUES = __DATA_PLACEHOLDER__;
     else if (v==="matrix") renderMatrix();
     else if (v==="fixtures") renderFixtures();
     else if (v==="schedule") renderSchedule();
+    else if (v==="players") renderPlayers();
     else if (v==="team") renderTeam();
+  }
+
+  // ---- Players (league-wide "Top players" + per-team squad) ----
+  // [key, label, align, cell(p), sortVal(p), teamViewHidden?]
+  function playerCols() {
+    return [
+      ["player_name","Player","left", p=>esc(p.player_name),                 p=>p.player_name],
+      ["team","Team","left", p=>`<a data-team="${p.team_code}">${esc(p.team_code||p.team_name)}</a>`, p=>p.team_name, true],
+      ["position","Pos","left", p=>esc(p.position||""),                      p=>p.position||""],
+      ["matches","Apps","right", p=>p.matches,                               p=>p.matches],
+      ["minutes","Min","right", p=>p.minutes,                                p=>p.minutes],
+      ["goals","G","right", p=>p.goals,                                      p=>p.goals],
+      ["assists","A","right", p=>p.assists,                                  p=>p.assists],
+      ["xg","xG","right", p=>p.xg.toFixed(1),                                p=>p.xg],
+      ["xa","xA","right", p=>p.xa.toFixed(1),                                p=>p.xa],
+      ["shots","Sh","right", p=>(p.shots||""),                               p=>p.shots],
+    ];
+  }
+  function renderPlayersTable(elId, players, teamView) {
+    const el = $(elId); if (!el) return;
+    if (!players.length) {
+      el.innerHTML = `<div class="legend">No player data for ${esc(LEAGUES[cur].league.name)} yet — `
+        + `run <code>python -m leagues.players ${cur}</code> to fetch it.</div>`;
+      return;
+    }
+    const cols = playerCols().filter(c => !(teamView && c[5]));
+    const sc = cols.find(c => c[0]===plSort) || cols[0];
+    const sorted = players.slice().sort((a,b) => {
+      const va = sc[4](a), vb = sc[4](b);
+      const r = (typeof va==="number" && typeof vb==="number")
+        ? va - vb : String(va).localeCompare(String(vb));
+      return plAsc ? r : -r;
+    });
+    const th = cols.map(c =>
+      `<th data-col="${c[0]}" style="text-align:${c[2]}" class="${c[0]===plSort?(plAsc?'sort-asc':'sort-desc'):''}">${c[1]}</th>`).join("");
+    const body = sorted.map(p =>
+      `<tr>${cols.map(c => `<td style="text-align:${c[2]}">${c[3](p)}</td>`).join("")}</tr>`).join("");
+    el.innerHTML = `<div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
+    el.querySelectorAll("th[data-col]").forEach(h => h.onclick = () => {
+      const c = h.dataset.col;
+      if (c===plSort) plAsc = !plAsc; else { plSort = c; plAsc = false; }
+      renderPlayersTable(elId, players, teamView);
+    });
+    el.querySelectorAll("a[data-team]").forEach(a => a.onclick = () => {
+      teamCode = a.dataset.team; teamTab = "summary"; setView("team");
+    });
+  }
+  function renderPlayers() {
+    const L = LEAGUES[cur];
+    $("players-view").innerHTML =
+      `<div class="sec-h">Top players — ${esc(L.league.name)}</div>
+       <div class="legend">Season totals${L.meta.used_xg ? " (with xG)" : ""}. Click a header to sort;
+         click a team to open it.</div>
+       <div id="players-table"></div>`;
+    renderPlayersTable("players-table", L.players || [], false);
   }
 
   // ---- Standings odds table ----
@@ -601,7 +669,29 @@ const LEAGUES = __DATA_PLACEHOLDER__;
     const L = LEAGUES[cur];
     const r = L.teams.find(t => t.code===teamCode) || L.teams[0];
     const n = L.league.n_teams;
-    if (r.code !== treeTeam) { treePath = []; treeTeam = r.code; }
+    if (r.code !== treeTeam) { treePath = []; treeTeam = r.code; teamTab = "summary"; }
+    $("team-view").innerHTML =
+      `<h2 style="margin:0 0 2px">${esc(r.name)}</h2>
+       <div class="sub">Currently ${r.cur_rank}${ord(r.cur_rank)} · ${r.cur_pts} pts from ${r.played} played</div>
+       <div class="subtabs">
+         <a class="${teamTab==='summary'?'active':''}" data-tt="summary">Summary</a>
+         <a class="${teamTab==='players'?'active':''}" data-tt="players">Players</a>
+       </div>
+       <div id="team-body"></div>`;
+    $("team-view").querySelectorAll(".subtabs a").forEach(a =>
+      a.onclick = () => { teamTab = a.dataset.tt; renderTeam(); });
+    if (teamTab === "players") {
+      const players = (L.players || []).filter(p => p.team_code === r.code);
+      $("team-body").innerHTML = `<div class="sec-h">Squad — season totals</div>`
+        + `<div class="legend">Individual player stats for this club. Click a header to sort.</div>`
+        + `<div id="team-players"></div>`;
+      renderPlayersTable("team-players", players, true);
+      return;
+    }
+    renderTeamSummary(L, r, n);
+  }
+
+  function renderTeamSummary(L, r, n) {
     const pmax = Math.max(...r.position_probs, 0.05);
     const bars = r.position_probs.map((p,i) =>
       `<div class="col" style="height:${(p/pmax*100).toFixed(1)}%"
@@ -645,10 +735,8 @@ const LEAGUES = __DATA_PLACEHOLDER__;
            <tbody>${schBody}</tbody></table></div>`
       : "";
 
-    $("team-view").innerHTML =
-      `<h2 style="margin:0 0 2px">${esc(r.name)}</h2>
-       <div class="sub">Currently ${r.cur_rank}${ord(r.cur_rank)} · ${r.cur_pts} pts from ${r.played} played</div>
-       <div class="kpis">
+    $("team-body").innerHTML =
+      `<div class="kpis">
          <div class="kpi"><div class="v">${r.proj_pts.toFixed(0)}</div><div class="k">projected pts (${r.proj_pts_p10}–${r.proj_pts_p90})</div></div>
          <div class="kpi"><div class="v">${r.title_pct.toFixed(1)}%</div><div class="k">title</div></div>
          <div class="kpi"><div class="v">${r.ucl_pct.toFixed(1)}%</div><div class="k">Champions League</div></div>
@@ -725,7 +813,26 @@ const LEAGUES = __DATA_PLACEHOLDER__;
 """
 
 
+def read_players(key: str) -> list[dict]:
+    """Load data/leagues/<key>/players.csv (if present) with numeric fields typed."""
+    path = DATA_ROOT / key / "players.csv"
+    if not path.exists():
+        return []
+    ints = ("matches", "minutes", "goals", "assists", "shots", "yellow_cards", "red_cards")
+    out = []
+    with path.open(encoding="utf-8") as f:
+        for r in csv.DictReader(f):
+            for k in ints:
+                r[k] = int(r[k]) if r.get(k) not in ("", None) else 0
+            for k in ("xg", "xa"):
+                r[k] = float(r[k]) if r.get(k) not in ("", None) else 0.0
+            out.append(r)
+    return out
+
+
 def build(leagues_data: dict) -> str:
+    for key, ld in leagues_data.items():           # attach player tables (independent of sims)
+        ld.setdefault("players", read_players(key))
     return HTML_TEMPLATE.replace("__DATA_PLACEHOLDER__", json.dumps(leagues_data))
 
 
