@@ -101,14 +101,22 @@ free **fixturedownload** feed (no browser), while **USL Championship has no free
 feed and defaults to `fbref`** (FBref comp 73, via soccerdata + a browser). NWSL is
 FBref comp 182 if you want its xG.
 
-**US-league FBref data is best-effort and needs a browser with a display.** The
-Big-5 (xG + players via Understat, no browser) and MLS/NWSL *fixtures* (via
+**US-league FBref data is opt-in (`--fbref`) and needs a browser with a display.**
+The Big-5 (xG + players via Understat, no browser) and MLS/NWSL *fixtures* (via
 fixturedownload) work headless. But **USL fixtures and *all* US-league player stats
-come from FBref**, which throws a CAPTCHA its solver can't clear in headless mode —
-so on a headless server those are slow (CAPTCHA retries) and usually **skipped**
-(the run continues; nothing is lost). Run them on a desktop, or under `xvfb-run`
-with a real display so soccerdata's GUI CAPTCHA solver can engage. A locked-down
-egress policy also blocks the soccerdata hosts entirely.
+come from FBref**, which throws a CAPTCHA its solver can't clear in headless mode.
+So `update` **skips FBref-sourced work by default** — a plain
+`update --refresh [--players]` stays fast and browserless, printing e.g.
+`[players] usl needs FBref (browser/display) — skipped; pass --fbref`. Pass
+**`--fbref`** (best on a desktop, or under `xvfb-run` so soccerdata's GUI CAPTCHA
+solver can engage) to attempt them:
+
+```bash
+xvfb-run -a python -m leagues.update --refresh --players --fbref   # incl. US-league FBref data
+```
+
+A source that returns nothing never overwrites good CSVs (fixtures *or* players),
+and a locked-down egress policy blocks the soccerdata hosts entirely.
 
 ### 1. Ingest data
 

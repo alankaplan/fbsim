@@ -104,7 +104,14 @@ def players_from_fbref(cfg: LeagueConfig, season: str) -> list[dict]:
     _ensure_fbref_league(sd, cfg)
     with _hidden_display():
         fb = sd.FBref(leagues=cfg.fbref_league, seasons=season)
-        df = fb.read_player_season_stats(stat_type="standard").reset_index()
+        try:
+            df = fb.read_player_season_stats(stat_type="standard").reset_index()
+        except ValueError as exc:                  # FBref returned no player table (empty/CAPTCHA)
+            if "No objects to concatenate" in str(exc):
+                return []
+            raise
+    if df.empty:
+        return []
     df.columns = [_flat(c) for c in df.columns]
 
     def g(d, *names):
@@ -159,6 +166,9 @@ def build_players(cfg: LeagueConfig, season: str, source: str) -> Path:
     out_rows.sort(key=lambda r: (-(r["goals"] or 0), -(r["xg"] or 0)))
 
     out = data_dir / "players.csv"
+    if not out_rows and out.exists():              # don't clobber good data with nothing
+        print(f"  [players] no player data for {cfg.name} {season} — keeping existing players.csv")
+        return out
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=PLAYER_FIELDS)
