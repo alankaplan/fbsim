@@ -179,7 +179,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(
         description="One command: refresh data, simulate what changed, rebuild the report.")
     ap.add_argument("leagues", nargs="*", default=None,
-                    help="league keys (default: all — eng, esp, ita, de, fr, mls, nwsl, usl)")
+                    help="league keys (default: all — eng, esp, ita, de, fr, mls, nwsl)")
     ap.add_argument("--season", default=None,
                     help="ingest this season for every selected league before "
                          "simulating (e.g. 2024-25); omit to simulate from the "
@@ -190,8 +190,7 @@ def main() -> None:
     ap.add_argument("--source", default=None, choices=list(SOURCES),
                     help="override the schedule source for --season / --refresh; by "
                          "default each league uses its own (fixturedownload for the "
-                         "Big-5/MLS/NWSL, fbref for USL). Big-5 xG is overlaid from "
-                         "Understat.")
+                         "Big-5/MLS/NWSL). Big-5 xG is overlaid from Understat.")
     ap.add_argument("--sims", type=int, default=20000, help="simulations per league")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--reg", type=float, default=0.05, help="model L2 shrinkage")
@@ -209,9 +208,9 @@ def main() -> None:
                     help="also refresh individual player stats (players.csv) for each "
                          "league via its player source (understat/fbref; browser for US)")
     ap.add_argument("--fbref", action="store_true",
-                    help="attempt FBref-sourced data (USL fixtures, US-league player "
-                         "stats); off by default because it needs a browser/display and "
-                         "hits fbref CAPTCHA headless — run under a display / xvfb-run")
+                    help="attempt FBref-sourced data (US-league player stats); off by "
+                         "default because it needs a browser/display and hits fbref "
+                         "CAPTCHA headless — run under a display / xvfb-run")
     ap.add_argument("--force", action="store_true",
                     help="re-simulate even when the data hasn't changed")
     ap.add_argument("--no-page", action="store_true", help="skip rebuilding leagues.html")

@@ -1,7 +1,7 @@
 # fbsim
 
 A **domestic-league season simulator** for the big-five European leagues plus
-three North American ones (MLS, NWSL, USL Championship). Team strengths are fit as
+two North American ones (MLS, NWSL). Team strengths are fit as
 attack/defense Poisson ratings from FBref
 expected-goals (xG) data (falling back to actual goals), and full seasons are
 run by Monte Carlo to produce title, qualification and relegation probabilities.
@@ -81,33 +81,29 @@ A layered pipeline under `leagues/`:
 | `update.py` | One command: ingest → simulate what changed → rebuild the report |
 
 Supported leagues (keys): `eng` (Premier League), `esp` (La Liga),
-`ita` (Serie A), `de` (Bundesliga), `fr` (Ligue 1), `mls` (MLS), `nwsl` (NWSL),
-`usl` (USL Championship). Slot counts and tiebreaker order are per-league — Spain
-and Italy apply head-to-head before overall goal difference; England, Germany and
-France use overall goal difference first; the US leagues rank on wins before goal
-difference.
+`ita` (Serie A), `de` (Bundesliga), `fr` (Ligue 1), `mls` (MLS), `nwsl` (NWSL).
+Slot counts and tiebreaker order are per-league — Spain and Italy apply
+head-to-head before overall goal difference; England, Germany and France use
+overall goal difference first; the US leagues rank on wins before goal difference.
 
-**US-league notes.** MLS, NWSL and USL Championship are each modeled as a single
-calendar-year table producing a regular-season (**Shield**) race and **Playoff**
-qualification — a single-table approximation of a conference league (top-18 for
-MLS, top-8 for NWSL, top-16 for USL). The conferences and the playoff brackets are
-not modeled, and there is no relegation, so their reports show **Shield%** and
-**Playoff%** columns instead of Champions League / Europe / relegation. Seasons are
-calendar years (auto-detected — e.g. `2026` in 2026). None are soccerdata built-in
-leagues; the CLIs register them in soccerdata's `league_dict.json` **before** it is
-imported, so `USA-NWSL` / `USA-USL Championship` resolve correctly. **Data sources
-differ (and each league picks its own by default):** MLS and NWSL default to the
-free **fixturedownload** feed (no browser), while **USL Championship has no free
-feed and defaults to `fbref`** (FBref comp 73, via soccerdata + a browser). NWSL is
-FBref comp 182 if you want its xG.
+**US-league notes.** MLS and NWSL are each modeled as a single calendar-year table
+producing a regular-season (**Shield**) race and **Playoff** qualification — a
+single-table approximation of a conference league (top-18 for MLS, top-8 for NWSL).
+The conferences and the playoff brackets are not modeled, and there is no
+relegation, so their reports show **Shield%** and **Playoff%** columns instead of
+Champions League / Europe / relegation. Seasons are calendar years (auto-detected —
+e.g. `2026` in 2026). NWSL isn't a soccerdata built-in league; the CLIs register it
+in soccerdata's `league_dict.json` **before** it is imported, so `USA-NWSL` resolves
+correctly. Both take their **fixtures** from the free **fixturedownload** feed (no
+browser); NWSL is FBref comp 182 if you want its xG or player stats.
 
-**US-league FBref data is opt-in (`--fbref`) and needs a browser with a display.**
+**US-league player stats are opt-in (`--fbref`) and need a browser with a display.**
 The Big-5 (xG + players via Understat, no browser) and MLS/NWSL *fixtures* (via
-fixturedownload) work headless. But **USL fixtures and *all* US-league player stats
-come from FBref**, which throws a CAPTCHA its solver can't clear in headless mode.
-So `update` **skips FBref-sourced work by default** — a plain
-`update --refresh [--players]` stays fast and browserless, printing e.g.
-`[players] usl needs FBref (browser/display) — skipped; pass --fbref`. Pass
+fixturedownload) work headless. But **US-league player stats come from FBref**,
+which throws a CAPTCHA its solver can't clear in headless mode. So `update`
+**skips FBref-sourced work by default** — a plain `update --refresh [--players]`
+stays fast and browserless, printing e.g.
+`[players] nwsl needs FBref (browser/display) — skipped; pass --fbref`. Pass
 **`--fbref`** (best on a desktop, or under `xvfb-run` so soccerdata's GUI CAPTCHA
 solver can engage) to attempt them:
 
@@ -136,7 +132,7 @@ by team) — a reliable schedule (with future fixtures) plus xG when it exists:
 # Uses each league's own schedule source (+ automatic xG overlay for the Big-5):
 venv/bin/python -m leagues.ingest eng  --season 2025   # fixturedownload + Understat xG
 venv/bin/python -m leagues.ingest mls  --season 2026   # fixturedownload (no xG)
-venv/bin/python -m leagues.ingest usl  --season 2026   # fbref (browser; xG inline)
+venv/bin/python -m leagues.ingest nwsl --season 2026   # fixturedownload (no xG)
 
 # Override the schedule source explicitly when you want to:
 venv/bin/python -m leagues.ingest eng --season 2024-25 --source openfootball  # offline
@@ -166,20 +162,20 @@ Data sources (all write the same canonical CSVs):
 |---|---|---|---|---|
 | `fixturedownload` | no | no | broad (incl. MLS/NWSL) | free JSON feed; reliable, has future fixtures; **default schedule for the Big-5/MLS/NWSL** |
 | `understat` | no | **yes** | Big-5 only | soccerdata; own xG model; **overlaid onto the Big-5** (also serves their player stats) |
-| `fbref` | yes (Chrome) | yes | broad (incl. USL) | soccerdata; clears Cloudflare via Xvfb; may hit a captcha; **default for USL**; player stats for US leagues |
+| `fbref` | yes (Chrome) | yes | broad | soccerdata; clears Cloudflare via Xvfb; may hit a captcha; US-league player stats |
 | `fbref-http` | no | yes | broad | `curl_cffi` + `read_html`; **currently blocked by Cloudflare** |
 | `openfootball` | no | no | Big-5 (lags) | static mirror; offline fallback |
 
-**Per-league defaults:** the Big-5 (`eng/esp/ita/de/fr`) and `mls`/`nwsl` take
-their **schedule** from `fixturedownload`; `usl` from `fbref`. The Big-5
-additionally **overlay xG from `understat`** onto played games. So a plain
-`python -m leagues.update --refresh` gets reliable fixtures everywhere plus xG for
-the Big-5 — no `--source` needed. `understat`/`fbref` need the `soccerdata` package
-(`fbref` also a browser); a locked-down egress policy may block their hosts.
+**Per-league defaults:** every league takes its **schedule** from
+`fixturedownload`; the Big-5 (`eng/esp/ita/de/fr`) additionally **overlay xG from
+`understat`** onto played games. So a plain `python -m leagues.update --refresh`
+gets reliable fixtures everywhere plus xG for the Big-5 — no `--source` needed.
+`understat`/`fbref` need the `soccerdata` package (`fbref` also a browser); a
+locked-down egress policy may block their hosts.
 
 You can also hand-author CSVs in the canonical schema (the `data/leagues/`
-directory already ships with sample data for all six leagues). Unplayed
-fixtures have empty goal/xG fields and `played = False`.
+directory ships with sample data). Unplayed fixtures have empty goal/xG fields and
+`played = False`.
 
 ### 2. Fit and simulate a season
 

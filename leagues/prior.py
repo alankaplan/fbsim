@@ -120,11 +120,10 @@ def main() -> None:
     ensure_league_dict()                            # register custom leagues before soccerdata import
     ap = argparse.ArgumentParser(
         description="Build a preseason prior from a league's previous season.")
-    ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls, nwsl, usl)")
+    ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls, nwsl)")
     ap.add_argument("--source", default=None, choices=list(SOURCES),
                     help="schedule source for the prior season (default: the league's "
-                         "own — fixturedownload for the Big-5/MLS/NWSL, fbref for USL; "
-                         "Big-5 xG overlaid from Understat)")
+                         "own — fixturedownload; Big-5 xG overlaid from Understat)")
     ap.add_argument("--season", default=None,
                     help="season to fit as the prior; default = the season before "
                          "the current one for this source")

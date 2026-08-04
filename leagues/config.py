@@ -174,25 +174,6 @@ LEAGUES: dict[str, LeagueConfig] = {
         title_label="Shield", qual_label="Playoff",
         qual_name="playoff", drop_name="",
     ),
-    # USL Championship. Modeled like MLS as a single calendar-year table
-    # (Players' Shield race + playoff qualification); the Eastern/Western
-    # conferences and the playoff bracket are not modeled, and the schedule is
-    # unbalanced (conference-weighted) — the model still adjusts for opponent
-    # strength from the actual fixtures. `ucl_slots=16` approximates the large
-    # conference playoff field. No free fixturedownload feed exists, so its data
-    # comes from FBref (comp 73) via `--source fbref` (soccerdata + browser).
-    "usl": LeagueConfig(
-        key="usl", name="USL Championship", country="USA", n_teams=24,
-        openfootball_path="", fbref_league="USA-USL Championship",
-        fbref_comp_id=73, fbref_slug="USL-Championship", fixturedownload_slug="",
-        default_source="fbref",  # no free feed exists; FBref is the only source
-        calendar_year=True,
-        fbref_name="USL Championship", season_start="Mar", season_end="Nov",
-        ucl_slots=16, europa_slots=0, relegation_slots=0,
-        tiebreakers=("pts", "wins", "gd", "gf"),
-        title_label="Shield", qual_label="Playoff",
-        qual_name="playoff", drop_name="",
-    ),
 }
 
 

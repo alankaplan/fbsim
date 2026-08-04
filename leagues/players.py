@@ -9,7 +9,7 @@ report then shows them without caring where they came from.
 Coverage forces the source split (fixturedownload has no player data at all):
 
   * Big-5 European leagues  -> Understat (its own xG/xA, no browser)
-  * MLS / NWSL / USL        -> FBref     (only player source for US leagues; browser)
+  * MLS / NWSL              -> FBref     (only player source for US leagues; browser)
 
 Each league's default is :pyattr:`LeagueConfig.player_source`; pass ``--source``
 to override. Player rows are linked back to ``teams.csv`` by normalised team name
@@ -179,7 +179,7 @@ def build_players(cfg: LeagueConfig, season: str, source: str) -> Path:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Ingest individual player season stats.")
-    ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls, nwsl, usl)")
+    ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls, nwsl)")
     ap.add_argument("--season", default=None,
                     help="season (default: the league's current season for its source)")
     ap.add_argument("--source", default=None, choices=list(PLAYER_SOURCES),

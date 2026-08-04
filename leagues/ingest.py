@@ -330,7 +330,7 @@ def _league_dict_path() -> Path:
 
 
 def ensure_league_dict() -> None:
-    """Register every custom league (MLS/NWSL/USL) in soccerdata's league_dict.json.
+    """Register every custom league (MLS/NWSL) in soccerdata's league_dict.json.
 
     soccerdata merges that file into its ``LEAGUE_DICT`` **only once, at import**
     (``_config.py``), so a league added afterward isn't recognised. Call this at the
@@ -700,14 +700,14 @@ def ingest_dataset(cfg: LeagueConfig, season: str, source: str,
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Ingest league fixtures/results into canonical CSVs.")
-    ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls, nwsl, usl)")
+    ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls, nwsl)")
     ap.add_argument("--season", required=True,
                     help="season: start year (fixturedownload, e.g. 2025 / 2026), "
                          "2025-2026 (fbref), or 2024-25 (openfootball)")
     ap.add_argument("--source", default=None, choices=list(SOURCES),
                     help="schedule source (default: the league's own — fixturedownload "
-                         "for the Big-5/MLS/NWSL, fbref for USL). Big-5 xG is overlaid "
-                         "from Understat automatically.")
+                         "for the Big-5/MLS/NWSL). Big-5 xG is overlaid from Understat "
+                         "automatically.")
     args = ap.parse_args()
 
     ensure_league_dict()                            # register custom leagues before soccerdata import
