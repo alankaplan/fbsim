@@ -231,6 +231,72 @@ def from_fixturedownload(cfg: LeagueConfig, season: str) -> tuple[list[dict], li
 
 
 # ---------------------------------------------------------------------------
+# Understat source (xG-bearing, no browser) via the soccerdata package.
+# Big-5 European leagues only; its own xG model, inline in the schedule.
+# ---------------------------------------------------------------------------
+
+def from_understat(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[dict]]:
+    """Return (teams, matches) from Understat via soccerdata (no browser).
+
+    Understat carries its own xG for every game right in the schedule, so this is
+    the low-friction xG source for the Big-5 leagues (it covers only those). Season
+    is the start year, e.g. "2025" (2025-26). Needs ``soccerdata`` (which fetches a
+    small TLS helper on first use) — no browser, unlike ``fbref``.
+    """
+    try:
+        import soccerdata as sd
+    except ImportError as exc:  # pragma: no cover - environment dependent
+        raise SystemExit(
+            "The 'understat' source needs the soccerdata package:\n"
+            "    venv/bin/pip install soccerdata\n"
+            "(no browser required). Or use --source fixturedownload."
+        ) from exc
+
+    us = sd.Understat(leagues=cfg.fbref_league, seasons=season)
+    schedule = us.read_schedule().reset_index()
+
+    name_to_id: dict[str, int] = {}
+    codes_taken: set[str] = set()
+    teams: list[dict] = []
+
+    def team_id(name: str) -> int:
+        if name not in name_to_id:
+            tid = len(name_to_id) + 1
+            name_to_id[name] = tid
+            teams.append({"id": tid, "team_name": name,
+                          "code": _make_code(name, codes_taken)})
+        return name_to_id[name]
+
+    def _num(v):
+        return None if v is None or v != v else v   # drop NaN
+
+    matches: list[dict] = []
+    for i, row in enumerate(schedule.itertuples(index=False), start=1):
+        d = row._asdict()
+        home, away = d.get("home_team"), d.get("away_team")
+        if not home or not away:
+            continue
+        hid, aid = team_id(str(home)), team_id(str(away))
+        played = bool(d.get("is_result"))
+        hg, ag = _num(d.get("home_goals")), _num(d.get("away_goals"))
+        hx, ax = _num(d.get("home_xg")), _num(d.get("away_xg"))
+        matches.append({
+            "match_number": i,
+            "matchday": "",                        # Understat carries no round number
+            "date": str(d.get("date", ""))[:10],
+            "datetime_utc": "",                    # Understat time zone unclear — date only
+            "home_team_id": hid,
+            "away_team_id": aid,
+            "home_goals": int(hg) if played and hg is not None else "",
+            "away_goals": int(ag) if played and ag is not None else "",
+            "xg_home": round(float(hx), 3) if played and hx is not None else "",
+            "xg_away": round(float(ax), 3) if played and ax is not None else "",
+            "played": played,
+        })
+    return teams, matches
+
+
+# ---------------------------------------------------------------------------
 # FBref sources (xG-bearing): "fbref" (soccerdata/browser) and "fbref-http"
 # (plain HTTP + pandas.read_html). Both parse the same "N–M" score strings.
 # ---------------------------------------------------------------------------
@@ -536,8 +602,9 @@ def write_league(cfg: LeagueConfig, teams: list[dict], matches: list[dict]) -> P
 
 
 SOURCES = {
-    "fixturedownload": from_fixturedownload,  # default: plain JSON, no browser, no xG
-    "fbref": from_fbref,             # soccerdata browser (hidden via xvfb); has xG
+    "fixturedownload": from_fixturedownload,  # plain JSON, no browser, no xG (broad coverage)
+    "understat": from_understat,     # soccerdata, no browser, has xG (Big-5 only)
+    "fbref": from_fbref,             # soccerdata browser (hidden via xvfb); has xG (broad)
     "fbref-http": from_fbref_http,   # plain HTTP + read_html; currently Cloudflare-blocked
     "openfootball": from_openfootball,  # offline mirror, no xG, no dependencies
 }
@@ -549,20 +616,21 @@ def main() -> None:
     ap.add_argument("--season", required=True,
                     help="season: start year (fixturedownload, e.g. 2025 / 2026), "
                          "2025-2026 (fbref), or 2024-25 (openfootball)")
-    ap.add_argument("--source", default="fixturedownload", choices=list(SOURCES),
-                    help="data source (default: fixturedownload — current data, no browser, "
-                         "no xG; 'fbref' adds xG via a browser; 'openfootball' is the "
-                         "offline fallback)")
+    ap.add_argument("--source", default=None, choices=list(SOURCES),
+                    help="data source (default: the league's own — understat for the "
+                         "Big-5, fixturedownload for MLS/NWSL, fbref for USL; "
+                         "'openfootball' is the offline fallback)")
     args = ap.parse_args()
 
     cfg = get_league(args.league)
-    teams, matches = SOURCES[args.source](cfg, args.season)
+    source = args.source or cfg.default_source
+    teams, matches = SOURCES[source](cfg, args.season)
 
     n_played = sum(1 for m in matches if m["played"])
     n_xg = sum(1 for m in matches if m["xg_home"] != "")
     out_dir = write_league(cfg, teams, matches)
 
-    print(f"{cfg.name} {args.season} [{args.source}]: "
+    print(f"{cfg.name} {args.season} [{source}]: "
           f"{len(teams)} teams, {len(matches)} fixtures "
           f"({n_played} played, {n_xg} with xG) -> {out_dir}")
     if n_played and not n_xg:

@@ -115,18 +115,21 @@ def main() -> None:
     ap = argparse.ArgumentParser(
         description="Build a preseason prior from a league's previous season.")
     ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls, nwsl, usl)")
-    ap.add_argument("--source", default="fixturedownload", choices=list(SOURCES),
-                    help="data source for the prior season (default: fixturedownload)")
+    ap.add_argument("--source", default=None, choices=list(SOURCES),
+                    help="data source for the prior season (default: the league's own "
+                         "— understat for the Big-5, fixturedownload for MLS/NWSL, "
+                         "fbref for USL)")
     ap.add_argument("--season", default=None,
                     help="season to fit as the prior; default = the season before "
                          "the current one for this source")
     args = ap.parse_args()
 
     cfg = get_league(args.league)
-    season = args.season or _prev_season(args.source, cfg.season_for(args.source))
-    out = build_prior(cfg, args.source, season)
+    source = args.source or cfg.default_source
+    season = args.season or _prev_season(source, cfg.season_for(source))
+    out = build_prior(cfg, source, season)
     d = json.loads(out.read_text(encoding="utf-8"))
-    print(f"{cfg.name}: prior from {season} [{args.source}] — {len(d['teams'])} teams, "
+    print(f"{cfg.name}: prior from {season} [{source}] — {len(d['teams'])} teams, "
           f"{d['n_played']} played [{'xG' if d['used_xg'] else 'goals'}] -> {out}")
 
 

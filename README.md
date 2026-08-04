@@ -95,11 +95,12 @@ not modeled, and there is no relegation, so their reports show **Shield%** and
 **Playoff%** columns instead of Champions League / Europe / relegation. Seasons are
 calendar years (auto-detected — e.g. `2026` in 2026). None are soccerdata built-in
 leagues, so under `--source fbref` they're auto-registered as custom leagues on
-first use (best-effort). **Data sources differ:** MLS and NWSL are on the default
-free **fixturedownload** feed (no browser needed), but **USL Championship has no
-free feed — ingest it with `--source fbref`** (FBref comp 73, via soccerdata + a
-browser). NWSL is FBref comp 182 if you want its xG. Note both data hosts must be
-reachable from your network; a locked-down egress policy may block them.
+first use (best-effort). **Data sources differ (and each league picks its own by
+default):** MLS and NWSL default to the free **fixturedownload** feed (no browser),
+while **USL Championship has no free feed and defaults to `fbref`** (FBref comp 73,
+via soccerdata + a browser). NWSL is FBref comp 182 if you want its xG. Note the
+soccerdata hosts must be reachable from your network; a locked-down egress policy
+may block them.
 
 ### 1. Ingest data
 
@@ -110,28 +111,36 @@ source-agnostic:
 - `data/leagues/<key>/matches.csv` — `match_number, matchday, date,
   home_team_id, away_team_id, home_goals, away_goals, xg_home, xg_away, played`
 
+**Each league has a default source** (below), so `--source` is optional — omit it
+and the right source is used automatically:
+
 ```bash
-# fixturedownload (default) — current fixtures + scores, plain JSON, no browser
-venv/bin/python -m leagues.ingest eng --season 2025
-venv/bin/python -m leagues.ingest mls --season 2026
-venv/bin/python -m leagues.ingest nwsl --season 2026
-venv/bin/python -m leagues.ingest usl --season 2026 --source fbref  # USL: no free feed
+# Uses each league's own default source (understat / fixturedownload / fbref):
+venv/bin/python -m leagues.ingest eng  --season 2025   # -> understat (xG, no browser)
+venv/bin/python -m leagues.ingest mls  --season 2026   # -> fixturedownload
+venv/bin/python -m leagues.ingest usl  --season 2026   # -> fbref (browser)
 
-# fbref via soccerdata — adds xG, through a browser (hidden on Linux via Xvfb)
-venv/bin/python -m leagues.ingest eng --season 2025-2026 --source fbref
-
-# openfootball GitHub mirror (schedules + scores, no xG) — works offline/sandboxed
-venv/bin/python -m leagues.ingest eng --season 2024-25 --source openfootball
+# Override the source explicitly when you want to:
+venv/bin/python -m leagues.ingest eng --season 2024-25 --source openfootball  # offline
+venv/bin/python -m leagues.ingest mls --season 2026 --source fbref            # add xG
 ```
 
 Data sources (all write the same canonical CSVs):
 
-| `--source` | Browser? | xG? | Current data? | Notes |
+| `--source` | Browser? | xG? | Coverage | Notes |
 |---|---|---|---|---|
-| `fixturedownload` *(default)* | no | no | yes | free JSON feed; reliable, no dependencies |
-| `fbref` | yes (Chrome) | yes | yes | soccerdata; clears Cloudflare; hidden via Xvfb; may hit a captcha |
-| `fbref-http` | no | yes | yes | `curl_cffi` + `read_html`; **currently blocked by Cloudflare** |
-| `openfootball` | no | no | no (lags) | static mirror; offline |
+| `understat` | no | **yes** | Big-5 only | soccerdata; own xG model, inline; **default for the Big-5** |
+| `fixturedownload` | no | no | broad (incl. MLS/NWSL) | free JSON feed; reliable, no deps; **default for MLS/NWSL** |
+| `fbref` | yes (Chrome) | yes | broad (incl. USL) | soccerdata; clears Cloudflare via Xvfb; may hit a captcha; **default for USL** |
+| `fbref-http` | no | yes | broad | `curl_cffi` + `read_html`; **currently blocked by Cloudflare** |
+| `openfootball` | no | no | Big-5 (lags) | static mirror; offline fallback |
+
+**Per-league defaults:** Big-5 (`eng/esp/ita/de/fr`) → `understat` (xG, no browser);
+`mls`/`nwsl` → `fixturedownload`; `usl` → `fbref`. So a plain
+`python -m leagues.update --refresh` fetches xG for the Big-5, schedules for
+MLS/NWSL, and FBref for USL — no `--source` needed. `understat` and `fbref` both
+need the `soccerdata` package (`fbref` additionally needs a browser); a locked-down
+egress policy may block their hosts.
 
 You can also hand-author CSVs in the canonical schema (the `data/leagues/`
 directory already ships with sample data for all six leagues). Unplayed

@@ -180,11 +180,10 @@ def main() -> None:
     ap.add_argument("--refresh", action="store_true",
                     help="ingest each league at its current season (auto-detected "
                          "from today's date); ignored when --season is given")
-    ap.add_argument("--source", default="fixturedownload", choices=list(SOURCES),
-                    help="ingest source for --season / --refresh (default: "
-                         "fixturedownload — current data, no browser, no xG; "
-                         "'fbref' adds xG via a browser; 'openfootball' is the "
-                         "offline fallback)")
+    ap.add_argument("--source", default=None, choices=list(SOURCES),
+                    help="override the ingest source for --season / --refresh; by "
+                         "default each league uses its own (understat for the Big-5, "
+                         "fixturedownload for MLS/NWSL, fbref for USL)")
     ap.add_argument("--sims", type=int, default=20000, help="simulations per league")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--reg", type=float, default=0.05, help="model L2 shrinkage")
@@ -212,16 +211,17 @@ def main() -> None:
         print(f"{cfg.name} ({cfg.key}):")
         data_dir = DATA_ROOT / cfg.key
         matches_csv = data_dir / "matches.csv"
+        source = args.source or cfg.default_source   # per-league default unless overridden
 
         if args.season:
             season = args.season
         elif args.refresh:
-            season = cfg.season_for(args.source)
+            season = cfg.season_for(source)
         else:
             season = None
         if season:
             try:
-                ingest_league(cfg, season, args.source)
+                ingest_league(cfg, season, source)
             # SystemExit (a BaseException) is what the source functions raise for
             # a missing dependency / Cloudflare block, so catch it too and keep
             # the existing data instead of aborting the whole refresh.
@@ -235,7 +235,7 @@ def main() -> None:
 
         if needs_sim(matches_csv, data_dir / "sim_results.json", args.force):
             simulate_league(cfg, args.sims, args.seed, args.reg, args.recency_halflife,
-                            args.source, args.no_prior, args.prior_regression,
+                            source, args.no_prior, args.prior_regression,
                             args.resolution_sims)
             simulated.append(cfg.key)
         else:
