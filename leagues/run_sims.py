@@ -159,6 +159,8 @@ def run(cfg: LeagueConfig, teams: pd.DataFrame, matches: pd.DataFrame,
         model: LeagueModel, n_sims: int, seed: int, resolution_sims: int = 250) -> dict:
     fx = SeasonFixtures(cfg, teams, matches, model)
     n = fx.n
+    if n == 0:
+        raise SystemExit(f"{cfg.name}: no teams/fixtures to simulate — ingest data first.")
     rng = np.random.default_rng(seed)
 
     R = int((~fx.played).sum())                     # number of remaining fixtures

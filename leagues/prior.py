@@ -57,9 +57,14 @@ def prior_path(cfg: LeagueConfig) -> Path:
 
 
 def build_prior(cfg: LeagueConfig, source: str, season: str) -> Path:
-    """Fit ``season`` for ``cfg`` and write it as the preseason prior."""
-    from .ingest import SOURCES
-    teams_rows, matches_rows = SOURCES[source](cfg, season)
+    """Fit ``season`` for ``cfg`` and write it as the preseason prior.
+
+    Uses the same fixtures-source + xG-overlay as the live ingest, so a Big-5 prior
+    is fit from Understat xG (matching the current season's team names)."""
+    from .ingest import ingest_dataset
+    teams_rows, matches_rows, _ = ingest_dataset(cfg, season, source, cfg.xg_source)
+    if not teams_rows or not matches_rows:
+        raise SystemExit(f"{cfg.name}: no data for prior season {season} [{source}].")
     teams_df = pd.DataFrame(teams_rows)
     matches_df = pd.DataFrame(matches_rows)
     model = fit_model(teams_df, matches_df)  # no prior — a plain single-season fit
@@ -116,9 +121,9 @@ def main() -> None:
         description="Build a preseason prior from a league's previous season.")
     ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls, nwsl, usl)")
     ap.add_argument("--source", default=None, choices=list(SOURCES),
-                    help="data source for the prior season (default: the league's own "
-                         "— understat for the Big-5, fixturedownload for MLS/NWSL, "
-                         "fbref for USL)")
+                    help="schedule source for the prior season (default: the league's "
+                         "own — fixturedownload for the Big-5/MLS/NWSL, fbref for USL; "
+                         "Big-5 xG overlaid from Understat)")
     ap.add_argument("--season", default=None,
                     help="season to fit as the prior; default = the season before "
                          "the current one for this source")

@@ -595,6 +595,9 @@ def _write_csv(path: Path, fields: list[str], rows: list[dict]) -> None:
 
 
 def write_league(cfg: LeagueConfig, teams: list[dict], matches: list[dict]) -> Path:
+    if not teams or not matches:                   # never overwrite good data with nothing
+        raise SystemExit(f"{cfg.name}: source returned no data (0 teams / 0 fixtures) — "
+                         "not writing. The season may be unpublished on this source.")
     out_dir = DATA_ROOT / cfg.key
     _write_csv(out_dir / "teams.csv", TEAM_FIELDS, teams)
     _write_csv(out_dir / "matches.csv", MATCH_FIELDS, matches)
@@ -610,6 +613,63 @@ SOURCES = {
 }
 
 
+def _norm_team(name: str) -> str:
+    """Normalise a club name for cross-source matching (drop suffix tokens/punct)."""
+    toks = [t for t in re.split(r"[\s.\-']+", str(name).lower())
+            if t and t not in {"fc", "afc", "cf", "sc", "ac", "ssc", "us", "cd", "rc",
+                               "ud", "as", "ss", "sv", "club", "de", "the", "1", "calcio"}]
+    return " ".join(toks)
+
+
+def overlay_xg(cfg: LeagueConfig, teams: list[dict], matches: list[dict],
+               xg_source: str, season: str) -> int:
+    """Merge xG from ``xg_source`` onto the played rows of ``matches`` in place.
+
+    Fixtures come from a schedule source (fixturedownload) that carries no xG;
+    this overlays another source's xG (e.g. Understat) onto played games, matched
+    by the ordered ``(home, away)`` pair — unique per team once in a double
+    round-robin, so it's robust to date/time-zone differences between sources.
+    Returns the number of games enriched. A no-op when nothing has been played.
+    """
+    if not any(m["played"] for m in matches):
+        return 0
+    x_teams, x_matches = SOURCES[xg_source](cfg, season)
+    xname = {t["id"]: t["team_name"] for t in x_teams}
+    lut = {}
+    for m in x_matches:
+        if not m["played"] or m["xg_home"] == "" or m["xg_away"] == "":
+            continue
+        lut[(_norm_team(xname.get(m["home_team_id"], "")),
+             _norm_team(xname.get(m["away_team_id"], "")))] = (m["xg_home"], m["xg_away"])
+    tname = {t["id"]: t["team_name"] for t in teams}
+    n = 0
+    for m in matches:
+        if not m["played"]:
+            continue
+        hit = lut.get((_norm_team(tname.get(m["home_team_id"], "")),
+                       _norm_team(tname.get(m["away_team_id"], ""))))
+        if hit:
+            m["xg_home"], m["xg_away"] = hit
+            n += 1
+    return n
+
+
+def ingest_dataset(cfg: LeagueConfig, season: str, source: str,
+                   xg_source: str = "") -> tuple[list[dict], list[dict], int]:
+    """Fetch (teams, matches) from ``source`` and, when ``xg_source`` is set and
+    there are played games, overlay its xG. Returns (teams, matches, n_xg_added).
+    xG-overlay failures are swallowed (best-effort) so a missing xG source never
+    blocks the reliable schedule ingest."""
+    teams, matches = SOURCES[source](cfg, season)
+    added = 0
+    if xg_source and xg_source != source and any(m["played"] for m in matches):
+        try:                                       # fixturedownload & understat share the
+            added = overlay_xg(cfg, teams, matches, xg_source, season)  # start-year season fmt
+        except (Exception, SystemExit) as exc:  # noqa: BLE001
+            print(f"  [xg] overlay from {xg_source} skipped: {exc}")
+    return teams, matches, added
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Ingest league fixtures/results into canonical CSVs.")
     ap.add_argument("league", help="league key (eng, esp, ita, de, fr, mls, nwsl, usl)")
@@ -617,24 +677,25 @@ def main() -> None:
                     help="season: start year (fixturedownload, e.g. 2025 / 2026), "
                          "2025-2026 (fbref), or 2024-25 (openfootball)")
     ap.add_argument("--source", default=None, choices=list(SOURCES),
-                    help="data source (default: the league's own — understat for the "
-                         "Big-5, fixturedownload for MLS/NWSL, fbref for USL; "
-                         "'openfootball' is the offline fallback)")
+                    help="schedule source (default: the league's own — fixturedownload "
+                         "for the Big-5/MLS/NWSL, fbref for USL). Big-5 xG is overlaid "
+                         "from Understat automatically.")
     args = ap.parse_args()
 
     cfg = get_league(args.league)
     source = args.source or cfg.default_source
-    teams, matches = SOURCES[source](cfg, args.season)
+    teams, matches, n_added = ingest_dataset(cfg, args.season, source, cfg.xg_source)
 
     n_played = sum(1 for m in matches if m["played"])
     n_xg = sum(1 for m in matches if m["xg_home"] != "")
-    out_dir = write_league(cfg, teams, matches)
+    out_dir = write_league(cfg, teams, matches)     # raises (keeps data) if empty
 
-    print(f"{cfg.name} {args.season} [{source}]: "
+    xg_note = f" [+{n_added} xG from {cfg.xg_source}]" if n_added else ""
+    print(f"{cfg.name} {args.season} [{source}]{xg_note}: "
           f"{len(teams)} teams, {len(matches)} fixtures "
           f"({n_played} played, {n_xg} with xG) -> {out_dir}")
     if n_played and not n_xg:
-        print("  note: no xG in this source; the model will fall back to goals.")
+        print("  note: no xG for these games; the model will fall back to goals.")
 
 
 if __name__ == "__main__":

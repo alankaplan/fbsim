@@ -46,7 +46,7 @@ from pathlib import Path
 import pandas as pd
 
 from .config import LEAGUES, LeagueConfig, get_league
-from .ingest import DATA_ROOT, MATCH_FIELDS, SOURCES, TEAM_FIELDS
+from .ingest import DATA_ROOT, MATCH_FIELDS, SOURCES, TEAM_FIELDS, ingest_dataset
 from .model import fit_model
 from .prior import build_prior, load_prior, _prev_season, PRIOR_REGRESSION
 from .run_sims import run, SCHEMA_VERSION
@@ -77,15 +77,22 @@ def _write_if_changed(path: Path, fields: list[str], rows: list[dict]) -> bool:
 
 
 def ingest_league(cfg: LeagueConfig, season: str, source: str) -> bool:
-    """Fetch and write canonical CSVs; return True if anything changed on disk."""
-    teams, matches = SOURCES[source](cfg, season)
+    """Fetch and write canonical CSVs; return True if anything changed on disk.
+
+    Never overwrites existing data with an empty result (e.g. a source that lacks
+    the upcoming season) — it keeps what's on disk and reports it."""
+    teams, matches, n_added = ingest_dataset(cfg, season, source, cfg.xg_source)
+    if not teams or not matches:
+        print("  [ingest] source returned no data — keeping existing CSVs")
+        return False
     data_dir = DATA_ROOT / cfg.key
     teams_changed = _write_if_changed(data_dir / "teams.csv", TEAM_FIELDS, teams)
     matches_changed = _write_if_changed(data_dir / "matches.csv", MATCH_FIELDS, matches)
     n_played = sum(1 for m in matches if m["played"])
     n_xg = sum(1 for m in matches if m["xg_home"] != "")
     tag = "updated" if (teams_changed or matches_changed) else "no change"
-    print(f"  [ingest] {season} [{source}]: {len(teams)} teams, {len(matches)} "
+    xg_note = f" [+{n_added} xG from {cfg.xg_source}]" if n_added else ""
+    print(f"  [ingest] {season} [{source}]{xg_note}: {len(teams)} teams, {len(matches)} "
           f"fixtures ({n_played} played, {n_xg} xG) — {tag}")
     return teams_changed or matches_changed
 
@@ -181,9 +188,10 @@ def main() -> None:
                     help="ingest each league at its current season (auto-detected "
                          "from today's date); ignored when --season is given")
     ap.add_argument("--source", default=None, choices=list(SOURCES),
-                    help="override the ingest source for --season / --refresh; by "
-                         "default each league uses its own (understat for the Big-5, "
-                         "fixturedownload for MLS/NWSL, fbref for USL)")
+                    help="override the schedule source for --season / --refresh; by "
+                         "default each league uses its own (fixturedownload for the "
+                         "Big-5/MLS/NWSL, fbref for USL). Big-5 xG is overlaid from "
+                         "Understat.")
     ap.add_argument("--sims", type=int, default=20000, help="simulations per league")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--reg", type=float, default=0.05, help="model L2 shrinkage")
@@ -244,6 +252,13 @@ def main() -> None:
 
         if not matches_csv.exists():
             print("  [skip] no matches.csv — ingest data for this league first.")
+            skipped.append(cfg.key)
+            continue
+
+        teams_csv = data_dir / "teams.csv"
+        if (not teams_csv.exists() or pd.read_csv(teams_csv).empty
+                or pd.read_csv(matches_csv).empty):
+            print("  [skip] no teams/fixtures on disk — nothing to simulate.")
             skipped.append(cfg.key)
             continue
 

@@ -48,7 +48,8 @@ class LeagueConfig:
     fbref_comp_id: int = 0         # fbref.com competition id, e.g. 9 (Premier League)
     fbref_slug: str = ""           # fbref URL slug, e.g. "Premier-League"
     fixturedownload_slug: str = "" # fixturedownload.com feed slug, e.g. "epl"
-    default_source: str = "fixturedownload"  # ingest source used when none is given
+    default_source: str = "fixturedownload"  # schedule/results source when none is given
+    xg_source: str = ""            # source to overlay xG from (e.g. "understat"); "" = none
     # soccerdata custom-league registration (only for leagues not built into
     # soccerdata's FBref list — the Big 5 are built in and leave these blank) --
     fbref_name: str = ""           # FBref competition display name, e.g. "Major League Soccer"
@@ -68,9 +69,9 @@ class LeagueConfig:
 
     @property
     def player_source(self) -> str:
-        """Source for individual player stats. fixturedownload carries no player
-        data, so leagues on it fall back to FBref; Understat/FBref serve their own."""
-        return self.default_source if self.default_source in ("understat", "fbref") else "fbref"
+        """Source for individual player stats: the league's xG source when it has
+        one (Understat for the Big-5), else FBref (fixturedownload has no players)."""
+        return self.xg_source or "fbref"
 
     def season_start_year(self, today: date | None = None) -> int:
         """Start year of the season current *today* for this league.
@@ -103,7 +104,7 @@ LEAGUES: dict[str, LeagueConfig] = {
         key="eng", name="Premier League", country="England", n_teams=20,
         openfootball_path="en.1", fbref_league="ENG-Premier League",
         fbref_comp_id=9, fbref_slug="Premier-League", fixturedownload_slug="epl",
-        default_source="understat",
+        xg_source="understat",
         ucl_slots=5, europa_slots=2, relegation_slots=3,
         tiebreakers=("pts", "gd", "gf", "h2h"),
     ),
@@ -111,7 +112,7 @@ LEAGUES: dict[str, LeagueConfig] = {
         key="esp", name="La Liga", country="Spain", n_teams=20,
         openfootball_path="es.1", fbref_league="ESP-La Liga",
         fbref_comp_id=12, fbref_slug="La-Liga", fixturedownload_slug="la-liga",
-        default_source="understat",
+        xg_source="understat",
         ucl_slots=5, europa_slots=2, relegation_slots=3,
         tiebreakers=("pts", "h2h", "gd", "gf"),
     ),
@@ -119,7 +120,7 @@ LEAGUES: dict[str, LeagueConfig] = {
         key="ita", name="Serie A", country="Italy", n_teams=20,
         openfootball_path="it.1", fbref_league="ITA-Serie A",
         fbref_comp_id=11, fbref_slug="Serie-A", fixturedownload_slug="serie-a",
-        default_source="understat",
+        xg_source="understat",
         ucl_slots=5, europa_slots=2, relegation_slots=3,
         tiebreakers=("pts", "h2h", "gd", "gf"),
     ),
@@ -127,7 +128,7 @@ LEAGUES: dict[str, LeagueConfig] = {
         key="de", name="Bundesliga", country="Germany", n_teams=18,
         openfootball_path="de.1", fbref_league="GER-Bundesliga",
         fbref_comp_id=20, fbref_slug="Bundesliga", fixturedownload_slug="bundesliga",
-        default_source="understat",
+        xg_source="understat",
         ucl_slots=4, europa_slots=2, relegation_slots=2,  # +1 relegation playoff, not modeled
         tiebreakers=("pts", "gd", "gf", "h2h"),
     ),
@@ -135,7 +136,7 @@ LEAGUES: dict[str, LeagueConfig] = {
         key="fr", name="Ligue 1", country="France", n_teams=18,
         openfootball_path="fr.1", fbref_league="FRA-Ligue 1",
         fbref_comp_id=13, fbref_slug="Ligue-1", fixturedownload_slug="ligue-1",
-        default_source="understat",
+        xg_source="understat",
         ucl_slots=4, europa_slots=2, relegation_slots=2,  # +1 relegation playoff, not modeled
         tiebreakers=("pts", "gd", "gf", "h2h"),
     ),

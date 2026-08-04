@@ -111,19 +111,25 @@ source-agnostic:
 - `data/leagues/<key>/matches.csv` — `match_number, matchday, date,
   home_team_id, away_team_id, home_goals, away_goals, xg_home, xg_away, played`
 
-**Each league has a default source** (below), so `--source` is optional — omit it
-and the right source is used automatically:
+**Each league has a default schedule source** (below), so `--source` is optional —
+omit it and the right source is used automatically. For the Big-5, **fixtures come
+from fixturedownload and xG is overlaid from Understat** onto played games (matched
+by team) — a reliable schedule (with future fixtures) plus xG when it exists:
 
 ```bash
-# Uses each league's own default source (understat / fixturedownload / fbref):
-venv/bin/python -m leagues.ingest eng  --season 2025   # -> understat (xG, no browser)
-venv/bin/python -m leagues.ingest mls  --season 2026   # -> fixturedownload
-venv/bin/python -m leagues.ingest usl  --season 2026   # -> fbref (browser)
+# Uses each league's own schedule source (+ automatic xG overlay for the Big-5):
+venv/bin/python -m leagues.ingest eng  --season 2025   # fixturedownload + Understat xG
+venv/bin/python -m leagues.ingest mls  --season 2026   # fixturedownload (no xG)
+venv/bin/python -m leagues.ingest usl  --season 2026   # fbref (browser; xG inline)
 
-# Override the source explicitly when you want to:
+# Override the schedule source explicitly when you want to:
 venv/bin/python -m leagues.ingest eng --season 2024-25 --source openfootball  # offline
-venv/bin/python -m leagues.ingest mls --season 2026 --source fbref            # add xG
 ```
+
+Note: a source that lacks a season (e.g. Understat has no *upcoming*-season
+fixtures) never overwrites good CSVs — the ingest keeps what's on disk and reports
+it. Preseason simply has no xG yet (there are no played games); the overlay fills it
+in once matches are played.
 
 **Individual player stats** (informational; they don't feed the model) go into
 `data/leagues/<key>/players.csv` via a separate step, sourced per league — Understat
@@ -142,18 +148,18 @@ Data sources (all write the same canonical CSVs):
 
 | `--source` | Browser? | xG? | Coverage | Notes |
 |---|---|---|---|---|
-| `understat` | no | **yes** | Big-5 only | soccerdata; own xG model, inline; **default for the Big-5** |
-| `fixturedownload` | no | no | broad (incl. MLS/NWSL) | free JSON feed; reliable, no deps; **default for MLS/NWSL** |
-| `fbref` | yes (Chrome) | yes | broad (incl. USL) | soccerdata; clears Cloudflare via Xvfb; may hit a captcha; **default for USL** |
+| `fixturedownload` | no | no | broad (incl. MLS/NWSL) | free JSON feed; reliable, has future fixtures; **default schedule for the Big-5/MLS/NWSL** |
+| `understat` | no | **yes** | Big-5 only | soccerdata; own xG model; **overlaid onto the Big-5** (also serves their player stats) |
+| `fbref` | yes (Chrome) | yes | broad (incl. USL) | soccerdata; clears Cloudflare via Xvfb; may hit a captcha; **default for USL**; player stats for US leagues |
 | `fbref-http` | no | yes | broad | `curl_cffi` + `read_html`; **currently blocked by Cloudflare** |
 | `openfootball` | no | no | Big-5 (lags) | static mirror; offline fallback |
 
-**Per-league defaults:** Big-5 (`eng/esp/ita/de/fr`) → `understat` (xG, no browser);
-`mls`/`nwsl` → `fixturedownload`; `usl` → `fbref`. So a plain
-`python -m leagues.update --refresh` fetches xG for the Big-5, schedules for
-MLS/NWSL, and FBref for USL — no `--source` needed. `understat` and `fbref` both
-need the `soccerdata` package (`fbref` additionally needs a browser); a locked-down
-egress policy may block their hosts.
+**Per-league defaults:** the Big-5 (`eng/esp/ita/de/fr`) and `mls`/`nwsl` take
+their **schedule** from `fixturedownload`; `usl` from `fbref`. The Big-5
+additionally **overlay xG from `understat`** onto played games. So a plain
+`python -m leagues.update --refresh` gets reliable fixtures everywhere plus xG for
+the Big-5 — no `--source` needed. `understat`/`fbref` need the `soccerdata` package
+(`fbref` also a browser); a locked-down egress policy may block their hosts.
 
 You can also hand-author CSVs in the canonical schema (the `data/leagues/`
 directory already ships with sample data for all six leagues). Unplayed
