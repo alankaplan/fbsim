@@ -211,6 +211,9 @@ def main() -> None:
                     help="attempt FBref-sourced data (US-league player stats); off by "
                          "default because it needs a browser/display and hits fbref "
                          "CAPTCHA headless — run under a display / xvfb-run")
+    ap.add_argument("--national", action="store_true",
+                    help="also refresh USMNT/USWNT fixtures + results (data/national/, "
+                         "browserless via ESPN); shown as the report's National teams tab")
     ap.add_argument("--force", action="store_true",
                     help="re-simulate even when the data hasn't changed")
     ap.add_argument("--no-page", action="store_true", help="skip rebuilding leagues.html")
@@ -285,6 +288,21 @@ def main() -> None:
 
     print(f"\nSimulated: {', '.join(simulated) or '(none)'} | "
           f"skipped: {', '.join(skipped) or '(none)'}")
+
+    if args.national:                               # display-only US national-team games (ESPN)
+        from datetime import date
+        from .national import NATIONAL, build_national
+        print("National teams (usmnt, uswnt):")
+        year = int(args.season) if (args.season and args.season.isdigit()) else date.today().year
+        for entry in NATIONAL:
+            try:
+                out = build_national(entry, year)
+                d = json.loads(out.read_text(encoding="utf-8"))
+                played = sum(1 for g in d["games"] if g["status"] == "completed")
+                print(f"  [national] {entry['name']} {year}: {len(d['games'])} games "
+                      f"({played} played) -> {out.name}")
+            except (Exception, SystemExit) as exc:
+                print(f"  [national] {entry['key']} skipped: {exc}")
 
     if not args.no_page:
         build_page(args.open)

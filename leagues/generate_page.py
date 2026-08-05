@@ -188,10 +188,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <div id="fixtures-view" style="display:none"></div>
   <div id="schedule-view" style="display:none"></div>
   <div id="players-view" style="display:none"></div>
+  <div id="national-view" style="display:none"></div>
   <div id="team-view" style="display:none"></div>
 </main>
 <script>
 const LEAGUES = __DATA_PLACEHOLDER__;
+const NATIONAL = __NATIONAL_PLACEHOLDER__;
 (function () {
   const keys = Object.keys(LEAGUES);
   let cur = keys[0];
@@ -252,10 +254,13 @@ const LEAGUES = __DATA_PLACEHOLDER__;
       `<button class="lg-btn ${(view!=='schedule'&&k===cur)?'active':''}" data-k="${k}">${esc(LEAGUES[k].league.name)}</button>`
     ).join("");
     const top = `<button class="lg-btn top ${view==='schedule'?'active':''}" data-top="1">Top games</button>`;
-    $("league-tabs").innerHTML = lg + top;
+    const nat = (NATIONAL && NATIONAL.length)
+      ? `<button class="lg-btn top ${view==='national'?'active':''}" data-nat="1">National teams</button>` : "";
+    $("league-tabs").innerHTML = lg + top + nat;
     $("league-tabs").querySelectorAll("button").forEach(b =>
       b.onclick = () => {
         if (b.dataset.top) { setView("schedule"); return; }
+        if (b.dataset.nat) { setView("national"); return; }
         cur = b.dataset.k; teamCode = null;
         setView((view==='schedule'||view==='team') ? 'main' : view);
       });
@@ -266,6 +271,12 @@ const LEAGUES = __DATA_PLACEHOLDER__;
       $("hdr-badge").innerHTML = "";
       $("hdr-sub").textContent =
         `Top games across ${keys.length} leagues · kickoff in US Pacific time`;
+      return;
+    }
+    if (view === "national") {  // national teams: results + schedule, no simulation
+      $("hdr-badge").innerHTML = "";
+      $("hdr-sub").textContent =
+        `National-team results and upcoming games · kickoff in US Pacific time`;
       return;
     }
     const L = LEAGUES[cur], m = L.meta;
@@ -282,19 +293,50 @@ const LEAGUES = __DATA_PLACEHOLDER__;
 
   function setView(v) {
     view = v;
-    ["main","matrix","fixtures","schedule","players","team"].forEach(x =>
+    ["main","matrix","fixtures","schedule","players","national","team"].forEach(x =>
       $(x+"-view").style.display = (x===v ? "" : "none"));
     $("nav").querySelectorAll("a").forEach(a =>
       a.classList.toggle("active", a.dataset.view===v));
     $("nav-team").style.display = (v==="team") ? "" : "none";
-    $("nav").style.display = (v==="schedule") ? "none" : "";  // per-league tabs don't apply
+    // cross-cutting views (Top games / National teams) don't use the per-league tabs
+    $("nav").style.display = (v==="schedule"||v==="national") ? "none" : "";
     head(); leagueTabs();
     if (v==="main") renderMain();
     else if (v==="matrix") renderMatrix();
     else if (v==="fixtures") renderFixtures();
     else if (v==="schedule") renderSchedule();
     else if (v==="players") renderPlayers();
+    else if (v==="national") renderNational();
     else if (v==="team") renderTeam();
+  }
+
+  // ---- National teams (display-only results + schedule; no simulation) ----
+  function renderNational() {
+    const venLabel = { home: "H", away: "A", neutral: "N" };
+    const cards = NATIONAL.map(t => {
+      const games = (t.games || []);
+      const firstFut = games.findIndex(g => g.status !== "completed");
+      const rows = games.map((g, i) => {
+        const nowCls = i === firstFut ? ' class="now"' : '';
+        const opp = `${esc(g.opponent)} <span class="pos">(${venLabel[g.venue] || "?"})</span>`;
+        const when = (g.status === "completed") ? esc(g.date || "") : esc(kickoff(g));
+        const res = (g.status === "completed")
+          ? `<span class="res ${String(g.result).toLowerCase()}">${g.gf}–${g.ga} ${g.result}</span>` : "";
+        return `<tr${nowCls}><td>${when}</td><td>${opp}</td>`
+          + `<td>${esc(g.competition || "")}</td><td>${res}</td></tr>`;
+      }).join("");
+      const body = games.length ? rows
+        : `<tr><td colspan="4" class="pos">No games — run <code>python -m leagues.national ${esc(t.key)}</code>.</td></tr>`;
+      return `<div class="sec-h">${esc(t.name)}</div>
+        <div class="wrap"><table class="tsched"><thead><tr>
+          <th>When</th><th>Opponent</th><th>Competition</th><th>Result</th>
+        </tr></thead><tbody>${body}</tbody></table></div>`;
+    }).join("");
+    $("national-view").innerHTML =
+      `<div class="legend">Results and upcoming games for the US national teams, across all
+        competitions (ESPN). These are shown for reference only — national teams aren't
+        simulated. The <span style="color:#f78166">orange line</span> marks the next game.</div>`
+      + cards;
   }
 
   // ---- Players (league-wide "Top players" + per-team squad) ----
@@ -853,10 +895,26 @@ def read_players(key: str) -> list[dict]:
     return out
 
 
+def read_national() -> list[dict]:
+    """Load every data/national/*.json (USMNT/USWNT schedules), newest-updated first."""
+    root = DATA_ROOT.parent / "national"
+    if not root.exists():
+        return []
+    out = []
+    for path in sorted(root.glob("*.json")):
+        try:
+            out.append(json.loads(path.read_text(encoding="utf-8")))
+        except (ValueError, OSError):
+            continue
+    return out
+
+
 def build(leagues_data: dict) -> str:
     for key, ld in leagues_data.items():           # attach player tables (independent of sims)
         ld.setdefault("players", read_players(key))
-    return HTML_TEMPLATE.replace("__DATA_PLACEHOLDER__", json.dumps(leagues_data))
+    return (HTML_TEMPLATE
+            .replace("__DATA_PLACEHOLDER__", json.dumps(leagues_data))
+            .replace("__NATIONAL_PLACEHOLDER__", json.dumps(read_national())))
 
 
 def main() -> None:

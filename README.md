@@ -183,6 +183,24 @@ You can also hand-author CSVs in the canonical schema (the `data/leagues/`
 directory ships with sample data). Unplayed fixtures have empty goal/xG fields and
 `played = False`.
 
+#### National teams (USMNT / USWNT) — display only
+
+The US men's and women's national teams are **not** simulated: they play
+friendlies and tournaments with no league table, so the season model doesn't apply.
+Instead they get a **display-only "National teams" tab** — past results and upcoming
+games across all competitions — fetched (browserless, no key) from **ESPN's public
+JSON API** by merging a fixed set of competition slugs (friendlies, Nations League,
+World Cup qualifying, Gold Cup, World Cup; women's equivalents).
+
+```bash
+venv/bin/python -m leagues.national all          # USMNT + USWNT -> data/national/*.json
+venv/bin/python -m leagues.update --refresh --national   # refresh leagues + national teams
+```
+
+Data lands in `data/national/` (gitignored — a fetched artifact, refreshed on
+demand); the tab appears automatically once those files exist. A source that
+returns nothing never overwrites existing data.
+
 ### 2. Fit and simulate a season
 
 `run_sims` fits the attack/defense model on played matches, simulates the
