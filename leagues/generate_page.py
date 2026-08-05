@@ -43,6 +43,7 @@ from pathlib import Path
 
 from .config import LEAGUES
 from .ingest import DATA_ROOT
+from .players import _norm_team, resolve_team_code
 
 OUT = Path(__file__).resolve().parent.parent / "leagues.html"
 
@@ -813,11 +814,29 @@ const LEAGUES = __DATA_PLACEHOLDER__;
 """
 
 
+def _team_lookup(key: str) -> tuple[dict, dict]:
+    """Build normalised-name -> (code, canonical name) maps from a league's teams.csv."""
+    code_by_norm, name_by_norm = {}, {}
+    path = DATA_ROOT / key / "teams.csv"
+    if path.exists():
+        with path.open(encoding="utf-8") as f:
+            for t in csv.DictReader(f):
+                nm, code = t["team_name"], t["code"]
+                code_by_norm[_norm_team(nm)] = code
+                name_by_norm[_norm_team(nm)] = nm
+    return code_by_norm, name_by_norm
+
+
 def read_players(key: str) -> list[dict]:
-    """Load data/leagues/<key>/players.csv (if present) with numeric fields typed."""
+    """Load data/leagues/<key>/players.csv (if present) with numeric fields typed.
+
+    Re-resolves each row's team_code from its team_name against the current teams.csv
+    (accent-folding + short-name tolerance), so an already-fetched players.csv whose
+    codes were blanked by a name mismatch is repaired here — no FBref re-fetch needed."""
     path = DATA_ROOT / key / "players.csv"
     if not path.exists():
         return []
+    code_by_norm, name_by_norm = _team_lookup(key)
     ints = ("matches", "minutes", "goals", "assists", "shots", "yellow_cards", "red_cards")
     out = []
     with path.open(encoding="utf-8") as f:
@@ -826,6 +845,10 @@ def read_players(key: str) -> list[dict]:
                 r[k] = int(r[k]) if r.get(k) not in ("", None) else 0
             for k in ("xg", "xa"):
                 r[k] = float(r[k]) if r.get(k) not in ("", None) else 0.0
+            raw = r.get("team_name", "")
+            code, canon = resolve_team_code(_norm_team(raw), code_by_norm, name_by_norm)
+            if code:
+                r["team_code"], r["team_name"] = code, canon
             out.append(r)
     return out
 

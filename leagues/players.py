@@ -34,6 +34,7 @@ import argparse
 import csv
 import re
 import sys
+import unicodedata
 from pathlib import Path
 
 import pandas as pd
@@ -50,9 +51,40 @@ _TEAM_STOP = {"fc", "afc", "cf", "sc", "ac", "ssc", "us", "cd", "rc", "ud", "as"
               "ss", "sv", "club", "de", "the", "1", "calcio"}
 
 
+def _fold(s: str) -> str:
+    """Lowercase and strip diacritics so 'San José' == 'San Jose', 'Montréal' == 'Montreal'."""
+    nfkd = unicodedata.normalize("NFKD", str(s).lower())
+    return "".join(c for c in nfkd if not unicodedata.combining(c))
+
+
 def _norm_team(name: str) -> str:
-    toks = [t for t in re.split(r"[\s.\-']+", str(name).lower()) if t and t not in _TEAM_STOP]
+    toks = [t for t in re.split(r"[\s.\-']+", _fold(name)) if t and t not in _TEAM_STOP]
     return " ".join(toks)
+
+
+def resolve_team_code(norm_key: str, code_by_norm: dict, name_by_norm: dict) -> tuple[str, str]:
+    """Map a normalised player-source team name to a (team_code, canonical_name) from teams.csv.
+
+    Exact normalised match first (the common case — Big-5 fixtures and players share a
+    source). On a miss, fall back to a *unique* token-subset match: the single teams.csv
+    team whose token set is a superset or subset of the player's, sharing ≥1 token — so
+    FBref's "San Jose" resolves to "San Jose Earthquakes" (SJE) unambiguously, while an
+    ambiguous or non-overlapping name returns ("", "") and is left unmatched (never
+    mis-assigned)."""
+    if norm_key in code_by_norm:
+        return code_by_norm[norm_key], name_by_norm[norm_key]
+    key_toks = set(norm_key.split())
+    if not key_toks:
+        return "", ""
+    hits = []
+    for cand, code in code_by_norm.items():
+        cand_toks = set(cand.split())
+        if cand_toks and (key_toks <= cand_toks or cand_toks <= key_toks):
+            hits.append((cand, code))
+    if len(hits) == 1:
+        cand, code = hits[0]
+        return code, name_by_norm[cand]
+    return "", ""
 
 
 def _i(v):
@@ -155,15 +187,23 @@ def build_players(cfg: LeagueConfig, season: str, source: str) -> Path:
             code_by_norm[_norm_team(nm)] = code
             name_by_norm[_norm_team(nm)] = nm
 
-    out_rows = []
+    out_rows, unmatched = [], {}
     for r in rows:
         if not r["player_name"] or r["minutes"] in ("", 0):   # drop non-players / no minutes
             continue
-        key = _norm_team(r["team_name"])
-        r["team_code"] = code_by_norm.get(key, "")
-        r["team_name"] = name_by_norm.get(key, r["team_name"])
+        raw = r["team_name"]
+        code, canon = resolve_team_code(_norm_team(raw), code_by_norm, name_by_norm)
+        r["team_code"] = code
+        r["team_name"] = canon or raw
+        if not code and raw:                          # couldn't tie this squad to teams.csv
+            unmatched[raw] = unmatched.get(raw, 0) + 1
         out_rows.append(r)
     out_rows.sort(key=lambda r: (-(r["goals"] or 0), -(r["xg"] or 0)))
+
+    if unmatched:                                     # surface silent mismatches (e.g. FBref short names)
+        names = ", ".join(f"'{n}'" for n in sorted(unmatched))
+        print(f"  [players] {cfg.key}: {len(unmatched)} team name(s) unmatched to teams.csv "
+              f"(players hidden on those team pages): {names}")
 
     out = data_dir / "players.csv"
     if not out_rows and out.exists():              # don't clobber good data with nothing

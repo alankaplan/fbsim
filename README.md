@@ -155,6 +155,12 @@ venv/bin/python -m leagues.update --refresh --players   # refresh fixtures + pla
 ```
 
 They surface as the report's **Top players** tab and each team's **Players** sub-tab.
+Each player is linked to its club by normalised team name — accents are folded and
+short forms tolerated (so FBref's "San Jose" / "San José" ties to "San Jose
+Earthquakes"); any squad name that still can't be matched is reported and its players
+are simply left off that team's page. Matching is re-checked when the page is built,
+so fixing a name mismatch only needs a `generate_page` (or `update`) run, not a
+re-fetch.
 
 Data sources (all write the same canonical CSVs):
 
