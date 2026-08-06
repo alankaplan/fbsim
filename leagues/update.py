@@ -290,16 +290,16 @@ def main() -> None:
           f"skipped: {', '.join(skipped) or '(none)'}")
 
     if args.national:                               # display-only US national-team games (ESPN)
-        from datetime import date
         from .national import NATIONAL, build_national
         print("National teams (usmnt, uswnt):")
-        year = int(args.season) if (args.season and args.season.isdigit()) else date.today().year
+        # Bare fetch (each competition's current season) unless a numeric --season is given.
+        season = int(args.season) if (args.season and args.season.isdigit()) else None
         for entry in NATIONAL:
             try:
-                out = build_national(entry, year)
+                out = build_national(entry, season)
                 d = json.loads(out.read_text(encoding="utf-8"))
                 played = sum(1 for g in d["games"] if g["status"] == "completed")
-                print(f"  [national] {entry['name']} {year}: {len(d['games'])} games "
+                print(f"  [national] {entry['name']}: {len(d['games'])} games "
                       f"({played} played) -> {out.name}")
             except (Exception, SystemExit) as exc:
                 print(f"  [national] {entry['key']} skipped: {exc}")

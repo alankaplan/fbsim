@@ -30,10 +30,15 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import date, datetime, timezone
+import urllib.error
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from .ingest import _fetch_json
+
+# Keep only games this recent (or in the future) so a bare tournament fetch can't
+# surface a stale past edition (e.g. World Cup 2022) alongside current fixtures.
+RECENT_DAYS = 400
 
 ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer"
 
@@ -50,20 +55,20 @@ NATIONAL = [
         "slugs": [
             ("fifa.friendly", "Friendly"),
             ("concacaf.nations.league", "Nations League"),
-            ("concacaf.nations.league_qual", "Nations League Qual"),
             ("fifa.worldq.concacaf", "World Cup Qual"),
             ("concacaf.gold", "Gold Cup"),
             ("fifa.world", "World Cup"),
+            ("fifa.olympics", "Olympics"),
         ],
     },
     {
         "key": "uswnt", "name": "USWNT", "espn_id": None,
         "slugs": [
             ("fifa.friendly.w", "Friendly"),
+            ("fifa.shebelieves", "SheBelieves Cup"),
             ("concacaf.w.gold", "W Gold Cup"),
-            ("concacaf.w.championship", "W Championship"),
             ("fifa.wwc", "World Cup"),
-            ("fifa.olympics.w", "Olympics"),
+            ("fifa.w.olympics", "Olympics"),
         ],
     },
 ]
@@ -77,21 +82,25 @@ def _is_us(team: dict) -> bool:
     return any(n in name for n in _US_NAMES) or abbr in ("usa", "us")
 
 
-def _resolve_team_id(slug: str) -> int | None:
-    """Find ESPN's team id for the USA within a competition's /teams list."""
-    try:
-        payload = _fetch_json(f"{ESPN_BASE}/{slug}/teams")
-    except Exception:
-        return None
-    for sport in payload.get("sports", []):
-        for lg in sport.get("leagues", []):
-            for t in lg.get("teams", []):
-                team = t.get("team", t)
-                if _is_us(team):
-                    try:
-                        return int(team["id"])
-                    except (KeyError, ValueError, TypeError):
-                        return None
+def _resolve_team_id(slugs: list[tuple[str, str]]) -> int | None:
+    """Find ESPN's team id for the USA, trying each competition's /teams list in turn.
+
+    Friendly "leagues" often don't populate /teams, so we fall through to the next slug
+    (a real tournament like concacaf.w.gold does list its teams)."""
+    for slug, _label in slugs:
+        try:
+            payload = _fetch_json(f"{ESPN_BASE}/{slug}/teams")
+        except Exception:
+            continue
+        for sport in payload.get("sports", []):
+            for lg in sport.get("leagues", []):
+                for t in lg.get("teams", []):
+                    team = t.get("team", t)
+                    if _is_us(team):
+                        try:
+                            return int(team["id"])
+                        except (KeyError, ValueError, TypeError):
+                            pass
     return None
 
 
@@ -149,24 +158,38 @@ def _parse_event(event: dict, team_id: int, label: str) -> dict | None:
     }
 
 
-def fetch_games(entry: dict, year: int) -> list[dict]:
-    """Merge a national team's games across its competition slugs (deduped by event id)."""
-    team_id = entry.get("espn_id") or _resolve_team_id(entry["slugs"][0][0])
+def fetch_games(entry: dict, season: int | None = None) -> list[dict]:
+    """Merge a national team's games across its competition slugs (deduped by event id).
+
+    Fetches each slug's schedule bare (ESPN returns the competition's current season —
+    recent + upcoming); ``season`` appends ``?season=`` only when the caller asks for a
+    specific year. Games older than ``RECENT_DAYS`` are dropped so a bare tournament
+    fetch can't surface a stale past edition."""
+    team_id = entry.get("espn_id") or _resolve_team_id(entry["slugs"])
     if not team_id:
         print(f"  [national] {entry['key']}: could not resolve ESPN team id — skipped")
         return []
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=RECENT_DAYS)).strftime("%Y-%m-%d")
     by_id: dict[str, dict] = {}
     for slug, label in entry["slugs"]:
-        url = f"{ESPN_BASE}/{slug}/teams/{team_id}/schedule?season={year}"
+        url = f"{ESPN_BASE}/{slug}/teams/{team_id}/schedule"
+        if season:
+            url += f"?season={season}"
         try:
             payload = _fetch_json(url)
-        except Exception as exc:                       # a slug the team isn't in / 404 / 403
-            print(f"  [national] {entry['key']}: {slug} unavailable ({type(exc).__name__}) — skipped")
+        except urllib.error.HTTPError as exc:          # slug/season the team isn't in
+            print(f"  [national] {entry['key']}: {slug} — HTTP {exc.code} (skipped)")
+            continue
+        except Exception as exc:                       # network / decode / other
+            print(f"  [national] {entry['key']}: {slug} — {type(exc).__name__} (skipped)")
             continue
         for event in payload.get("events", []):
             row = _parse_event(event, team_id, label)
-            if row and row["event_id"] and row["event_id"] not in by_id:
-                by_id[row["event_id"]] = row
+            if not row or not row["event_id"]:
+                continue
+            if (row["date"] or "9999") < cutoff:       # too old to be "current" — drop
+                continue
+            by_id.setdefault(row["event_id"], row)
     games = list(by_id.values())
     games.sort(key=lambda g: g["datetime_utc"] or g["date"])
     return games
@@ -176,16 +199,20 @@ def national_path(key: str) -> Path:
     return NATIONAL_ROOT / f"{key}.json"
 
 
-def build_national(entry: dict, year: int) -> Path:
-    """Fetch a team's calendar and write data/national/<key>.json (non-destructive on empty)."""
-    games = fetch_games(entry, year)
+def build_national(entry: dict, season: int | None = None) -> Path:
+    """Fetch a team's calendar and write data/national/<key>.json (non-destructive on empty).
+
+    ``season`` is optional: omit it (the default) to fetch each competition's current
+    season; pass a year to force ``?season=`` on every request."""
+    games = fetch_games(entry, season)
     out = national_path(entry["key"])
     if not games and out.exists():                     # don't clobber good data with nothing
-        print(f"  [national] no games for {entry['name']} {year} — keeping existing {out.name}")
+        print(f"  [national] no games for {entry['name']} — keeping existing {out.name}")
         return out
     payload = {
         "key": entry["key"], "name": entry["name"], "espn_id": entry.get("espn_id"),
-        "season": year, "updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "season": season or date.today().year,
+        "updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "games": games,
     }
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -205,17 +232,17 @@ def main() -> None:
     ap.add_argument("team", nargs="?", default="all",
                     help="usmnt, uswnt, or all (default: all)")
     ap.add_argument("--season", type=int, default=None,
-                    help="calendar year to fetch (default: current year)")
+                    help="force a specific calendar year via ?season= (default: each "
+                         "competition's current season — recent + upcoming games)")
     args = ap.parse_args()
 
-    year = args.season or date.today().year
     entries = NATIONAL if args.team == "all" else [_entry(args.team)]
     for entry in entries:
-        out = build_national(entry, year)
+        out = build_national(entry, args.season)
         d = json.loads(out.read_text(encoding="utf-8"))
         games = d["games"]
         played = sum(1 for g in games if g["status"] == "completed")
-        print(f"{entry['name']} {year}: {len(games)} games ({played} played, "
+        print(f"{entry['name']}: {len(games)} games ({played} played, "
               f"{len(games) - played} upcoming) -> {out}")
 
 
