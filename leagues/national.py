@@ -30,17 +30,56 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 import urllib.error
+import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-
-from .ingest import _fetch_json
 
 # Keep only games this recent (or in the future) so a bare tournament fetch can't
 # surface a stale past edition (e.g. World Cup 2022) alongside current fixtures.
 RECENT_DAYS = 400
 
 ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer"
+
+# ESPN rate-limits bursts (a batch of quick requests gets 403'd wholesale), so keep a
+# minimum spacing between calls and retry with backoff when it does push back.
+_THROTTLE_S = 0.6
+_last_call = [0.0]
+_ESPN_HEADERS = {
+    "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                   "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"),
+    "Accept": "application/json, text/plain, */*",
+    "Referer": "https://www.espn.com/",
+}
+
+
+def _espn_get(url: str, tries: int = 3):
+    """GET an ESPN JSON endpoint, throttled and retried with backoff.
+
+    Spaces requests ``_THROTTLE_S`` apart (bursts get 403'd wholesale) and retries on
+    403/429/5xx and transient network errors with 2s/4s/8s backoff, so a short-lived
+    rate-limit cools off instead of failing the whole run."""
+    last_exc = None
+    for attempt in range(tries):
+        wait = _THROTTLE_S - (time.monotonic() - _last_call[0])
+        if wait > 0:
+            time.sleep(wait)
+        try:
+            req = urllib.request.Request(url, headers=_ESPN_HEADERS)
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            last_exc = exc
+            if exc.code not in (403, 429, 500, 502, 503, 504):
+                raise                                  # a real 404 etc. — don't retry
+        except Exception as exc:                       # network / decode — retry
+            last_exc = exc
+        finally:
+            _last_call[0] = time.monotonic()
+        if attempt < tries - 1:
+            time.sleep(2 * (2 ** attempt))             # 2s, 4s, 8s
+    raise last_exc
 
 # data/national/ (sibling of data/leagues/), gitignored like the rest of the data.
 NATIONAL_ROOT = Path(__file__).resolve().parent.parent / "data" / "national"
@@ -89,7 +128,7 @@ def _resolve_team_id(slugs: list[tuple[str, str]]) -> int | None:
     (a real tournament like concacaf.w.gold does list its teams)."""
     for slug, _label in slugs:
         try:
-            payload = _fetch_json(f"{ESPN_BASE}/{slug}/teams")
+            payload = _espn_get(f"{ESPN_BASE}/{slug}/teams")
         except Exception:
             continue
         for sport in payload.get("sports", []):
@@ -160,12 +199,16 @@ def _parse_event(event: dict, team_id: int, label: str) -> dict | None:
 
 def _season_set(explicit: int | None) -> list[int | None]:
     """Which seasons to request per slug. Default = the bare (current) season plus this
-    year and next, so upcoming fixtures are caught even when ESPN's bare default season
-    lags the calendar. An explicit --season forces just that one year."""
+    year — and next year only late in the season — so upcoming fixtures are caught even
+    when ESPN's bare default lags the calendar, while keeping the request count low
+    (ESPN 403s bursts). An explicit --season forces just that one year."""
     if explicit:
         return [explicit]
-    y = date.today().year
-    return [None, y, y + 1]
+    today = date.today()
+    seasons: list[int | None] = [None, today.year]
+    if today.month >= 9:                               # late in the year, pull next year's early fixtures too
+        seasons.append(today.year + 1)
+    return seasons
 
 
 def fetch_games(entry: dict, season: int | None = None) -> list[dict]:
@@ -190,7 +233,7 @@ def fetch_games(entry: dict, season: int | None = None) -> list[dict]:
             if s:
                 url += f"?season={s}"
             try:
-                payload = _fetch_json(url)
+                payload = _espn_get(url)
             except urllib.error.HTTPError as exc:      # slug/season the team isn't in
                 last_err = f"HTTP {exc.code}"
                 continue
