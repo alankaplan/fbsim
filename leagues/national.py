@@ -8,71 +8,80 @@ Ingest **national-team fixtures and results** (USMNT / USWNT) into
 National teams are deliberately **not** modeled as leagues: they play friendlies
 and tournaments against a rotating opponent set, with no league table, so nothing
 here touches the season simulator (``run_sims``). This module only fetches a team's
-schedule + results and writes them out; ``generate_page`` renders them as a plain
-"National teams" tab.
+recent results + upcoming games and writes them out; ``generate_page`` renders them
+as a plain "National teams" tab.
 
-Source is **ESPN's public JSON API** (browserless, no key) — the same simple GET
-the league ingest uses. ESPN's team-schedule endpoint is *per competition*, so a
-team's full calendar is assembled by fetching a fixed set of competition slugs and
-merging the events (deduped by ESPN event id):
+Source is **TheSportsDB's free JSON API** (browserless, no key setup — the public
+test key). It gives a team's recent results and next fixtures across *all*
+competitions in just two lookups per team, so there are no request bursts:
 
-    https://site.api.espn.com/apis/site/v2/sports/soccer/<slug>/teams/<id>/schedule?season=<year>
+    https://www.thesportsdb.com/api/v1/json/<key>/eventslast.php?id=<teamId>   # results
+    https://www.thesportsdb.com/api/v1/json/<key>/eventsnext.php?id=<teamId>   # upcoming
+
+(ESPN's API was the original source but hard-blocks some networks with 403s.)
 
 Usage
 -----
-    venv/bin/python -m leagues.national all               # USMNT + USWNT, current year
-    venv/bin/python -m leagues.national usmnt              # one team
-    venv/bin/python -m leagues.national uswnt --season 2026
+    venv/bin/python -m leagues.national all      # USMNT + USWNT
+    venv/bin/python -m leagues.national usmnt     # one team
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-# Keep only games this recent (or in the future) so a bare tournament fetch can't
-# surface a stale past edition (e.g. World Cup 2022) alongside current fixtures.
+# Keep only games this recent (or in the future), so a rare stale result can't leak in.
 RECENT_DAYS = 400
 
-ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer"
+# TheSportsDB free/public test key. Swap for a personal key if you have one.
+TSDB_KEY = "3"
+TSDB_BASE = f"https://www.thesportsdb.com/api/v1/json/{TSDB_KEY}"
 
-# ESPN rate-limits bursts (a batch of quick requests gets 403'd wholesale), so keep a
-# minimum spacing between calls and retry with backoff when it does push back.
-_THROTTLE_S = 0.6
+# data/national/ (sibling of data/leagues/), gitignored like the rest of the data.
+NATIONAL_ROOT = Path(__file__).resolve().parent.parent / "data" / "national"
+
+# Each team: a display name, the names to search TheSportsDB for, the gender that
+# disambiguates the men's vs women's national side, and an optional pinned team id
+# (set tsdb_id to skip runtime resolution if it ever picks the wrong team).
+NATIONAL = [
+    {"key": "usmnt", "name": "USMNT", "tsdb_search": ["USA", "United States"],
+     "gender": "Male", "tsdb_id": None},
+    {"key": "uswnt", "name": "USWNT", "tsdb_search": ["USA", "United States"],
+     "gender": "Female", "tsdb_id": None},
+]
+
+# ---------------------------------------------------------------------------
+# HTTP client: throttled + retried (gentle even though TheSportsDB is friendly).
+# ---------------------------------------------------------------------------
+_THROTTLE_S = 0.4
 _last_call = [0.0]
-_ESPN_HEADERS = {
-    "User-Agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                   "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"),
-    "Accept": "application/json, text/plain, */*",
-    "Referer": "https://www.espn.com/",
-}
+_HEADERS = {"User-Agent": "Mozilla/5.0", "Accept": "application/json, */*"}
 
 
-def _espn_get(url: str, tries: int = 3):
-    """GET an ESPN JSON endpoint, throttled and retried with backoff.
-
-    Spaces requests ``_THROTTLE_S`` apart (bursts get 403'd wholesale) and retries on
-    403/429/5xx and transient network errors with 2s/4s/8s backoff, so a short-lived
-    rate-limit cools off instead of failing the whole run."""
+def _get_json(url: str, tries: int = 3):
+    """GET a JSON endpoint, spaced ``_THROTTLE_S`` apart and retried with backoff."""
     last_exc = None
     for attempt in range(tries):
         wait = _THROTTLE_S - (time.monotonic() - _last_call[0])
         if wait > 0:
             time.sleep(wait)
         try:
-            req = urllib.request.Request(url, headers=_ESPN_HEADERS)
+            req = urllib.request.Request(url, headers=_HEADERS)
             with urllib.request.urlopen(req, timeout=45) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             last_exc = exc
-            if exc.code not in (403, 429, 500, 502, 503, 504):
-                raise                                  # a real 404 etc. — don't retry
+            if exc.code not in (429, 500, 502, 503, 504):
+                raise                                  # 4xx (other than 429) — don't retry
         except Exception as exc:                       # network / decode — retry
             last_exc = exc
         finally:
@@ -81,114 +90,90 @@ def _espn_get(url: str, tries: int = 3):
             time.sleep(2 * (2 ** attempt))             # 2s, 4s, 8s
     raise last_exc
 
-# data/national/ (sibling of data/leagues/), gitignored like the rest of the data.
-NATIONAL_ROOT = Path(__file__).resolve().parent.parent / "data" / "national"
 
-# Each team: the competitions to merge, as (ESPN league slug, readable label). The
-# slug list is easy to extend; a slug a team isn't in for a given season just yields
-# no events and is skipped. espn_id is ESPN's team id (660 = USA men, documented);
-# None is resolved at runtime from a slug's /teams list.
-NATIONAL = [
-    {
-        "key": "usmnt", "name": "USMNT", "espn_id": 660,
-        "slugs": [
-            ("fifa.friendly", "Friendly"),
-            ("concacaf.nations.league", "Nations League"),
-            ("fifa.worldq.concacaf", "World Cup Qual"),
-            ("concacaf.gold", "Gold Cup"),
-            ("fifa.world", "World Cup"),
-            ("fifa.olympics", "Olympics"),
-        ],
-    },
-    {
-        "key": "uswnt", "name": "USWNT", "espn_id": None,
-        "slugs": [
-            ("fifa.friendly.w", "Friendly"),
-            ("fifa.shebelieves", "SheBelieves Cup"),
-            ("concacaf.w.gold", "W Gold Cup"),
-            ("fifa.wwc", "World Cup"),
-            ("fifa.w.olympics", "Olympics"),
-        ],
-    },
-]
-
-_US_NAMES = ("united states", "usa")
+# ---------------------------------------------------------------------------
+# Team-id resolution (TheSportsDB ids aren't guessable, so resolve + log them).
+# ---------------------------------------------------------------------------
+def _us_national_name(name: str) -> bool:
+    """True if a team name is a US national side (a country form, not a club)."""
+    base = re.sub(r"\bwomen\b|\(w\)|\bu-?\d+\b", "", str(name).lower())
+    base = base.replace("national team", "").strip(" .-")
+    return base in ("usa", "us", "united states", "united states of america")
 
 
-def _is_us(team: dict) -> bool:
-    name = str(team.get("displayName", "")).lower()
-    abbr = str(team.get("abbreviation", "")).lower()
-    return any(n in name for n in _US_NAMES) or abbr in ("usa", "us")
+def _team_gender(team: dict) -> str:
+    """Male/Female for a TheSportsDB team, from strGender or a name marker."""
+    g = str(team.get("strGender", "")).strip().capitalize()
+    if g in ("Male", "Female"):
+        return g
+    name = str(team.get("strTeam", "")).lower()
+    return "Female" if ("women" in name or "(w)" in name) else "Male"
 
 
-def _resolve_team_id(slugs: list[tuple[str, str]]) -> int | None:
-    """Find ESPN's team id for the USA, trying each competition's /teams list in turn.
-
-    Friendly "leagues" often don't populate /teams, so we fall through to the next slug
-    (a real tournament like concacaf.w.gold does list its teams)."""
-    for slug, _label in slugs:
+def _resolve_tsdb_id(entry: dict) -> str | None:
+    """Resolve (and log) TheSportsDB team id for a national side; honor a pinned id."""
+    if entry.get("tsdb_id"):
+        return str(entry["tsdb_id"])
+    seen: set[str] = set()
+    for name in entry["tsdb_search"]:
         try:
-            payload = _espn_get(f"{ESPN_BASE}/{slug}/teams")
-        except Exception:
+            payload = _get_json(f"{TSDB_BASE}/searchteams.php?t={urllib.parse.quote(name)}")
+        except Exception as exc:
+            print(f"  [national] {entry['key']}: search '{name}' failed ({type(exc).__name__})")
             continue
-        for sport in payload.get("sports", []):
-            for lg in sport.get("leagues", []):
-                for t in lg.get("teams", []):
-                    team = t.get("team", t)
-                    if _is_us(team):
-                        try:
-                            return int(team["id"])
-                        except (KeyError, ValueError, TypeError):
-                            pass
+        for t in (payload.get("teams") or []):
+            tid = str(t.get("idTeam", ""))
+            if tid in seen:
+                continue
+            seen.add(tid)
+            if (str(t.get("strSport")) == "Soccer" and _us_national_name(t.get("strTeam"))
+                    and _team_gender(t) == entry["gender"]):
+                print(f"  [national] {entry['key']}: resolved to idTeam {tid} "
+                      f"'{t.get('strTeam')}'")
+                return tid
+    print(f"  [national] {entry['key']}: could not resolve a TheSportsDB team id — skipped")
     return None
 
 
-def _score(competitor: dict):
-    """A competitor's numeric score, or None when not yet played."""
-    s = competitor.get("score")
-    if isinstance(s, dict):
-        s = s.get("value", s.get("displayValue"))
-    if s in (None, ""):
+# ---------------------------------------------------------------------------
+# Event parsing.
+# ---------------------------------------------------------------------------
+def _int(v):
+    """Int score, or None when absent/blank/'null'."""
+    if v in (None, "", "null"):
         return None
     try:
-        return int(round(float(s)))
+        return int(round(float(v)))
     except (ValueError, TypeError):
         return None
 
 
-def _parse_event(event: dict, team_id: int, label: str) -> dict | None:
-    """One ESPN schedule event -> a canonical game row from the USA's perspective."""
-    comps = event.get("competitions") or []
-    if not comps:
+def _parse_event(ev: dict, team_id: str) -> dict | None:
+    """One TheSportsDB event -> a canonical game row from the USA's perspective."""
+    if str(ev.get("strSport", "Soccer")) != "Soccer":
         return None
-    comp = comps[0]
-    competitors = comp.get("competitors") or []
-    us = next((c for c in competitors if str(c.get("team", {}).get("id")) == str(team_id)), None)
-    if us is None:
-        us = next((c for c in competitors if _is_us(c.get("team", {}))), None)
-    opp = next((c for c in competitors if c is not us), None)
-    if us is None or opp is None:
-        return None
-
-    dt = event.get("date") or comp.get("date") or ""
-    neutral = bool(comp.get("neutralSite"))
-    venue = "neutral" if neutral else ("home" if us.get("homeAway") == "home" else "away")
-    completed = bool(((comp.get("status") or {}).get("type") or {}).get("completed"))
-    gf, ga = _score(us), _score(opp)
-    if completed and gf is not None and ga is not None:
-        result = "W" if gf > ga else ("L" if gf < ga else "D")
+    tid, id_home, id_away = str(team_id), str(ev.get("idHomeTeam", "")), str(ev.get("idAwayTeam", ""))
+    if tid == id_home:
+        venue, opponent = "home", ev.get("strAwayTeam", "TBD")
+        gf, ga = _int(ev.get("intHomeScore")), _int(ev.get("intAwayScore"))
+    elif tid == id_away:
+        venue, opponent = "away", ev.get("strHomeTeam", "TBD")
+        gf, ga = _int(ev.get("intAwayScore")), _int(ev.get("intHomeScore"))
     else:
-        completed = False
-        result = ""
+        return None                                    # event not involving this team
 
-    opp_team = opp.get("team", {})
+    completed = gf is not None and ga is not None
+    result = ("W" if gf > ga else ("L" if gf < ga else "D")) if completed else ""
+    ts = str(ev.get("strTimestamp") or "").strip()
+    dt_date = str(ev.get("dateEvent") or "")
+    datetime_utc = (ts + "Z") if (ts and not ts.endswith("Z")) else (ts or dt_date)
     return {
-        "event_id": str(event.get("id", "")),
-        "date": dt[:10] if dt else "",
-        "datetime_utc": dt,
-        "competition": label,
-        "opponent": opp_team.get("displayName", opp_team.get("name", "TBD")),
-        "opp_code": opp_team.get("abbreviation", ""),
+        "event_id": str(ev.get("idEvent", "")),
+        "date": dt_date,
+        "datetime_utc": datetime_utc,
+        "competition": ev.get("strLeague") or "",
+        "opponent": opponent or "TBD",
+        "opp_code": "",
         "venue": venue,
         "gf": gf if completed else "",
         "ga": ga if completed else "",
@@ -197,68 +182,38 @@ def _parse_event(event: dict, team_id: int, label: str) -> dict | None:
     }
 
 
-def _season_set(explicit: int | None) -> list[int | None]:
-    """Which seasons to request per slug. Default = the bare (current) season plus this
-    year — and next year only late in the season — so upcoming fixtures are caught even
-    when ESPN's bare default lags the calendar, while keeping the request count low
-    (ESPN 403s bursts). An explicit --season forces just that one year."""
-    if explicit:
-        return [explicit]
-    today = date.today()
-    seasons: list[int | None] = [None, today.year]
-    if today.month >= 9:                               # late in the year, pull next year's early fixtures too
-        seasons.append(today.year + 1)
-    return seasons
-
-
 def fetch_games(entry: dict, season: int | None = None) -> list[dict]:
-    """Merge a national team's games across its competition slugs (deduped by event id).
+    """A national team's recent results + upcoming games (deduped by event id).
 
-    For each slug we request a *superset* of seasons (see :func:`_season_set`) and merge:
-    the bare call gives ESPN's default season, the ``?season=`` calls catch upcoming
-    fixtures the default may omit. A slug/season the team isn't in just 404s and is
-    skipped. Games older than ``RECENT_DAYS`` are dropped so a stale past edition can't
-    leak in."""
-    team_id = entry.get("espn_id") or _resolve_team_id(entry["slugs"])
+    Two lookups: ``eventslast`` (recent results) and ``eventsnext`` (upcoming). ``season``
+    is accepted for signature compatibility but unused — these endpoints already return
+    the current window. Games older than ``RECENT_DAYS`` are trimmed."""
+    team_id = _resolve_tsdb_id(entry)
     if not team_id:
-        print(f"  [national] {entry['key']}: could not resolve ESPN team id — skipped")
         return []
     cutoff = (datetime.now(timezone.utc) - timedelta(days=RECENT_DAYS)).strftime("%Y-%m-%d")
-    seasons = _season_set(season)
     by_id: dict[str, dict] = {}
-    for slug, label in entry["slugs"]:
-        seen, dates, last_err = set(), [], None
-        for s in seasons:
-            url = f"{ESPN_BASE}/{slug}/teams/{team_id}/schedule"
-            if s:
-                url += f"?season={s}"
-            try:
-                payload = _espn_get(url)
-            except urllib.error.HTTPError as exc:      # slug/season the team isn't in
-                last_err = f"HTTP {exc.code}"
+    for endpoint in ("eventslast.php", "eventsnext.php"):
+        try:
+            payload = _get_json(f"{TSDB_BASE}/{endpoint}?id={team_id}")
+        except Exception as exc:
+            print(f"  [national] {entry['key']}: {endpoint} failed ({type(exc).__name__})")
+            continue
+        for ev in (payload.get("results") or payload.get("events") or []):
+            row = _parse_event(ev, team_id)
+            if not row or not row["event_id"]:
                 continue
-            except Exception as exc:                   # network / decode / other
-                last_err = type(exc).__name__
+            if (row["date"] or "9999") < cutoff:       # too old to be "current" — drop
                 continue
-            for event in payload.get("events", []):
-                row = _parse_event(event, team_id, label)
-                if not row or not row["event_id"]:
-                    continue
-                if (row["date"] or "9999") < cutoff:   # too old to be "current" — drop
-                    continue
-                if row["event_id"] not in seen:        # count each game once per slug
-                    seen.add(row["event_id"])
-                    if row["date"]:
-                        dates.append(row["date"])
-                by_id.setdefault(row["event_id"], row)
-        if dates:                                      # one concise line per competition
-            print(f"  [national] {entry['key']}: {slug} — {len(dates)} games "
-                  f"({min(dates)} → {max(dates)})")
-        else:
-            print(f"  [national] {entry['key']}: {slug} — no current games"
-                  f"{f' ({last_err})' if last_err else ''}")
+            by_id.setdefault(row["event_id"], row)
     games = list(by_id.values())
     games.sort(key=lambda g: g["datetime_utc"] or g["date"])
+    if games:
+        dates = [g["date"] for g in games if g["date"]]
+        played = sum(1 for g in games if g["status"] == "completed")
+        span = f"{min(dates)} → {max(dates)}" if dates else "?"
+        print(f"  [national] {entry['key']}: {len(games)} games "
+              f"({played} played, {len(games) - played} upcoming; {span})")
     return games
 
 
@@ -267,17 +222,14 @@ def national_path(key: str) -> Path:
 
 
 def build_national(entry: dict, season: int | None = None) -> Path:
-    """Fetch a team's calendar and write data/national/<key>.json (non-destructive on empty).
-
-    ``season`` is optional: omit it (the default) to fetch each competition's current
-    season; pass a year to force ``?season=`` on every request."""
+    """Fetch a team's games and write data/national/<key>.json (non-destructive on empty)."""
     games = fetch_games(entry, season)
     out = national_path(entry["key"])
     if not games and out.exists():                     # don't clobber good data with nothing
         print(f"  [national] no games for {entry['name']} — keeping existing {out.name}")
         return out
     payload = {
-        "key": entry["key"], "name": entry["name"], "espn_id": entry.get("espn_id"),
+        "key": entry["key"], "name": entry["name"], "tsdb_id": entry.get("tsdb_id"),
         "season": season or date.today().year,
         "updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "games": games,
@@ -295,12 +247,12 @@ def _entry(key: str) -> dict:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Ingest USMNT/USWNT fixtures + results (ESPN).")
+    ap = argparse.ArgumentParser(description="Ingest USMNT/USWNT fixtures + results (TheSportsDB).")
     ap.add_argument("team", nargs="?", default="all",
                     help="usmnt, uswnt, or all (default: all)")
     ap.add_argument("--season", type=int, default=None,
-                    help="force a specific calendar year via ?season= (default: each "
-                         "competition's current season — recent + upcoming games)")
+                    help="accepted for compatibility; ignored (the feed returns the "
+                         "current recent+upcoming window)")
     args = ap.parse_args()
 
     entries = NATIONAL if args.team == "all" else [_entry(args.team)]

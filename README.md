@@ -197,9 +197,11 @@ directory ships with sample data). Unplayed fixtures have empty goal/xG fields a
 The US men's and women's national teams are **not** simulated: they play
 friendlies and tournaments with no league table, so the season model doesn't apply.
 Instead they get a **display-only "National teams" tab** — past results and upcoming
-games across all competitions — fetched (browserless, no key) from **ESPN's public
-JSON API** by merging a fixed set of competition slugs (friendlies, Nations League,
-World Cup qualifying, Gold Cup, World Cup; women's equivalents).
+games across all competitions — fetched (browserless) from **TheSportsDB's free JSON
+API**: two lookups per team (`eventslast` for recent results, `eventsnext` for
+upcoming), so there are no request bursts. Team ids are resolved at runtime and logged
+(pin `tsdb_id` in `leagues/national.py`'s `NATIONAL` list if resolution ever picks the
+wrong team).
 
 ```bash
 venv/bin/python -m leagues.national all          # USMNT + USWNT -> data/national/*.json
