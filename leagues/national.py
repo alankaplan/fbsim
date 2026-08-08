@@ -158,38 +158,62 @@ def _parse_event(event: dict, team_id: int, label: str) -> dict | None:
     }
 
 
+def _season_set(explicit: int | None) -> list[int | None]:
+    """Which seasons to request per slug. Default = the bare (current) season plus this
+    year and next, so upcoming fixtures are caught even when ESPN's bare default season
+    lags the calendar. An explicit --season forces just that one year."""
+    if explicit:
+        return [explicit]
+    y = date.today().year
+    return [None, y, y + 1]
+
+
 def fetch_games(entry: dict, season: int | None = None) -> list[dict]:
     """Merge a national team's games across its competition slugs (deduped by event id).
 
-    Fetches each slug's schedule bare (ESPN returns the competition's current season —
-    recent + upcoming); ``season`` appends ``?season=`` only when the caller asks for a
-    specific year. Games older than ``RECENT_DAYS`` are dropped so a bare tournament
-    fetch can't surface a stale past edition."""
+    For each slug we request a *superset* of seasons (see :func:`_season_set`) and merge:
+    the bare call gives ESPN's default season, the ``?season=`` calls catch upcoming
+    fixtures the default may omit. A slug/season the team isn't in just 404s and is
+    skipped. Games older than ``RECENT_DAYS`` are dropped so a stale past edition can't
+    leak in."""
     team_id = entry.get("espn_id") or _resolve_team_id(entry["slugs"])
     if not team_id:
         print(f"  [national] {entry['key']}: could not resolve ESPN team id — skipped")
         return []
     cutoff = (datetime.now(timezone.utc) - timedelta(days=RECENT_DAYS)).strftime("%Y-%m-%d")
+    seasons = _season_set(season)
     by_id: dict[str, dict] = {}
     for slug, label in entry["slugs"]:
-        url = f"{ESPN_BASE}/{slug}/teams/{team_id}/schedule"
-        if season:
-            url += f"?season={season}"
-        try:
-            payload = _fetch_json(url)
-        except urllib.error.HTTPError as exc:          # slug/season the team isn't in
-            print(f"  [national] {entry['key']}: {slug} — HTTP {exc.code} (skipped)")
-            continue
-        except Exception as exc:                       # network / decode / other
-            print(f"  [national] {entry['key']}: {slug} — {type(exc).__name__} (skipped)")
-            continue
-        for event in payload.get("events", []):
-            row = _parse_event(event, team_id, label)
-            if not row or not row["event_id"]:
+        seen, dates, last_err = set(), [], None
+        for s in seasons:
+            url = f"{ESPN_BASE}/{slug}/teams/{team_id}/schedule"
+            if s:
+                url += f"?season={s}"
+            try:
+                payload = _fetch_json(url)
+            except urllib.error.HTTPError as exc:      # slug/season the team isn't in
+                last_err = f"HTTP {exc.code}"
                 continue
-            if (row["date"] or "9999") < cutoff:       # too old to be "current" — drop
+            except Exception as exc:                   # network / decode / other
+                last_err = type(exc).__name__
                 continue
-            by_id.setdefault(row["event_id"], row)
+            for event in payload.get("events", []):
+                row = _parse_event(event, team_id, label)
+                if not row or not row["event_id"]:
+                    continue
+                if (row["date"] or "9999") < cutoff:   # too old to be "current" — drop
+                    continue
+                if row["event_id"] not in seen:        # count each game once per slug
+                    seen.add(row["event_id"])
+                    if row["date"]:
+                        dates.append(row["date"])
+                by_id.setdefault(row["event_id"], row)
+        if dates:                                      # one concise line per competition
+            print(f"  [national] {entry['key']}: {slug} — {len(dates)} games "
+                  f"({min(dates)} → {max(dates)})")
+        else:
+            print(f"  [national] {entry['key']}: {slug} — no current games"
+                  f"{f' ({last_err})' if last_err else ''}")
     games = list(by_id.values())
     games.sort(key=lambda g: g["datetime_utc"] or g["date"])
     return games
