@@ -11,14 +11,14 @@ here touches the season simulator (``run_sims``). This module only fetches a tea
 recent results + upcoming games and writes them out; ``generate_page`` renders them
 as a plain "National teams" tab.
 
-Source is **TheSportsDB's free JSON API** (browserless, no key setup — the public
-test key). It gives a team's recent results and next fixtures across *all*
-competitions in just two lookups per team, so there are no request bursts:
+Source is **API-Football** (api-sports.io v3). Its free tier (100 requests/day)
+returns a national team's fixtures — home and away, results and upcoming — across
+all competitions in two lookups per team. It needs a free API key: create one at
+https://dashboard.api-football.com and put it in a file named ``api.key`` at the
+repo root (gitignored). Without the key the tab simply stays empty.
 
-    https://www.thesportsdb.com/api/v1/json/<key>/eventslast.php?id=<teamId>   # results
-    https://www.thesportsdb.com/api/v1/json/<key>/eventsnext.php?id=<teamId>   # upcoming
-
-(ESPN's API was the original source but hard-blocks some networks with 403s.)
+(Earlier sources were dropped: ESPN hard-blocks some networks with 403; TheSportsDB's
+free tier only returns home events and no women's senior team.)
 
 Usage
 -----
@@ -30,58 +30,72 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
+import os
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # Keep only games this recent (or in the future), so a rare stale result can't leak in.
 RECENT_DAYS = 400
 
-# TheSportsDB free/public test key. Swap for a personal key if you have one.
-TSDB_KEY = "3"
-TSDB_BASE = f"https://www.thesportsdb.com/api/v1/json/{TSDB_KEY}"
+APIF_BASE = "https://v3.football.api-sports.io"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+API_KEY_FILE = REPO_ROOT / "api.key"
 
 # data/national/ (sibling of data/leagues/), gitignored like the rest of the data.
-NATIONAL_ROOT = Path(__file__).resolve().parent.parent / "data" / "national"
+NATIONAL_ROOT = REPO_ROOT / "data" / "national"
 
-# Each team: a display name, the names to search TheSportsDB for, the gender that
-# disambiguates the men's vs women's national side, and an optional pinned team id
-# (set tsdb_id to skip runtime resolution if it ever picks the wrong team).
+# API-Football fixture status codes that mean the match is over (has a final score).
+_FINISHED = {"FT", "AET", "PEN", "AWD", "WO"}
+
+# Each team: a display name, the API-Football search term, whether it's the women's
+# side (to disambiguate the two "USA" national teams), and an optional pinned team id
+# (set apif_id to skip runtime resolution if it ever picks the wrong team).
 NATIONAL = [
-    {"key": "usmnt", "name": "USMNT", "tsdb_search": ["USA", "United States"],
-     "gender": "Male", "tsdb_id": None},
-    {"key": "uswnt", "name": "USWNT", "tsdb_search": ["USA", "United States"],
-     "gender": "Female", "tsdb_id": None},
+    {"key": "usmnt", "name": "USMNT", "search": "USA", "women": False, "apif_id": None},
+    {"key": "uswnt", "name": "USWNT", "search": "USA", "women": True, "apif_id": None},
 ]
 
+
+def _read_key() -> str | None:
+    """API-Football key from the api.key file (preferred) or API_FOOTBALL_KEY env."""
+    try:
+        key = API_KEY_FILE.read_text(encoding="utf-8").strip()
+        if key:
+            return key
+    except OSError:
+        pass
+    return os.environ.get("API_FOOTBALL_KEY") or None
+
+
 # ---------------------------------------------------------------------------
-# HTTP client: throttled + retried (gentle even though TheSportsDB is friendly).
+# HTTP client: throttled + retried, sends the API-Football key header.
 # ---------------------------------------------------------------------------
 _THROTTLE_S = 0.4
 _last_call = [0.0]
-_HEADERS = {"User-Agent": "Mozilla/5.0", "Accept": "application/json, */*"}
 
 
-def _get_json(url: str, tries: int = 3):
-    """GET a JSON endpoint, spaced ``_THROTTLE_S`` apart and retried with backoff."""
+def _apif_get(path: str, key: str, tries: int = 3) -> dict:
+    """GET an API-Football endpoint (path incl. query), spaced + retried with backoff."""
+    url = f"{APIF_BASE}/{path}"
+    headers = {"x-apisports-key": key, "Accept": "application/json"}
     last_exc = None
     for attempt in range(tries):
         wait = _THROTTLE_S - (time.monotonic() - _last_call[0])
         if wait > 0:
             time.sleep(wait)
         try:
-            req = urllib.request.Request(url, headers=_HEADERS)
+            req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=45) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             last_exc = exc
             if exc.code not in (429, 500, 502, 503, 504):
-                raise                                  # 4xx (other than 429) — don't retry
+                raise
         except Exception as exc:                       # network / decode — retry
             last_exc = exc
         finally:
@@ -92,86 +106,72 @@ def _get_json(url: str, tries: int = 3):
 
 
 # ---------------------------------------------------------------------------
-# Team-id resolution (TheSportsDB ids aren't guessable, so resolve + log them).
+# Team-id resolution (log the pick so a wrong id is visible / pinnable).
 # ---------------------------------------------------------------------------
-def _us_national_name(name: str) -> bool:
-    """True if a team name is a US national side (a country form, not a club)."""
-    base = re.sub(r"\bwomen\b|\(w\)|\bu-?\d+\b", "", str(name).lower())
-    base = base.replace("national team", "").strip(" .-")
-    return base in ("usa", "us", "united states", "united states of america")
-
-
-def _team_gender(team: dict) -> str:
-    """Male/Female for a TheSportsDB team, from strGender or a name marker."""
-    g = str(team.get("strGender", "")).strip().capitalize()
-    if g in ("Male", "Female"):
-        return g
-    name = str(team.get("strTeam", "")).lower()
-    return "Female" if ("women" in name or "(w)" in name) else "Male"
-
-
-def _resolve_tsdb_id(entry: dict) -> str | None:
-    """Resolve (and log) TheSportsDB team id for a national side; honor a pinned id."""
-    if entry.get("tsdb_id"):
-        return str(entry["tsdb_id"])
-    seen: set[str] = set()
-    for name in entry["tsdb_search"]:
-        try:
-            payload = _get_json(f"{TSDB_BASE}/searchteams.php?t={urllib.parse.quote(name)}")
-        except Exception as exc:
-            print(f"  [national] {entry['key']}: search '{name}' failed ({type(exc).__name__})")
+def _resolve_team_id(entry: dict, key: str) -> int | None:
+    """Resolve (and log) the API-Football team id for a US national side."""
+    if entry.get("apif_id"):
+        return int(entry["apif_id"])
+    q = urllib.parse.urlencode({"search": entry["search"]})
+    try:
+        payload = _apif_get(f"teams?{q}", key)
+    except Exception as exc:
+        print(f"  [national] {entry['key']}: team search failed ({type(exc).__name__})")
+        return None
+    want_women = entry["women"]
+    for item in payload.get("response", []):
+        team = item.get("team", {})
+        if not team.get("national"):
             continue
-        for t in (payload.get("teams") or []):
-            tid = str(t.get("idTeam", ""))
-            if tid in seen:
-                continue
-            seen.add(tid)
-            if (str(t.get("strSport")) == "Soccer" and _us_national_name(t.get("strTeam"))
-                    and _team_gender(t) == entry["gender"]):
-                print(f"  [national] {entry['key']}: resolved to idTeam {tid} "
-                      f"'{t.get('strTeam')}'")
-                return tid
-    print(f"  [national] {entry['key']}: could not resolve a TheSportsDB team id — skipped")
+        if str(team.get("country", "")).lower() not in ("usa", "united states"):
+            continue
+        name = str(team.get("name", ""))
+        is_women = ("women" in name.lower() or name.lower().endswith(" w")
+                    or " w " in name.lower())
+        if is_women == want_women:
+            print(f"  [national] {entry['key']}: resolved to team {team.get('id')} "
+                  f"'{name}'")
+            return int(team["id"])
+    print(f"  [national] {entry['key']}: no matching US national team found — skipped")
     return None
 
 
 # ---------------------------------------------------------------------------
-# Event parsing.
+# Fixture parsing.
 # ---------------------------------------------------------------------------
 def _int(v):
-    """Int score, or None when absent/blank/'null'."""
-    if v in (None, "", "null"):
+    if v in (None, ""):
         return None
     try:
-        return int(round(float(v)))
+        return int(v)
     except (ValueError, TypeError):
         return None
 
 
-def _parse_event(ev: dict, team_id: str) -> dict | None:
-    """One TheSportsDB event -> a canonical game row from the USA's perspective."""
-    if str(ev.get("strSport", "Soccer")) != "Soccer":
-        return None
-    tid, id_home, id_away = str(team_id), str(ev.get("idHomeTeam", "")), str(ev.get("idAwayTeam", ""))
-    if tid == id_home:
-        venue, opponent = "home", ev.get("strAwayTeam", "TBD")
-        gf, ga = _int(ev.get("intHomeScore")), _int(ev.get("intAwayScore"))
-    elif tid == id_away:
-        venue, opponent = "away", ev.get("strHomeTeam", "TBD")
-        gf, ga = _int(ev.get("intAwayScore")), _int(ev.get("intHomeScore"))
+def _parse_fixture(item: dict, team_id: int) -> dict | None:
+    """One API-Football fixture -> a canonical game row from the USA's perspective."""
+    fx = item.get("fixture", {})
+    teams = item.get("teams", {})
+    goals = item.get("goals", {})
+    home, away = teams.get("home", {}), teams.get("away", {})
+    if home.get("id") == team_id:
+        venue, opponent = "home", away.get("name", "TBD")
+        gf, ga = _int(goals.get("home")), _int(goals.get("away"))
+    elif away.get("id") == team_id:
+        venue, opponent = "away", home.get("name", "TBD")
+        gf, ga = _int(goals.get("away")), _int(goals.get("home"))
     else:
-        return None                                    # event not involving this team
+        return None
 
-    completed = gf is not None and ga is not None
+    status = str(((fx.get("status") or {}).get("short")) or "")
+    completed = status in _FINISHED and gf is not None and ga is not None
     result = ("W" if gf > ga else ("L" if gf < ga else "D")) if completed else ""
-    ts = str(ev.get("strTimestamp") or "").strip()
-    dt_date = str(ev.get("dateEvent") or "")
-    datetime_utc = (ts + "Z") if (ts and not ts.endswith("Z")) else (ts or dt_date)
+    dt = str(fx.get("date") or "")                     # ISO 8601 with offset (usually Z)
     return {
-        "event_id": str(ev.get("idEvent", "")),
-        "date": dt_date,
-        "datetime_utc": datetime_utc,
-        "competition": ev.get("strLeague") or "",
+        "event_id": str(fx.get("id", "")),
+        "date": dt[:10],
+        "datetime_utc": dt,
+        "competition": (item.get("league", {}) or {}).get("name", "") or "",
         "opponent": opponent or "TBD",
         "opp_code": "",
         "venue": venue,
@@ -183,24 +183,29 @@ def _parse_event(ev: dict, team_id: str) -> dict | None:
 
 
 def fetch_games(entry: dict, season: int | None = None) -> list[dict]:
-    """A national team's recent results + upcoming games (deduped by event id).
+    """A national team's recent results + upcoming games (deduped by fixture id).
 
-    Two lookups: ``eventslast`` (recent results) and ``eventsnext`` (upcoming). ``season``
-    is accepted for signature compatibility but unused — these endpoints already return
-    the current window. Games older than ``RECENT_DAYS`` are trimmed."""
-    team_id = _resolve_tsdb_id(entry)
+    Two lookups: ``fixtures?team={id}&last=12`` and ``&next=15``. ``season`` is accepted
+    for signature compatibility but unused (last/next already scope the window). Games
+    older than ``RECENT_DAYS`` are trimmed."""
+    key = _read_key()
+    if not key:
+        print(f"  [national] {entry['key']}: no API-Football key — add it to "
+              f"{API_KEY_FILE.name} (free at dashboard.api-football.com)")
+        return []
+    team_id = _resolve_team_id(entry, key)
     if not team_id:
         return []
     cutoff = (datetime.now(timezone.utc) - timedelta(days=RECENT_DAYS)).strftime("%Y-%m-%d")
     by_id: dict[str, dict] = {}
-    for endpoint in ("eventslast.php", "eventsnext.php"):
+    for window in ("last=12", "next=15"):
         try:
-            payload = _get_json(f"{TSDB_BASE}/{endpoint}?id={team_id}")
+            payload = _apif_get(f"fixtures?team={team_id}&{window}", key)
         except Exception as exc:
-            print(f"  [national] {entry['key']}: {endpoint} failed ({type(exc).__name__})")
+            print(f"  [national] {entry['key']}: fixtures {window} failed ({type(exc).__name__})")
             continue
-        for ev in (payload.get("results") or payload.get("events") or []):
-            row = _parse_event(ev, team_id)
+        for item in payload.get("response", []):
+            row = _parse_fixture(item, team_id)
             if not row or not row["event_id"]:
                 continue
             if (row["date"] or "9999") < cutoff:       # too old to be "current" — drop
@@ -229,8 +234,7 @@ def build_national(entry: dict, season: int | None = None) -> Path:
         print(f"  [national] no games for {entry['name']} — keeping existing {out.name}")
         return out
     payload = {
-        "key": entry["key"], "name": entry["name"], "tsdb_id": entry.get("tsdb_id"),
-        "season": season or date.today().year,
+        "key": entry["key"], "name": entry["name"], "apif_id": entry.get("apif_id"),
         "updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "games": games,
     }
@@ -247,12 +251,11 @@ def _entry(key: str) -> dict:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Ingest USMNT/USWNT fixtures + results (TheSportsDB).")
+    ap = argparse.ArgumentParser(description="Ingest USMNT/USWNT fixtures + results (API-Football).")
     ap.add_argument("team", nargs="?", default="all",
                     help="usmnt, uswnt, or all (default: all)")
     ap.add_argument("--season", type=int, default=None,
-                    help="accepted for compatibility; ignored (the feed returns the "
-                         "current recent+upcoming window)")
+                    help="accepted for compatibility; ignored (last/next scope the window)")
     args = ap.parse_args()
 
     entries = NATIONAL if args.team == "all" else [_entry(args.team)]

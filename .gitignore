@@ -14,3 +14,6 @@ data/national/
 # soccerdata / seleniumbase scraping side-effects (fbref source)
 downloaded_files/
 soccerdata/
+
+# API-Football key (secret)
+api.key
