@@ -35,6 +35,12 @@ One command refreshes data, re-simulates the leagues whose data changed, and
 rebuilds the report:
 
 ```bash
+# Update EVERYTHING in one command: fixtures + Big-5 xG + player stats +
+# USMNT/USWNT national-team games, then simulate what changed and open the page.
+# (US-league player stats come from FBref, which needs a display — run it under a
+# desktop or xvfb-run; without one, that one step self-skips and the rest still runs.)
+xvfb-run -a python -m leagues.update --all --open
+
 # Refresh every league at its current season via fixturedownload (plain JSON,
 # no browser), simulate what changed, and open the page:
 venv/bin/python -m leagues.update --refresh --open
@@ -42,6 +48,9 @@ venv/bin/python -m leagues.update --refresh --open
 # Re-simulate stale leagues from the CSVs already on disk (no network):
 venv/bin/python -m leagues.update
 ```
+
+`--all` is just shorthand for `--refresh --players --fbref --national`; use the
+individual flags when you want only part of the pipeline.
 
 It's incremental: ingested CSVs are only rewritten when they actually differ,
 and a league is re-simulated only when its `matches.csv` is newer than its

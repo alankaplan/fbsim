@@ -214,11 +214,18 @@ def main() -> None:
     ap.add_argument("--national", action="store_true",
                     help="also refresh USMNT/USWNT fixtures + results (data/national/, "
                          "browserless via ESPN); shown as the report's National teams tab")
+    ap.add_argument("--all", action="store_true",
+                    help="do everything: shorthand for --refresh --players --fbref "
+                         "--national, then re-simulate and rebuild the page (FBref needs "
+                         "a display — run under xvfb-run/desktop; it self-skips headless)")
     ap.add_argument("--force", action="store_true",
                     help="re-simulate even when the data hasn't changed")
     ap.add_argument("--no-page", action="store_true", help="skip rebuilding leagues.html")
     ap.add_argument("--open", action="store_true", help="open the page in a browser")
     args = ap.parse_args()
+
+    if args.all:                                    # one flag = the whole pipeline
+        args.refresh = args.players = args.fbref = args.national = True
 
     ensure_league_dict()                            # register custom leagues before soccerdata import
     keys = args.leagues or list(LEAGUES)
