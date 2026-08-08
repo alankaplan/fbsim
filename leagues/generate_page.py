@@ -250,8 +250,9 @@ const NATIONAL = __NATIONAL_PLACEHOLDER__;
   }
 
   function leagueTabs() {
+    const crossLeague = (view==='schedule' || view==='national');   // Top games / National teams
     const lg = keys.map(k =>
-      `<button class="lg-btn ${(view!=='schedule'&&k===cur)?'active':''}" data-k="${k}">${esc(LEAGUES[k].league.name)}</button>`
+      `<button class="lg-btn ${(!crossLeague&&k===cur)?'active':''}" data-k="${k}">${esc(LEAGUES[k].league.name)}</button>`
     ).join("");
     const top = `<button class="lg-btn top ${view==='schedule'?'active':''}" data-top="1">Top games</button>`;
     const nat = (NATIONAL && NATIONAL.length)
@@ -262,7 +263,7 @@ const NATIONAL = __NATIONAL_PLACEHOLDER__;
         if (b.dataset.top) { setView("schedule"); return; }
         if (b.dataset.nat) { setView("national"); return; }
         cur = b.dataset.k; teamCode = null;
-        setView((view==='schedule'||view==='team') ? 'main' : view);
+        setView((crossLeague||view==='team') ? 'main' : view);
       });
   }
 
