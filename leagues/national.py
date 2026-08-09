@@ -108,6 +108,16 @@ def _apif_get(path: str, key: str, tries: int = 3) -> dict:
 # ---------------------------------------------------------------------------
 # Team-id resolution (log the pick so a wrong id is visible / pinnable).
 # ---------------------------------------------------------------------------
+def _api_errors(payload: dict) -> str:
+    """A human string for API-Football's in-body ``errors`` (200 OK but a problem), else ''."""
+    errs = payload.get("errors")
+    if isinstance(errs, dict) and errs:
+        return "; ".join(f"{k}: {v}" for k, v in errs.items())
+    if isinstance(errs, list) and errs:
+        return "; ".join(str(e) for e in errs)
+    return ""
+
+
 def _resolve_team_id(entry: dict, key: str) -> int | None:
     """Resolve (and log) the API-Football team id for a US national side."""
     if entry.get("apif_id"):
@@ -118,6 +128,9 @@ def _resolve_team_id(entry: dict, key: str) -> int | None:
     except Exception as exc:
         print(f"  [national] {entry['key']}: team search failed ({type(exc).__name__})")
         return None
+    err = _api_errors(payload)
+    if err:
+        print(f"  [national] {entry['key']}: team search — API says: {err}")
     want_women = entry["women"]
     for item in payload.get("response", []):
         team = item.get("team", {})
@@ -204,6 +217,11 @@ def fetch_games(entry: dict, season: int | None = None) -> list[dict]:
         except Exception as exc:
             print(f"  [national] {entry['key']}: fixtures {window} failed ({type(exc).__name__})")
             continue
+        err = _api_errors(payload)
+        if err:
+            print(f"  [national] {entry['key']}: fixtures {window} — API says: {err}")
+        elif not payload.get("response"):
+            print(f"  [national] {entry['key']}: fixtures {window} — 0 fixtures returned")
         for item in payload.get("response", []):
             row = _parse_fixture(item, team_id)
             if not row or not row["event_id"]:
