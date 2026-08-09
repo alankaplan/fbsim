@@ -43,7 +43,7 @@ from pathlib import Path
 # Keep only games this recent (or in the future); the section already scopes to ~a year.
 RECENT_DAYS = 400
 
-WIKI_API = "https://en.wikipedia.org/w/api.php"
+WIKI_REST = "https://en.wikipedia.org/api/rest_v1/page/html"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 NATIONAL_ROOT = REPO_ROOT / "data" / "national"
 
@@ -66,8 +66,9 @@ _last_call = [0.0]
 _HEADERS = {"User-Agent": "fbsim/1.0 (national-team fixtures; contact via repo)"}
 
 
-def _wiki_get(params: dict, tries: int = 3) -> dict:
-    url = f"{WIKI_API}?{urllib.parse.urlencode(params)}"
+def _article_html(article: str, tries: int = 3) -> str:
+    """The article's full HTML via the Wikipedia REST API (Parsoid markup)."""
+    url = f"{WIKI_REST}/{urllib.parse.quote(article, safe='')}"
     last_exc = None
     for attempt in range(tries):
         wait = _THROTTLE_S - (time.monotonic() - _last_call[0])
@@ -75,8 +76,8 @@ def _wiki_get(params: dict, tries: int = 3) -> dict:
             time.sleep(wait)
         try:
             req = urllib.request.Request(url, headers=_HEADERS)
-            with urllib.request.urlopen(req, timeout=45) as resp:
-                return json.loads(resp.read().decode("utf-8"))
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                return resp.read().decode("utf-8")
         except urllib.error.HTTPError as exc:
             last_exc = exc
             if exc.code not in (429, 500, 502, 503, 504):
@@ -91,117 +92,106 @@ def _wiki_get(params: dict, tries: int = 3) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Wikipedia section + Football box parsing.
+# Section slicing + Football box parsing (modern {{Football box collapsible}}).
 # ---------------------------------------------------------------------------
-def _find_section(article: str) -> int | None:
-    """Index of the article's results/fixtures section (prefer one naming 'fixtures')."""
-    data = _wiki_get({"action": "parse", "page": article, "prop": "sections",
-                      "format": "json"})
-    sections = data.get("parse", {}).get("sections", [])
-    best = None
-    for s in sections:
-        line = str(s.get("line", "")).lower()
-        if "fixture" in line:                          # "Results and fixtures" / "Fixtures"
-            return int(s["index"])
-        if best is None and ("result" in line or "schedule" in line):
-            best = int(s["index"])
-    return best
-
-
-def _section_html(article: str, idx: int) -> str:
-    data = _wiki_get({"action": "parse", "page": article, "section": idx,
-                      "prop": "text", "format": "json"})
-    return data.get("parse", {}).get("text", {}).get("*", "")
+def _section_slice(doc: str) -> str:
+    """The 'Results and fixtures' match-list region (down to the All-time summary/next h2)."""
+    i = doc.find('id="Results_and_fixtures"')
+    if i < 0:
+        m = re.search(r'id="[^"]*(?:Fixtures|Recent_results)[^"]*"', doc)
+        i = m.start() if m else -1
+    if i < 0:
+        return ""
+    rest = doc[i + 1:]
+    ends = [m.start() for m in (re.search(r'id="All-time_results"', rest),
+                                re.search(r'<h2\b', rest)) if m]
+    return rest[:min(ends)] if ends else rest
 
 
 def _text(fragment: str) -> str:
-    """HTML fragment -> plain text (strip tags, refs, flags, entities, extra space)."""
+    """HTML fragment -> plain text (strip tags, refs, entities, extra space)."""
     fragment = re.sub(r"<[^>]+>", " ", fragment)
     fragment = html.unescape(fragment)
     fragment = re.sub(r"\[\d+\]", "", fragment)        # [1] ref marks
     return re.sub(r"\s+", " ", fragment).strip()
 
 
-def _cell(row_html: str, cls: str) -> str:
-    m = re.search(rf'class="[^"]*\b{cls}\b[^"]*"[^>]*>(.*?)</t[hd]>', row_html,
-                  re.I | re.S)
-    return _text(m.group(1)) if m else ""
-
-
-def _team_cell(row_html: str, cls: str) -> str:
-    """A team cell's name, with flag-icon spans removed so only the team text remains."""
-    m = re.search(rf'class="[^"]*\b{cls}\b[^"]*"[^>]*>(.*?)</t[hd]>', row_html,
-                  re.I | re.S)
-    if not m:
-        return ""
-    frag = re.sub(r'<span class="flagicon".*?</span>', " ", m.group(1), flags=re.I | re.S)
+def _team_name(td_html: str) -> str:
+    """Team name from a `.vcard attendee` cell, with flag-icon spans removed."""
+    frag = re.sub(r'<span class="flagicon.*?</span>\s*</span>', " ", td_html, flags=re.I | re.S)
+    frag = re.sub(r'<span class="flagicon[^"]*">.*?</span>', " ", frag, flags=re.I | re.S)
     return _text(frag)
 
 
-_DATE_PATS = [
-    (re.compile(r"([A-Z][a-z]+ \d{1,2}, \d{4})"), "%B %d, %Y"),   # June 7, 2026
-    (re.compile(r"(\d{1,2} [A-Z][a-z]+ \d{4})"), "%d %B %Y"),     # 7 June 2026
-]
+_MONTHS = {m: i for i, m in enumerate(
+    ["January", "February", "March", "April", "May", "June", "July", "August",
+     "September", "October", "November", "December"], start=1)}
 
 
-def _parse_date(text: str) -> str:
-    for pat, fmt in _DATE_PATS:
-        m = pat.search(text)
-        if m:
-            try:
-                return datetime.strptime(m.group(1), fmt).strftime("%Y-%m-%d")
-            except ValueError:
-                pass
-    return ""
+def _infer_iso(date_txt: str, played: bool, today: date) -> str:
+    """A Month-Day (no year) -> ISO date, inferring the year from played/upcoming.
+
+    Wikipedia's fixtures list shows the last ~12 months + upcoming, without years. A
+    played game in a month after this one must be last year; an upcoming game in a month
+    before this one must be next year."""
+    m = re.search(r"([A-Z][a-z]+)\s+(\d{1,2})", date_txt)
+    if not m or m.group(1) not in _MONTHS:
+        return ""
+    mm, dd = _MONTHS[m.group(1)], int(m.group(2))
+    if played:
+        year = today.year if mm <= today.month else today.year - 1
+    else:
+        year = today.year if mm >= today.month else today.year + 1
+    return f"{year:04d}-{mm:02d}-{dd:02d}"
 
 
-def _parse_boxes(section_html: str) -> list[dict]:
-    """Parse the section's <table class="footballbox"> boxes into canonical rows.
-
-    Competition is taken from the most recent heading (<h3>/<h4>) above each box."""
+def _parse_boxes(section_html: str, today: date | None = None) -> list[dict]:
+    """Parse `tmpl-football-box-collapsible` match tables into canonical rows."""
+    today = today or datetime.now(timezone.utc).date()
     rows: list[dict] = []
-    comp = ""
-    # Walk headings and football boxes in document order.
-    token = re.compile(
-        r'<h[234][^>]*>(?P<head>.*?)</h[234]>'
-        r'|<table[^>]*class="[^"]*\bfootballbox\b[^"]*"[^>]*>(?P<box>.*?)</table>',
-        re.I | re.S)
-    for m in token.finditer(section_html):
-        if m.group("head") is not None:
-            head = m.group("head")
-            hl = re.search(r'class="[^"]*\bmw-headline\b[^"]*"[^>]*>(.*?)</span>', head,
-                           re.I | re.S)
-            comp = _text(hl.group(1) if hl else head)
+    for tbl in re.finditer(r'<table([^>]*)>(.*?)</table>', section_html, re.S):
+        if "tmpl-football-box-collapsible" not in tbl.group(1):
             continue
-        box = m.group("box")
-        date_txt = _cell(box, "fdate") or _cell(box, "fdatetime")
-        home = _team_cell(box, "fhome")
-        away = _team_cell(box, "faway")
-        score = _cell(box, "fscore")
-        if not home and not away:
+        body = tbl.group(2)
+        trm = re.search(r'<tr[^>]*>(.*?)</tr>', body, re.S)
+        if not trm:
             continue
-        us_home = bool(_US_RE.search(home))
-        us_away = bool(_US_RE.search(away))
+        tr = trm.group(1)
+        tds = re.findall(r'<td([^>]*)>(.*?)</td>', tr, re.S)
+        vcards = [c for a, c in tds if "vcard attendee" in a]
+        if len(vcards) < 2:
+            continue
+        home, away = _team_name(vcards[0]), _team_name(vcards[1])
+        us_home, us_away = bool(_US_RE.search(home)), bool(_US_RE.search(away))
         if not (us_home or us_away):
-            continue                                   # not a US match (stray box)
-        opponent = away if us_home else home
+            continue
+        opponent = (away if us_home else home) or "TBD"
         venue = "home" if us_home else "away"
+        td0 = tds[0][1] if tds else ""
+        small = re.search(r"<small[^>]*>(.*?)</small>", td0, re.S)
+        comp = _text(small.group(1)) if small else ""
+        date_txt = _text(re.sub(r"<small.*?</small>", " ", td0, flags=re.S))
+        score = ""
+        for a, c in tds:
+            if "text-align:center" in a:
+                score = _text(c)
+                break
         sm = re.search(r"(\d+)\s*[–−\-]\s*(\d+)", score)
-        if sm:
+        completed = bool(sm)
+        if completed:
             hs, as_ = int(sm.group(1)), int(sm.group(2))
             gf, ga = (hs, as_) if us_home else (as_, hs)
             result = "W" if gf > ga else ("L" if gf < ga else "D")
-            completed = True
         else:
             gf = ga = None
-            result, completed = "", False
-        iso = _parse_date(date_txt)
+            result = ""
+        iso = _infer_iso(date_txt, completed, today)
         rows.append({
             "event_id": f"{iso}|{venue}|{re.sub(r'[^a-z]', '', opponent.lower())}",
             "date": iso,
-            "datetime_utc": iso,                       # date only (Wikipedia has no kickoff)
+            "datetime_utc": iso,                       # date only (no kickoff time)
             "competition": comp,
-            "opponent": re.sub(r"\s*\(.*?\)\s*$", "", opponent).strip() or "TBD",
+            "opponent": opponent,
             "opp_code": "",
             "venue": venue,
             "gf": gf if completed else "",
@@ -216,21 +206,16 @@ def fetch_games(entry: dict, season: int | None = None) -> list[dict]:
     """A national team's results + upcoming games, scraped from its Wikipedia article."""
     article = entry["article"]
     try:
-        idx = _find_section(article)
+        doc = _article_html(article)
     except Exception as exc:
         print(f"  [national] {entry['key']}: Wikipedia fetch failed ({type(exc).__name__})")
         return []
-    if idx is None:
-        print(f"  [national] {entry['key']}: no results/fixtures section found on "
-              f"'{article}'")
-        return []
-    try:
-        section = _section_html(article, idx)
-    except Exception as exc:
-        print(f"  [national] {entry['key']}: section fetch failed ({type(exc).__name__})")
+    section = _section_slice(doc)
+    if not section:
+        print(f"  [national] {entry['key']}: no 'Results and fixtures' section on '{article}'")
         return []
 
-    n_boxes = len(re.findall(r'class="[^"]*\bfootballbox\b', section))
+    n_boxes = len(re.findall(r'<table[^>]*tmpl-football-box-collapsible', section))
     rows = _parse_boxes(section)
     cutoff = (datetime.now(timezone.utc) - timedelta(days=RECENT_DAYS)).strftime("%Y-%m-%d")
     by_id: dict[str, dict] = {}

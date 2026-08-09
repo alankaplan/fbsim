@@ -335,7 +335,7 @@ const NATIONAL = __NATIONAL_PLACEHOLDER__;
     }).join("");
     $("national-view").innerHTML =
       `<div class="legend">Results and upcoming games for the US national teams, across all
-        competitions (ESPN). These are shown for reference only — national teams aren't
+        competitions (Wikipedia). These are shown for reference only — national teams aren't
         simulated. The <span style="color:#f78166">orange line</span> marks the next game.</div>`
       + cards;
   }
