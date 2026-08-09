@@ -500,6 +500,12 @@ const NATIONAL = __NATIONAL_PLACEHOLDER__;
     }
     return fmtDate(f.date || f.datetime_utc);
   }
+  function kickoffSort(f) {  // sortable UTC key; date-only games get a midday-UTC time so
+    const dt = f.datetime_utc || "";  // they interleave with Pacific-displayed timed games
+    if (dt.includes("T")) return dt;
+    const d = f.date || dt;
+    return d ? d + "T12:00:00Z" : "";
+  }
   function fixtureCols() {
     // [key, label, align, cell(f), sortVal(f)]
     return [
@@ -558,7 +564,7 @@ const NATIONAL = __NATIONAL_PLACEHOLDER__;
   function scheduleCols() {
     // National rows carry no model output (xG / W-D-L / Info%), so those cells blank out.
     return [
-      ["kickoff", "Kickoff", "left",   f => esc(kickoff(f)),  f => f.datetime_utc || f.date || ""],
+      ["kickoff", "Kickoff", "left",   f => esc(kickoff(f)),  f => kickoffSort(f)],
       ["league",  "League",  "left",   f => esc(f._league),   f => f._league],
       ["home",    "Home",    "right",  f => selName(f, f.home_name), f => f.home_name],
       ["xg",      "xG",      "center", f => f.lam_home==null ? "" : `<span style="color:#8b949e">${f.lam_home.toFixed(1)}–${f.lam_away.toFixed(1)}</span>`, f => f.lam_home==null ? -1 : f.lam_home - f.lam_away],
