@@ -196,11 +196,11 @@ def _parse_fixture(item: dict, team_id: int) -> dict | None:
 
 
 def fetch_games(entry: dict, season: int | None = None) -> list[dict]:
-    """A national team's recent results + upcoming games (deduped by fixture id).
+    """A national team's results + upcoming games for the current year (deduped by id).
 
-    Two lookups: ``fixtures?team={id}&last=12`` and ``&next=15``. ``season`` is accepted
-    for signature compatibility but unused (last/next already scope the window). Games
-    older than ``RECENT_DAYS`` are trimmed."""
+    Uses ``fixtures?team={id}&season={year}`` (the free plan blocks the last/next params
+    but allows season). ``season`` arg is accepted for signature compatibility but unused.
+    Games older than ``RECENT_DAYS`` are trimmed."""
     key = _read_key()
     if not key:
         print(f"  [national] {entry['key']}: no API-Football key — add it to "
@@ -209,19 +209,24 @@ def fetch_games(entry: dict, season: int | None = None) -> list[dict]:
     team_id = _resolve_team_id(entry, key)
     if not team_id:
         return []
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=RECENT_DAYS)).strftime("%Y-%m-%d")
+    now = datetime.now(timezone.utc)
+    cutoff = (now - timedelta(days=RECENT_DAYS)).strftime("%Y-%m-%d")
+    # The free plan blocks the last/next params but allows season=YYYY, which returns a
+    # team's whole year of fixtures (past + upcoming). Pull this year, plus next year late
+    # in the season so upcoming January fixtures aren't missed.
+    seasons = [now.year] + ([now.year + 1] if now.month >= 9 else [])
     by_id: dict[str, dict] = {}
-    for window in ("last=12", "next=15"):
+    for yr in seasons:
         try:
-            payload = _apif_get(f"fixtures?team={team_id}&{window}", key)
+            payload = _apif_get(f"fixtures?team={team_id}&season={yr}", key)
         except Exception as exc:
-            print(f"  [national] {entry['key']}: fixtures {window} failed ({type(exc).__name__})")
+            print(f"  [national] {entry['key']}: fixtures {yr} failed ({type(exc).__name__})")
             continue
         err = _api_errors(payload)
         if err:
-            print(f"  [national] {entry['key']}: fixtures {window} — API says: {err}")
+            print(f"  [national] {entry['key']}: fixtures {yr} — API says: {err}")
         elif not payload.get("response"):
-            print(f"  [national] {entry['key']}: fixtures {window} — 0 fixtures returned")
+            print(f"  [national] {entry['key']}: fixtures {yr} — 0 fixtures returned")
         for item in payload.get("response", []):
             row = _parse_fixture(item, team_id)
             if not row or not row["event_id"]:
