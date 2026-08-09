@@ -487,13 +487,18 @@ const NATIONAL = __NATIONAL_PLACEHOLDER__;
   }
 
   // ---- Remaining fixtures ----
-  function kickoff(f) {  // UTC timestamp -> Pacific date+time; date-only -> plain date
+  const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  function fmtDate(s) {  // "YYYY-MM-DD" -> "Sep 26" (no timezone shift), else the raw string
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || "");
+    return m ? `${MON[+m[2]-1]} ${+m[3]}` : (s || "");
+  }
+  function kickoff(f) {  // UTC timestamp -> Pacific date+time; date-only -> "Mon D"
     if (f.datetime_utc && f.datetime_utc.includes("T")) {
       const d = new Date(f.datetime_utc);
       if (!isNaN(d)) return d.toLocaleString("en-US", { timeZone: "America/Los_Angeles",
         month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
     }
-    return f.date || f.datetime_utc || "";
+    return fmtDate(f.date || f.datetime_utc);
   }
   function fixtureCols() {
     // [key, label, align, cell(f), sortVal(f)]
