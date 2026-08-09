@@ -223,6 +223,7 @@ const NATIONAL = __NATIONAL_PLACEHOLDER__;
   try {                                            // restore picked teams (localStorage; file:// ok)
     const valid = new Set();
     keys.forEach(k => (LEAGUES[k].teams || []).forEach(t => valid.add(teamKey(k, t.name))));
+    (NATIONAL || []).forEach(t => valid.add(teamKey("__national__", t.name)));
     JSON.parse(localStorage.getItem("fbsim.topTeams") || "[]")
       .forEach(x => { if (valid.has(x)) selectedTeams.add(x); });
   } catch (e) {}
@@ -486,13 +487,13 @@ const NATIONAL = __NATIONAL_PLACEHOLDER__;
   }
 
   // ---- Remaining fixtures ----
-  function kickoff(f) {  // UTC timestamp -> Pacific date+time; date-only fallback
-    if (f.datetime_utc) {
+  function kickoff(f) {  // UTC timestamp -> Pacific date+time; date-only -> plain date
+    if (f.datetime_utc && f.datetime_utc.includes("T")) {
       const d = new Date(f.datetime_utc);
       if (!isNaN(d)) return d.toLocaleString("en-US", { timeZone: "America/Los_Angeles",
         month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
     }
-    return f.date || "";
+    return f.date || f.datetime_utc || "";
   }
   function fixtureCols() {
     // [key, label, align, cell(f), sortVal(f)]
@@ -550,17 +551,18 @@ const NATIONAL = __NATIONAL_PLACEHOLDER__;
     return selectedTeams.has(teamKey(f._lk, name)) ? `<span class="sel">${s}</span>` : s;
   }
   function scheduleCols() {
+    // National rows carry no model output (xG / W-D-L / Info%), so those cells blank out.
     return [
       ["kickoff", "Kickoff", "left",   f => esc(kickoff(f)),  f => f.datetime_utc || f.date || ""],
       ["league",  "League",  "left",   f => esc(f._league),   f => f._league],
       ["home",    "Home",    "right",  f => selName(f, f.home_name), f => f.home_name],
-      ["xg",      "xG",      "center", f => `<span style="color:#8b949e">${f.lam_home.toFixed(1)}–${f.lam_away.toFixed(1)}</span>`, f => f.lam_home - f.lam_away],
+      ["xg",      "xG",      "center", f => f.lam_home==null ? "" : `<span style="color:#8b949e">${f.lam_home.toFixed(1)}–${f.lam_away.toFixed(1)}</span>`, f => f.lam_home==null ? -1 : f.lam_home - f.lam_away],
       ["away",    "Away",    "left",   f => selName(f, f.away_name), f => f.away_name],
-      ["wdl",     "W / D / L","center",f => `<span class="wdl"><span class="w" style="width:${f.win*100}%"></span><span class="d" style="width:${f.draw*100}%"></span><span class="l" style="width:${f.loss*100}%"></span></span>`, f => f.win],
-      ["win",     "H",       "right",  f => `${(f.win*100).toFixed(0)}%`,  f => f.win],
-      ["draw",    "D",       "right",  f => `${(f.draw*100).toFixed(0)}%`, f => f.draw],
-      ["loss",    "A",       "right",  f => `${(f.loss*100).toFixed(0)}%`, f => f.loss],
-      ["info_pct","Info%",   "right",  f => `${(f.info_pct ?? 0).toFixed(2)}%`, f => (f.info_pct ?? 0)],
+      ["wdl",     "W / D / L","center",f => f.win==null ? "" : `<span class="wdl"><span class="w" style="width:${f.win*100}%"></span><span class="d" style="width:${f.draw*100}%"></span><span class="l" style="width:${f.loss*100}%"></span></span>`, f => f.win ?? -1],
+      ["win",     "H",       "right",  f => f.win==null ? "" : `${(f.win*100).toFixed(0)}%`,  f => f.win ?? -1],
+      ["draw",    "D",       "right",  f => f.draw==null ? "" : `${(f.draw*100).toFixed(0)}%`, f => f.draw ?? -1],
+      ["loss",    "A",       "right",  f => f.loss==null ? "" : `${(f.loss*100).toFixed(0)}%`, f => f.loss ?? -1],
+      ["info_pct","Info%",   "right",  f => f.info_pct==null ? "" : `${f.info_pct.toFixed(2)}%`, f => (f.info_pct ?? -1)],
     ];
   }
   function teamDropdown() {
@@ -574,11 +576,20 @@ const NATIONAL = __NATIONAL_PLACEHOLDER__;
         }).join("");
       return `<div class="tp-grp">${esc(LEAGUES[k].league.name)}</div>${items}`;
     }).join("");
+    let natGroup = "";
+    if ((NATIONAL || []).length) {
+      const items = NATIONAL.map(t => {
+        const key = teamKey("__national__", t.name), on = selectedTeams.has(key) ? " checked" : "";
+        return `<label data-name="${esc(t.name.toLowerCase())}"><input type="checkbox"
+          data-key="${esc(key)}"${on}>${esc(t.name)}</label>`;
+      }).join("");
+      natGroup = `<div class="tp-grp">National teams</div>${items}`;
+    }
     return `<div class="tp-dd">
       <button class="tp-btn" id="team-btn">Teams (${selectedTeams.size}) ▾</button>
       <div class="tp-panel" id="team-panel" style="display:${teamDDOpen ? '' : 'none'}">
         <input class="tp-filter" id="team-filter" placeholder="filter teams…" value="${esc(teamFilter)}">
-        ${groups}
+        ${groups}${natGroup}
       </div></div>`;
   }
   function applyTeamFilter() {
@@ -613,7 +624,8 @@ const NATIONAL = __NATIONAL_PLACEHOLDER__;
       `<div class="legend">Each league's most title-decisive upcoming games (ranked by
         <b>Info%</b>) — just enough to pull its title-race <b>entropy</b> below the threshold you
         set, so a league in a tight race contributes more games than a settled one — plus every
-        remaining game of any team you follow. Click a header to sort.</div>
+        remaining game of any team you follow (including the national teams, whose games are
+        shown for reference without model odds). Click a header to sort.</div>
        <div class="topn-row">
          <label class="topn"><span>Title-race entropy ≤</span>
            <input type="number" min="0" step="0.1" value="${threshold}" id="thr-input">
@@ -658,11 +670,32 @@ const NATIONAL = __NATIONAL_PLACEHOLDER__;
     };
     // (a) enough top games per league to pull it below the entropy threshold
     keys.forEach(k => topGamesFor(k).forEach(f => add(k, f)));
-    // (b) every remaining game of each selected team
+    // (b) every remaining game of each selected league team
     selectedTeams.forEach(key => {
       const [k, name] = key.split("\t");
+      if (k === "__national__") return;
       (LEAGUES[k] ? LEAGUES[k].fixtures : []).forEach(f => {
         if (f.home_name === name || f.away_name === name) add(k, f);
+      });
+    });
+    // (c) upcoming games of each followed national team (display-only rows)
+    selectedTeams.forEach(key => {
+      const [k, name] = key.split("\t");
+      if (k !== "__national__") return;
+      const nt = (NATIONAL || []).find(t => t.name === name);
+      if (!nt) return;
+      (nt.games || []).forEach(g => {
+        if (g.status !== "scheduled") return;          // future games only
+        const id = "nat::" + name + "::" + g.event_id;
+        if (seen.has(id)) return;
+        seen.add(id);
+        const home = g.venue !== "away";               // home/neutral -> US listed first
+        rows.push({
+          _league: name, _lk: "__national__", _national: true,
+          date: g.date, datetime_utc: "",
+          home_name: home ? name : g.opponent,
+          away_name: home ? g.opponent : name,
+        });
       });
     });
 
