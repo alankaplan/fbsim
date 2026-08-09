@@ -197,14 +197,13 @@ directory ships with sample data). Unplayed fixtures have empty goal/xG fields a
 The US men's and women's national teams are **not** simulated: they play
 friendlies and tournaments with no league table, so the season model doesn't apply.
 Instead they get a **display-only "National teams" tab** — past results and upcoming
-games across all competitions — fetched (browserless) from **API-Football**
-(api-sports.io): two lookups per team (`fixtures?...&last=` + `&next=`), home and away.
-It needs a **free API key** — create one at
-[dashboard.api-football.com](https://dashboard.api-football.com) (100 requests/day) and
-put it in a file named **`api.key`** at the repo root (gitignored; never committed).
-Without the key the tab just stays empty. Team ids are resolved at runtime and logged
-(pin `apif_id` in `leagues/national.py`'s `NATIONAL` list if resolution ever picks the
-wrong team).
+games across all competitions — scraped (no key) from each team's **Wikipedia** article:
+the "Results and fixtures" section is built from `{{Football box}}` templates, which carry
+recent results *and* upcoming fixtures. `leagues/national.py` pulls that section via the
+MediaWiki API and reads the boxes. (Free sports APIs were all dead ends here — ESPN blocks
+some networks, and the free tiers of TheSportsDB / API-Football don't cover the current
+season — so Wikipedia is the no-cost source; its table markup can shift, so the parser may
+occasionally need a tweak.)
 
 ```bash
 venv/bin/python -m leagues.national all          # USMNT + USWNT -> data/national/*.json

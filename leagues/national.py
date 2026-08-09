@@ -11,14 +11,14 @@ here touches the season simulator (``run_sims``). This module only fetches a tea
 recent results + upcoming games and writes them out; ``generate_page`` renders them
 as a plain "National teams" tab.
 
-Source is **API-Football** (api-sports.io v3). Its free tier (100 requests/day)
-returns a national team's fixtures — home and away, results and upcoming — across
-all competitions in two lookups per team. It needs a free API key: create one at
-https://dashboard.api-football.com and put it in a file named ``api.key`` at the
-repo root (gitignored). Without the key the tab simply stays empty.
+Source is **Wikipedia** (no key). The national-team articles carry a
+"Results and fixtures" section built from ``{{Football box}}`` templates, which
+render to ``<table class="footballbox">`` — recent results (with scores) *and*
+upcoming fixtures (no score), across all competitions. We pull that section via the
+MediaWiki parse API and read the boxes.
 
-(Earlier sources were dropped: ESPN hard-blocks some networks with 403; TheSportsDB's
-free tier only returns home events and no women's senior team.)
+(Free APIs were all dead ends here: ESPN hard-blocks the network; TheSportsDB free
+is home-events-only; API-Football free has no access to the current season.)
 
 Usage
 -----
@@ -29,219 +29,222 @@ Usage
 from __future__ import annotations
 
 import argparse
+import html
 import json
-import os
+import re
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-# Keep only games this recent (or in the future), so a rare stale result can't leak in.
+# Keep only games this recent (or in the future); the section already scopes to ~a year.
 RECENT_DAYS = 400
 
-APIF_BASE = "https://v3.football.api-sports.io"
+WIKI_API = "https://en.wikipedia.org/w/api.php"
 REPO_ROOT = Path(__file__).resolve().parent.parent
-API_KEY_FILE = REPO_ROOT / "api.key"
-
-# data/national/ (sibling of data/leagues/), gitignored like the rest of the data.
 NATIONAL_ROOT = REPO_ROOT / "data" / "national"
 
-# API-Football fixture status codes that mean the match is over (has a final score).
-_FINISHED = {"FT", "AET", "PEN", "AWD", "WO"}
-
-# Each team: a display name, the API-Football search term, whether it's the women's
-# side (to disambiguate the two "USA" national teams), and an optional pinned team id
-# (set apif_id to skip runtime resolution if it ever picks the wrong team).
+# Each team: display name, Wikipedia article, and the text that marks the US side within
+# a match row (so we can tell home from away and pick the opponent).
 NATIONAL = [
-    {"key": "usmnt", "name": "USMNT", "search": "USA", "women": False, "apif_id": None},
-    {"key": "uswnt", "name": "USWNT", "search": "USA", "women": True, "apif_id": None},
+    {"key": "usmnt", "name": "USMNT",
+     "article": "United States men's national soccer team"},
+    {"key": "uswnt", "name": "USWNT",
+     "article": "United States women's national soccer team"},
 ]
 
-
-def _read_key() -> str | None:
-    """API-Football key from the api.key file (preferred) or API_FOOTBALL_KEY env."""
-    try:
-        key = API_KEY_FILE.read_text(encoding="utf-8").strip()
-        if key:
-            return key
-    except OSError:
-        pass
-    return os.environ.get("API_FOOTBALL_KEY") or None
-
+_US_RE = re.compile(r"united states|(^|\W)usa(\W|$)", re.I)
 
 # ---------------------------------------------------------------------------
-# HTTP client: throttled + retried, sends the API-Football key header.
+# HTTP (throttled + retried).
 # ---------------------------------------------------------------------------
 _THROTTLE_S = 0.4
 _last_call = [0.0]
+_HEADERS = {"User-Agent": "fbsim/1.0 (national-team fixtures; contact via repo)"}
 
 
-def _apif_get(path: str, key: str, tries: int = 3) -> dict:
-    """GET an API-Football endpoint (path incl. query), spaced + retried with backoff."""
-    url = f"{APIF_BASE}/{path}"
-    headers = {"x-apisports-key": key, "Accept": "application/json"}
+def _wiki_get(params: dict, tries: int = 3) -> dict:
+    url = f"{WIKI_API}?{urllib.parse.urlencode(params)}"
     last_exc = None
     for attempt in range(tries):
         wait = _THROTTLE_S - (time.monotonic() - _last_call[0])
         if wait > 0:
             time.sleep(wait)
         try:
-            req = urllib.request.Request(url, headers=headers)
+            req = urllib.request.Request(url, headers=_HEADERS)
             with urllib.request.urlopen(req, timeout=45) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             last_exc = exc
             if exc.code not in (429, 500, 502, 503, 504):
                 raise
-        except Exception as exc:                       # network / decode — retry
+        except Exception as exc:
             last_exc = exc
         finally:
             _last_call[0] = time.monotonic()
         if attempt < tries - 1:
-            time.sleep(2 * (2 ** attempt))             # 2s, 4s, 8s
+            time.sleep(2 * (2 ** attempt))
     raise last_exc
 
 
 # ---------------------------------------------------------------------------
-# Team-id resolution (log the pick so a wrong id is visible / pinnable).
+# Wikipedia section + Football box parsing.
 # ---------------------------------------------------------------------------
-def _api_errors(payload: dict) -> str:
-    """A human string for API-Football's in-body ``errors`` (200 OK but a problem), else ''."""
-    errs = payload.get("errors")
-    if isinstance(errs, dict) and errs:
-        return "; ".join(f"{k}: {v}" for k, v in errs.items())
-    if isinstance(errs, list) and errs:
-        return "; ".join(str(e) for e in errs)
+def _find_section(article: str) -> int | None:
+    """Index of the article's results/fixtures section (prefer one naming 'fixtures')."""
+    data = _wiki_get({"action": "parse", "page": article, "prop": "sections",
+                      "format": "json"})
+    sections = data.get("parse", {}).get("sections", [])
+    best = None
+    for s in sections:
+        line = str(s.get("line", "")).lower()
+        if "fixture" in line:                          # "Results and fixtures" / "Fixtures"
+            return int(s["index"])
+        if best is None and ("result" in line or "schedule" in line):
+            best = int(s["index"])
+    return best
+
+
+def _section_html(article: str, idx: int) -> str:
+    data = _wiki_get({"action": "parse", "page": article, "section": idx,
+                      "prop": "text", "format": "json"})
+    return data.get("parse", {}).get("text", {}).get("*", "")
+
+
+def _text(fragment: str) -> str:
+    """HTML fragment -> plain text (strip tags, refs, flags, entities, extra space)."""
+    fragment = re.sub(r"<[^>]+>", " ", fragment)
+    fragment = html.unescape(fragment)
+    fragment = re.sub(r"\[\d+\]", "", fragment)        # [1] ref marks
+    return re.sub(r"\s+", " ", fragment).strip()
+
+
+def _cell(row_html: str, cls: str) -> str:
+    m = re.search(rf'class="[^"]*\b{cls}\b[^"]*"[^>]*>(.*?)</t[hd]>', row_html,
+                  re.I | re.S)
+    return _text(m.group(1)) if m else ""
+
+
+def _team_cell(row_html: str, cls: str) -> str:
+    """A team cell's name, with flag-icon spans removed so only the team text remains."""
+    m = re.search(rf'class="[^"]*\b{cls}\b[^"]*"[^>]*>(.*?)</t[hd]>', row_html,
+                  re.I | re.S)
+    if not m:
+        return ""
+    frag = re.sub(r'<span class="flagicon".*?</span>', " ", m.group(1), flags=re.I | re.S)
+    return _text(frag)
+
+
+_DATE_PATS = [
+    (re.compile(r"([A-Z][a-z]+ \d{1,2}, \d{4})"), "%B %d, %Y"),   # June 7, 2026
+    (re.compile(r"(\d{1,2} [A-Z][a-z]+ \d{4})"), "%d %B %Y"),     # 7 June 2026
+]
+
+
+def _parse_date(text: str) -> str:
+    for pat, fmt in _DATE_PATS:
+        m = pat.search(text)
+        if m:
+            try:
+                return datetime.strptime(m.group(1), fmt).strftime("%Y-%m-%d")
+            except ValueError:
+                pass
     return ""
 
 
-def _resolve_team_id(entry: dict, key: str) -> int | None:
-    """Resolve (and log) the API-Football team id for a US national side."""
-    if entry.get("apif_id"):
-        return int(entry["apif_id"])
-    q = urllib.parse.urlencode({"search": entry["search"]})
-    try:
-        payload = _apif_get(f"teams?{q}", key)
-    except Exception as exc:
-        print(f"  [national] {entry['key']}: team search failed ({type(exc).__name__})")
-        return None
-    err = _api_errors(payload)
-    if err:
-        print(f"  [national] {entry['key']}: team search — API says: {err}")
-    want_women = entry["women"]
-    for item in payload.get("response", []):
-        team = item.get("team", {})
-        if not team.get("national"):
+def _parse_boxes(section_html: str) -> list[dict]:
+    """Parse the section's <table class="footballbox"> boxes into canonical rows.
+
+    Competition is taken from the most recent heading (<h3>/<h4>) above each box."""
+    rows: list[dict] = []
+    comp = ""
+    # Walk headings and football boxes in document order.
+    token = re.compile(
+        r'<h[234][^>]*>(?P<head>.*?)</h[234]>'
+        r'|<table[^>]*class="[^"]*\bfootballbox\b[^"]*"[^>]*>(?P<box>.*?)</table>',
+        re.I | re.S)
+    for m in token.finditer(section_html):
+        if m.group("head") is not None:
+            head = m.group("head")
+            hl = re.search(r'class="[^"]*\bmw-headline\b[^"]*"[^>]*>(.*?)</span>', head,
+                           re.I | re.S)
+            comp = _text(hl.group(1) if hl else head)
             continue
-        if str(team.get("country", "")).lower() not in ("usa", "united states"):
+        box = m.group("box")
+        date_txt = _cell(box, "fdate") or _cell(box, "fdatetime")
+        home = _team_cell(box, "fhome")
+        away = _team_cell(box, "faway")
+        score = _cell(box, "fscore")
+        if not home and not away:
             continue
-        name = str(team.get("name", ""))
-        is_women = ("women" in name.lower() or name.lower().endswith(" w")
-                    or " w " in name.lower())
-        if is_women == want_women:
-            print(f"  [national] {entry['key']}: resolved to team {team.get('id')} "
-                  f"'{name}'")
-            return int(team["id"])
-    print(f"  [national] {entry['key']}: no matching US national team found — skipped")
-    return None
-
-
-# ---------------------------------------------------------------------------
-# Fixture parsing.
-# ---------------------------------------------------------------------------
-def _int(v):
-    if v in (None, ""):
-        return None
-    try:
-        return int(v)
-    except (ValueError, TypeError):
-        return None
-
-
-def _parse_fixture(item: dict, team_id: int) -> dict | None:
-    """One API-Football fixture -> a canonical game row from the USA's perspective."""
-    fx = item.get("fixture", {})
-    teams = item.get("teams", {})
-    goals = item.get("goals", {})
-    home, away = teams.get("home", {}), teams.get("away", {})
-    if home.get("id") == team_id:
-        venue, opponent = "home", away.get("name", "TBD")
-        gf, ga = _int(goals.get("home")), _int(goals.get("away"))
-    elif away.get("id") == team_id:
-        venue, opponent = "away", home.get("name", "TBD")
-        gf, ga = _int(goals.get("away")), _int(goals.get("home"))
-    else:
-        return None
-
-    status = str(((fx.get("status") or {}).get("short")) or "")
-    completed = status in _FINISHED and gf is not None and ga is not None
-    result = ("W" if gf > ga else ("L" if gf < ga else "D")) if completed else ""
-    dt = str(fx.get("date") or "")                     # ISO 8601 with offset (usually Z)
-    return {
-        "event_id": str(fx.get("id", "")),
-        "date": dt[:10],
-        "datetime_utc": dt,
-        "competition": (item.get("league", {}) or {}).get("name", "") or "",
-        "opponent": opponent or "TBD",
-        "opp_code": "",
-        "venue": venue,
-        "gf": gf if completed else "",
-        "ga": ga if completed else "",
-        "result": result,
-        "status": "completed" if completed else "scheduled",
-    }
+        us_home = bool(_US_RE.search(home))
+        us_away = bool(_US_RE.search(away))
+        if not (us_home or us_away):
+            continue                                   # not a US match (stray box)
+        opponent = away if us_home else home
+        venue = "home" if us_home else "away"
+        sm = re.search(r"(\d+)\s*[–−\-]\s*(\d+)", score)
+        if sm:
+            hs, as_ = int(sm.group(1)), int(sm.group(2))
+            gf, ga = (hs, as_) if us_home else (as_, hs)
+            result = "W" if gf > ga else ("L" if gf < ga else "D")
+            completed = True
+        else:
+            gf = ga = None
+            result, completed = "", False
+        iso = _parse_date(date_txt)
+        rows.append({
+            "event_id": f"{iso}|{venue}|{re.sub(r'[^a-z]', '', opponent.lower())}",
+            "date": iso,
+            "datetime_utc": iso,                       # date only (Wikipedia has no kickoff)
+            "competition": comp,
+            "opponent": re.sub(r"\s*\(.*?\)\s*$", "", opponent).strip() or "TBD",
+            "opp_code": "",
+            "venue": venue,
+            "gf": gf if completed else "",
+            "ga": ga if completed else "",
+            "result": result,
+            "status": "completed" if completed else "scheduled",
+        })
+    return rows
 
 
 def fetch_games(entry: dict, season: int | None = None) -> list[dict]:
-    """A national team's results + upcoming games for the current year (deduped by id).
+    """A national team's results + upcoming games, scraped from its Wikipedia article."""
+    article = entry["article"]
+    try:
+        idx = _find_section(article)
+    except Exception as exc:
+        print(f"  [national] {entry['key']}: Wikipedia fetch failed ({type(exc).__name__})")
+        return []
+    if idx is None:
+        print(f"  [national] {entry['key']}: no results/fixtures section found on "
+              f"'{article}'")
+        return []
+    try:
+        section = _section_html(article, idx)
+    except Exception as exc:
+        print(f"  [national] {entry['key']}: section fetch failed ({type(exc).__name__})")
+        return []
 
-    Uses ``fixtures?team={id}&season={year}`` (the free plan blocks the last/next params
-    but allows season). ``season`` arg is accepted for signature compatibility but unused.
-    Games older than ``RECENT_DAYS`` are trimmed."""
-    key = _read_key()
-    if not key:
-        print(f"  [national] {entry['key']}: no API-Football key — add it to "
-              f"{API_KEY_FILE.name} (free at dashboard.api-football.com)")
-        return []
-    team_id = _resolve_team_id(entry, key)
-    if not team_id:
-        return []
-    now = datetime.now(timezone.utc)
-    cutoff = (now - timedelta(days=RECENT_DAYS)).strftime("%Y-%m-%d")
-    # The free plan blocks the last/next params but allows season=YYYY, which returns a
-    # team's whole year of fixtures (past + upcoming). Pull this year, plus next year late
-    # in the season so upcoming January fixtures aren't missed.
-    seasons = [now.year] + ([now.year + 1] if now.month >= 9 else [])
+    n_boxes = len(re.findall(r'class="[^"]*\bfootballbox\b', section))
+    rows = _parse_boxes(section)
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=RECENT_DAYS)).strftime("%Y-%m-%d")
     by_id: dict[str, dict] = {}
-    for yr in seasons:
-        try:
-            payload = _apif_get(f"fixtures?team={team_id}&season={yr}", key)
-        except Exception as exc:
-            print(f"  [national] {entry['key']}: fixtures {yr} failed ({type(exc).__name__})")
+    for r in rows:
+        if r["date"] and r["date"] < cutoff:
             continue
-        err = _api_errors(payload)
-        if err:
-            print(f"  [national] {entry['key']}: fixtures {yr} — API says: {err}")
-        elif not payload.get("response"):
-            print(f"  [national] {entry['key']}: fixtures {yr} — 0 fixtures returned")
-        for item in payload.get("response", []):
-            row = _parse_fixture(item, team_id)
-            if not row or not row["event_id"]:
-                continue
-            if (row["date"] or "9999") < cutoff:       # too old to be "current" — drop
-                continue
-            by_id.setdefault(row["event_id"], row)
+        by_id.setdefault(r["event_id"], r)
     games = list(by_id.values())
-    games.sort(key=lambda g: g["datetime_utc"] or g["date"])
-    if games:
-        dates = [g["date"] for g in games if g["date"]]
-        played = sum(1 for g in games if g["status"] == "completed")
-        span = f"{min(dates)} → {max(dates)}" if dates else "?"
-        print(f"  [national] {entry['key']}: {len(games)} games "
-              f"({played} played, {len(games) - played} upcoming; {span})")
+    games.sort(key=lambda g: g["date"] or "9999")
+    dates = [g["date"] for g in games if g["date"]]
+    played = sum(1 for g in games if g["status"] == "completed")
+    span = f"{min(dates)} → {max(dates)}" if dates else "no dates"
+    print(f"  [national] {entry['key']}: section had {n_boxes} match boxes → "
+          f"{len(games)} games ({played} played, {len(games) - played} upcoming; {span})")
     return games
 
 
@@ -254,10 +257,10 @@ def build_national(entry: dict, season: int | None = None) -> Path:
     games = fetch_games(entry, season)
     out = national_path(entry["key"])
     if not games and out.exists():                     # don't clobber good data with nothing
-        print(f"  [national] no games for {entry['name']} — keeping existing {out.name}")
+        print(f"  [national] no games parsed for {entry['name']} — keeping existing {out.name}")
         return out
     payload = {
-        "key": entry["key"], "name": entry["name"], "apif_id": entry.get("apif_id"),
+        "key": entry["key"], "name": entry["name"], "source": "wikipedia",
         "updated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "games": games,
     }
@@ -274,11 +277,9 @@ def _entry(key: str) -> dict:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Ingest USMNT/USWNT fixtures + results (API-Football).")
-    ap.add_argument("team", nargs="?", default="all",
-                    help="usmnt, uswnt, or all (default: all)")
-    ap.add_argument("--season", type=int, default=None,
-                    help="accepted for compatibility; ignored (last/next scope the window)")
+    ap = argparse.ArgumentParser(description="Ingest USMNT/USWNT fixtures + results (Wikipedia).")
+    ap.add_argument("team", nargs="?", default="all", help="usmnt, uswnt, or all (default: all)")
+    ap.add_argument("--season", type=int, default=None, help="accepted for compatibility; ignored")
     args = ap.parse_args()
 
     entries = NATIONAL if args.team == "all" else [_entry(args.team)]
