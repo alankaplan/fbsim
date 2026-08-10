@@ -224,9 +224,10 @@ round-robins, so the season model doesn't apply. Instead they get a **display-on
 "Competitions" tab** — each competition's current standings plus its results and
 upcoming fixtures grouped by round — scraped (no key) from the competition's
 **Wikipedia** article. `leagues/competitions.py` reads the standings `wikitable`s and
-the `{{Football box}}` match tables (sharing the Wikipedia client in `leagues/wiki.py`
-with the national-team ingest). As with any scrape, the page markup can shift, so the
-parser may occasionally need a tweak.
+the `wikitable sports-series` tie tables (and `{{Football box}}` boxes where present),
+sharing the Wikipedia client in `leagues/wiki.py` with the national-team ingest. As with
+any scrape, the page markup can shift, so the parser may occasionally need a tweak —
+`python -m leagues.competitions --debug` prints a structural survey to help.
 
 ```bash
 venv/bin/python -m leagues.competitions all              # Leagues Cup + UCL -> data/competitions/*.json

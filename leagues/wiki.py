@@ -55,7 +55,12 @@ def article_html(article: str, tries: int = 3) -> str:
 
 
 def text(fragment: str) -> str:
-    """HTML fragment -> plain text (strip tags, refs, entities, extra space)."""
+    """HTML fragment -> plain text (strip tags, refs, entities, extra space).
+
+    Inlined ``<style>`` (TemplateStyles) and ``<script>`` blocks are dropped first —
+    Parsoid embeds a big CSS blob inside some header/navbar cells, which would otherwise
+    leak into the extracted text."""
+    fragment = re.sub(r"<(style|script)\b[^>]*>.*?</\1>", " ", fragment, flags=re.I | re.S)
     fragment = re.sub(r"<[^>]+>", " ", fragment)
     fragment = html.unescape(fragment)
     fragment = re.sub(r"\[\d+\]", "", fragment)        # [1] ref marks

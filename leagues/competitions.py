@@ -47,15 +47,26 @@ _MONTHS = {m: i for i, m in enumerate(
     ["January", "February", "March", "April", "May", "June", "July", "August",
      "September", "October", "November", "December"], start=1)}
 
-# Standings header text -> canonical column key.
+# Standings header text -> canonical column key (exact matches after cleaning).
 _COL = {
-    "pos": "pos", "r": "pos", "rk": "pos", "#": "pos", "": "pos",
-    "team": "team", "club": "team", "teamvte": "team",
+    "pos": "pos", "r": "pos", "rk": "pos", "rank": "pos", "#": "pos", "": "pos",
     "pld": "pld", "mp": "pld", "p": "pld",
     "w": "w", "d": "d", "l": "l",
     "gf": "gf", "ga": "ga", "gd": "gd", "gr": "gd",
     "pts": "pts", "points": "pts",
 }
+
+
+def _col_key(header: str) -> str | None:
+    """A cleaned standings header cell -> canonical column key, or None to ignore it.
+
+    The team column is matched loosely (starts with 'team'/'club') because Wikipedia
+    pollutes that header with a 'v t e' navbar; everything else maps exactly."""
+    h = re.sub(r"\bv\s*t\s*e\b", "", header.lower()).strip()
+    h = re.sub(r"[^a-z#]", "", h)
+    if h.startswith("team") or h.startswith("club"):
+        return "team"
+    return _COL.get(h)
 
 
 # ---------------------------------------------------------------------------
@@ -119,20 +130,47 @@ def _headings(doc: str) -> list[tuple[int, str]]:
     return out
 
 
+# Generic section labels that don't name a round — fall through to the parent heading.
+_GENERIC_HEADS = {"table", "tables", "results", "result", "bracket", "standings",
+                  "matches", "fixtures", "overview", "summary", "ranking", "rankings"}
+
+
 def _round_for(pos: int, heads: list[tuple[int, str]]) -> str:
-    """The nearest heading text preceding `pos` (the round a match sits under)."""
-    name = ""
+    """The round a table sits under: the nearest *meaningful* heading before `pos`.
+
+    Wikipedia nests the real content under generic sub-headings ('Table', 'Results',
+    'Bracket') below a descriptive parent ('League phase', 'Knockout stage'), so we skip
+    the generic ones and use the nearest heading that actually names a round/phase."""
+    last = last_named = ""
     for start, txt in heads:
-        if start < pos:
-            name = txt
-        else:
+        if start >= pos:
             break
-    return name
+        last = txt
+        if re.sub(r"[^a-z]", "", txt.lower()) not in _GENERIC_HEADS:
+            last_named = txt
+    return last_named or last
 
 
 # ---------------------------------------------------------------------------
 # Standings (wikitable with Pld + Pts columns).
 # ---------------------------------------------------------------------------
+def _standings_label(pre_html: str, fallback: str) -> str:
+    """A specific label for a standings table (e.g. 'Liga MX', 'Major League Soccer').
+
+    Wikipedia's side-by-side group tables carry no caption, but the transclusion metadata
+    just before each one names it (…_Liga_MX_Standings). Pull that, strip the season/phase
+    prefix; fall back to the section heading when nothing clean is found."""
+    p = pre_html.replace("_", " ")
+    cands = re.findall(r"([A-Za-z0-9][A-Za-z0-9 ]{2,70})\s+(?:Standings|Table)\b", p)
+    if not cands:
+        return fallback
+    label = re.sub(r"^.*\b(?:stage|phase|group|round)\s+", "", cands[-1], flags=re.I)
+    label = re.sub(r"^\d{4}\s+", "", label).strip()
+    if not label or len(label) > 40 or "standings" in label.lower():
+        return fallback
+    return label
+
+
 def _parse_standings(doc: str) -> list[dict]:
     """Every league/group table on the page -> [{title, rows:[{pos,team,pld..pts}]}]."""
     heads = _headings(doc)
@@ -144,9 +182,10 @@ def _parse_standings(doc: str) -> list[dict]:
         trs = re.findall(r"<tr[^>]*>(.*?)</tr>", body, re.S)
         if not trs:
             continue
-        headers = [text(c).lower() for c in re.findall(r"<th[^>]*>(.*?)</th>", trs[0], re.S)]
-        cmap = {i: _COL[h] for i, h in enumerate(headers) if h in _COL}
-        if "pts" not in cmap.values() or "pld" not in cmap.values() or "team" not in cmap.values():
+        headers = [text(c) for c in re.findall(r"<th[^>]*>(.*?)</th>", trs[0], re.S)]
+        cmap = {i: k for i, h in enumerate(headers) if (k := _col_key(h))}
+        vals = set(cmap.values())
+        if not {"pts", "pld", "team"} <= vals:         # require a real league/group table
             continue
         rows = []
         for tr in trs[1:]:
@@ -169,7 +208,9 @@ def _parse_standings(doc: str) -> list[dict]:
             if row.get("team") and row.get("pts") is not None:
                 rows.append(row)
         if rows:
-            groups.append({"title": _round_for(tbl.start(), heads), "rows": rows})
+            pre = doc[max(0, tbl.start() - 1500):tbl.start()]
+            title = _standings_label(pre, _round_for(tbl.start(), heads))
+            groups.append({"title": title, "rows": rows})
     return groups
 
 
@@ -220,6 +261,61 @@ def _parse_matches(doc: str, years: tuple[int, ...]) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Matches (modern `wikitable sports-series` ties), grouped by round.
+# ---------------------------------------------------------------------------
+def _score_pair(cell_text: str) -> tuple[int, int] | None:
+    """First `N–N` score in a cell (aggregate or single), ignoring penalty suffixes."""
+    m = re.search(r"(\d+)\s*[–−\-]\s*(\d+)", cell_text)
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def _parse_series(doc: str) -> list[dict]:
+    """Every `wikitable sports-series` tie (two-legged or single) -> canonical rows.
+
+    Layout is `Team 1 | Agg./Score | Team 2 | [1st leg | 2nd leg]`; we take the tie result
+    from the aggregate/score column (the middle cell between the two teams)."""
+    heads = _headings(doc)
+    rows: list[dict] = []
+    for tbl in re.finditer(r'<table([^>]*)>(.*?)</table>', doc, re.S):
+        if "sports-series" not in (tbl.group(1) or ""):
+            continue
+        body = tbl.group(2)
+        trs = re.findall(r"<tr[^>]*>(.*?)</tr>", body, re.S)
+        if len(trs) < 2:
+            continue
+        headers = [text(c).lower() for c in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", trs[0], re.S)]
+        if len(headers) < 3:
+            continue
+        # Team columns bracket the score column: 'Team 1' ... (agg/score) ... 'Team 2'.
+        try:
+            h_i = next(i for i, h in enumerate(headers) if h.startswith("team 1") or h == "home")
+            a_i = next(i for i, h in enumerate(headers) if h.startswith("team 2") or h == "away")
+        except StopIteration:
+            h_i, a_i = 0, 2
+        s_i = next((i for i, h in enumerate(headers)
+                    if "agg" in h or h.startswith("score") or h == "result"), h_i + 1)
+        rnd = _round_for(tbl.start(), heads)
+        for tr in trs[1:]:
+            cells = re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", tr, re.S)
+            if len(cells) <= max(h_i, a_i, s_i):
+                continue
+            home, away = _clean_team(cells[h_i]), _clean_team(cells[a_i])
+            if not home and not away:
+                continue
+            pair = _score_pair(text(cells[s_i]))
+            done = pair is not None
+            rows.append({
+                "event_id": f"{rnd}|{re.sub(r'[^a-z0-9]', '', home.lower())}|{re.sub(r'[^a-z0-9]', '', away.lower())}",
+                "date": "", "datetime_utc": "", "round": rnd,
+                "home": home or "TBD", "away": away or "TBD",
+                "hs": pair[0] if done else "",
+                "as": pair[1] if done else "",
+                "status": "completed" if done else "scheduled",
+            })
+    return rows
+
+
+# ---------------------------------------------------------------------------
 # Fetch + write.
 # ---------------------------------------------------------------------------
 def fetch_competition(entry: dict) -> dict:
@@ -233,9 +329,9 @@ def fetch_competition(entry: dict) -> dict:
         return {"standings": [], "rounds": []}
 
     standings = _parse_standings(doc)
-    matches = _parse_matches(doc, years)
+    matches = _parse_matches(doc, years) + _parse_series(doc)
 
-    # Group matches by round, preserving first-seen order.
+    # Group matches by round, preserving first-seen (document) order.
     rounds: list[dict] = []
     index: dict[str, dict] = {}
     seen: set[str] = set()
@@ -290,13 +386,39 @@ def _entry(key: str) -> dict:
                      f"{', '.join(e['key'] for e in COMPETITIONS)}, all")
 
 
+def _debug_survey(entry: dict) -> None:
+    """Print a structural survey of a competition's article (for parser drift)."""
+    from collections import Counter
+    doc = article_html(entry["article"])
+    print(f"\n### {entry['key']}: {entry['article']} — {len(doc):,} bytes")
+    print("  football-box-collapsible:", len(re.findall(r"tmpl-football-box-collapsible", doc)))
+    print("  sports-series:", len(re.findall(r"sports-series", doc)))
+    print("  wikitable:", len(re.findall(r"wikitable", doc)))
+    classes = re.findall(r'<table[^>]*class="([^"]*)"', doc)
+    print("  table classes:", Counter(classes).most_common(15))
+    for i, m in enumerate(re.finditer(r"<table([^>]*)>(.*?)</table>", doc, re.S)):
+        cls = re.search(r'class="([^"]*)"', m.group(1))
+        cls = cls.group(1) if cls else ""
+        if "wikitable" not in cls and "sports-series" not in cls:
+            continue
+        tr = re.search(r"<tr[^>]*>(.*?)</tr>", m.group(2), re.S)
+        hdr = [text(c) for c in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", tr.group(1), re.S)] if tr else []
+        print(f"  [{i}] '{cls}' headers: {hdr[:14]}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Ingest Leagues Cup / Champions League (Wikipedia).")
     ap.add_argument("competition", nargs="?", default="all",
                     help="leaguescup, ucl, or all (default: all)")
+    ap.add_argument("--debug", action="store_true",
+                    help="print a structural survey of each article instead of writing data")
     args = ap.parse_args()
 
     entries = COMPETITIONS if args.competition == "all" else [_entry(args.competition)]
+    if args.debug:
+        for entry in entries:
+            _debug_survey(entry)
+        return
     for entry in entries:
         out = build_competition(entry)
         d = json.loads(out.read_text(encoding="utf-8"))
