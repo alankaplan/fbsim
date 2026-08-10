@@ -189,11 +189,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <div id="schedule-view" style="display:none"></div>
   <div id="players-view" style="display:none"></div>
   <div id="national-view" style="display:none"></div>
+  <div id="competitions-view" style="display:none"></div>
   <div id="team-view" style="display:none"></div>
 </main>
 <script>
 const LEAGUES = __DATA_PLACEHOLDER__;
 const NATIONAL = __NATIONAL_PLACEHOLDER__;
+const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
 (function () {
   const keys = Object.keys(LEAGUES);
   let cur = keys[0];
@@ -251,18 +253,22 @@ const NATIONAL = __NATIONAL_PLACEHOLDER__;
   }
 
   function leagueTabs() {
-    const crossLeague = (view==='schedule' || view==='national');   // Top games / National teams
+    // Top games / National teams / Competitions are cross-league (no single league applies).
+    const crossLeague = (view==='schedule' || view==='national' || view==='competitions');
     const lg = keys.map(k =>
       `<button class="lg-btn ${(!crossLeague&&k===cur)?'active':''}" data-k="${k}">${esc(LEAGUES[k].league.name)}</button>`
     ).join("");
     const top = `<button class="lg-btn top ${view==='schedule'?'active':''}" data-top="1">Top games</button>`;
     const nat = (NATIONAL && NATIONAL.length)
       ? `<button class="lg-btn top ${view==='national'?'active':''}" data-nat="1">National teams</button>` : "";
-    $("league-tabs").innerHTML = lg + top + nat;
+    const cup = (COMPETITIONS && COMPETITIONS.length)
+      ? `<button class="lg-btn top ${view==='competitions'?'active':''}" data-cup="1">Competitions</button>` : "";
+    $("league-tabs").innerHTML = lg + top + nat + cup;
     $("league-tabs").querySelectorAll("button").forEach(b =>
       b.onclick = () => {
         if (b.dataset.top) { setView("schedule"); return; }
         if (b.dataset.nat) { setView("national"); return; }
+        if (b.dataset.cup) { setView("competitions"); return; }
         cur = b.dataset.k; teamCode = null;
         setView((crossLeague||view==='team') ? 'main' : view);
       });
@@ -281,6 +287,12 @@ const NATIONAL = __NATIONAL_PLACEHOLDER__;
         `National-team results and upcoming games · kickoff in US Pacific time`;
       return;
     }
+    if (view === "competitions") {  // cup competitions: standings + results, no simulation
+      $("hdr-badge").innerHTML = "";
+      $("hdr-sub").textContent =
+        `Cup standings, results and upcoming fixtures · kickoff in US Pacific time`;
+      return;
+    }
     const L = LEAGUES[cur], m = L.meta;
     $("hdr-badge").innerHTML = m.used_xg
       ? '<span class="badge xg">FBref xG</span>' : '<span class="badge">goals model</span>';
@@ -295,13 +307,13 @@ const NATIONAL = __NATIONAL_PLACEHOLDER__;
 
   function setView(v) {
     view = v;
-    ["main","matrix","fixtures","schedule","players","national","team"].forEach(x =>
+    ["main","matrix","fixtures","schedule","players","national","competitions","team"].forEach(x =>
       $(x+"-view").style.display = (x===v ? "" : "none"));
     $("nav").querySelectorAll("a").forEach(a =>
       a.classList.toggle("active", a.dataset.view===v));
     $("nav-team").style.display = (v==="team") ? "" : "none";
-    // cross-cutting views (Top games / National teams) don't use the per-league tabs
-    $("nav").style.display = (v==="schedule"||v==="national") ? "none" : "";
+    // cross-cutting views (Top games / National teams / Competitions) skip the per-league tabs
+    $("nav").style.display = (v==="schedule"||v==="national"||v==="competitions") ? "none" : "";
     head(); leagueTabs();
     if (v==="main") renderMain();
     else if (v==="matrix") renderMatrix();
@@ -309,6 +321,7 @@ const NATIONAL = __NATIONAL_PLACEHOLDER__;
     else if (v==="schedule") renderSchedule();
     else if (v==="players") renderPlayers();
     else if (v==="national") renderNational();
+    else if (v==="competitions") renderCompetitions();
     else if (v==="team") renderTeam();
   }
 
@@ -339,6 +352,51 @@ const NATIONAL = __NATIONAL_PLACEHOLDER__;
         competitions (Wikipedia). These are shown for reference only — national teams aren't
         simulated. The <span style="color:#f78166">orange line</span> marks the next game.</div>`
       + cards;
+  }
+
+  // ---- Competitions (display-only cup standings + results; no simulation) ----
+  function renderCompetitions() {
+    function standingsTable(grp) {
+      const rows = (grp.rows || []).map((r, i) =>
+        `<tr><td class="pos">${esc(r.pos || (i + 1))}</td><td>${esc(r.team || "")}</td>`
+        + `<td>${r.pld ?? ""}</td><td>${r.w ?? ""}</td><td>${r.d ?? ""}</td><td>${r.l ?? ""}</td>`
+        + `<td>${r.gf ?? ""}</td><td>${r.ga ?? ""}</td><td>${r.gd ?? ""}</td>`
+        + `<td><strong>${r.pts ?? ""}</strong></td></tr>`).join("");
+      const cap = grp.title ? `<div class="sec-h">${esc(grp.title)}</div>` : "";
+      return cap + `<div class="wrap"><table><thead><tr>
+        <th>#</th><th>Team</th><th>Pld</th><th>W</th><th>D</th><th>L</th>
+        <th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    function roundTable(rd) {
+      const rows = (rd.matches || []).map(m => {
+        const done = m.status === "completed";
+        const when = done ? esc(m.date || "") : esc(kickoff(m));
+        let score;
+        if (done) {
+          const cls = m.hs > m.as ? "win" : (m.hs < m.as ? "loss" : "draw");
+          score = `<span class="res ${cls}">${m.hs}–${m.as}</span>`;
+        } else { score = '<span class="pos">v</span>'; }
+        return `<tr><td>${when}</td><td>${esc(m.home || "")}</td>`
+          + `<td>${score}</td><td>${esc(m.away || "")}</td></tr>`;
+      }).join("");
+      return `<div class="sec-h">${esc(rd.name || "Fixtures")}</div>
+        <div class="wrap"><table class="tsched"><thead><tr>
+          <th>Date</th><th>Home</th><th>Score</th><th>Away</th>
+        </tr></thead><tbody>${rows}</tbody></table></div>`;
+    }
+    const cards = COMPETITIONS.map(c => {
+      const head = `<div class="sec-h" style="font-size:17px">${esc(c.name)}`
+        + (c.season ? ` <span class="pos">${esc(c.season)}</span>` : "") + `</div>`;
+      const st = (c.standings || []).map(standingsTable).join("");
+      const rounds = (c.rounds || []).map(roundTable).join("");
+      const body = (st || rounds) ? (st + rounds)
+        : `<div class="pos">No data — run <code>python -m leagues.competitions ${esc(c.key)}</code>.</div>`;
+      return head + body;
+    }).join("");
+    $("competitions-view").innerHTML =
+      `<div class="legend">Standings, results and upcoming fixtures for cup competitions
+        (Wikipedia). Shown for reference only — these aren't simulated. Kickoff/dates in US
+        Pacific time.</div>` + cards;
   }
 
   // ---- Players (league-wide "Top players" + per-team squad) ----
@@ -940,9 +998,9 @@ def read_players(key: str) -> list[dict]:
     return out
 
 
-def read_national() -> list[dict]:
-    """Load every data/national/*.json (USMNT/USWNT schedules), newest-updated first."""
-    root = DATA_ROOT.parent / "national"
+def _read_json_dir(name: str) -> list[dict]:
+    """Load every data/<name>/*.json (display-only artifacts), sorted by filename."""
+    root = DATA_ROOT.parent / name
     if not root.exists():
         return []
     out = []
@@ -954,12 +1012,23 @@ def read_national() -> list[dict]:
     return out
 
 
+def read_national() -> list[dict]:
+    """Load every data/national/*.json (USMNT/USWNT schedules)."""
+    return _read_json_dir("national")
+
+
+def read_competitions() -> list[dict]:
+    """Load every data/competitions/*.json (Leagues Cup / Champions League)."""
+    return _read_json_dir("competitions")
+
+
 def build(leagues_data: dict) -> str:
     for key, ld in leagues_data.items():           # attach player tables (independent of sims)
         ld.setdefault("players", read_players(key))
     return (HTML_TEMPLATE
             .replace("__DATA_PLACEHOLDER__", json.dumps(leagues_data))
-            .replace("__NATIONAL_PLACEHOLDER__", json.dumps(read_national())))
+            .replace("__NATIONAL_PLACEHOLDER__", json.dumps(read_national()))
+            .replace("__COMPETITIONS_PLACEHOLDER__", json.dumps(read_competitions())))
 
 
 def main() -> None:

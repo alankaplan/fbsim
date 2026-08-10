@@ -213,11 +213,15 @@ def main() -> None:
                          "CAPTCHA headless — run under a display / xvfb-run")
     ap.add_argument("--national", action="store_true",
                     help="also refresh USMNT/USWNT fixtures + results (data/national/, "
-                         "browserless via ESPN); shown as the report's National teams tab")
+                         "browserless via Wikipedia); shown as the report's National teams tab")
+    ap.add_argument("--competitions", action="store_true",
+                    help="also refresh Leagues Cup + Champions League standings/results "
+                         "(data/competitions/, browserless via Wikipedia); shown as the "
+                         "report's Competitions tab")
     ap.add_argument("--all", action="store_true",
                     help="do everything: shorthand for --refresh --players --fbref "
-                         "--national, then re-simulate and rebuild the page (FBref needs "
-                         "a display — run under xvfb-run/desktop; it self-skips headless)")
+                         "--national --competitions, then re-simulate and rebuild the page "
+                         "(FBref needs a display — run under xvfb-run/desktop; self-skips headless)")
     ap.add_argument("--force", action="store_true",
                     help="re-simulate even when the data hasn't changed")
     ap.add_argument("--no-page", action="store_true", help="skip rebuilding leagues.html")
@@ -225,7 +229,7 @@ def main() -> None:
     args = ap.parse_args()
 
     if args.all:                                    # one flag = the whole pipeline
-        args.refresh = args.players = args.fbref = args.national = True
+        args.refresh = args.players = args.fbref = args.national = args.competitions = True
 
     ensure_league_dict()                            # register custom leagues before soccerdata import
     keys = args.leagues or list(LEAGUES)
@@ -310,6 +314,19 @@ def main() -> None:
                       f"({played} played) -> {out.name}")
             except (Exception, SystemExit) as exc:
                 print(f"  [national] {entry['key']} skipped: {exc}")
+
+    if args.competitions:                           # display-only cup competitions (Wikipedia)
+        from .competitions import COMPETITIONS, build_competition
+        print("Competitions (leaguescup, ucl):")
+        for entry in COMPETITIONS:
+            try:
+                out = build_competition(entry)
+                d = json.loads(out.read_text(encoding="utf-8"))
+                n_matches = sum(len(r["matches"]) for r in d["rounds"])
+                print(f"  [competitions] {entry['name']}: {len(d['standings'])} tables, "
+                      f"{n_matches} matches -> {out.name}")
+            except (Exception, SystemExit) as exc:
+                print(f"  [competitions] {entry['key']} skipped: {exc}")
 
     if not args.no_page:
         build_page(args.open)

@@ -36,7 +36,8 @@ rebuilds the report:
 
 ```bash
 # Update EVERYTHING in one command: fixtures + Big-5 xG + player stats +
-# USMNT/USWNT national-team games, then simulate what changed and open the page.
+# USMNT/USWNT national-team games + Leagues Cup / Champions League, then simulate
+# what changed and open the page.
 # (US-league player stats come from FBref, which needs a display — run it under a
 # desktop or xvfb-run; without one, that one step self-skips and the rest still runs.)
 xvfb-run -a python -m leagues.update --all --open
@@ -49,8 +50,8 @@ venv/bin/python -m leagues.update --refresh --open
 venv/bin/python -m leagues.update
 ```
 
-`--all` is just shorthand for `--refresh --players --fbref --national`; use the
-individual flags when you want only part of the pipeline.
+`--all` is just shorthand for `--refresh --players --fbref --national
+--competitions`; use the individual flags when you want only part of the pipeline.
 
 It's incremental: ingested CSVs are only rewritten when they actually differ,
 and a league is re-simulated only when its `matches.csv` is newer than its
@@ -214,6 +215,27 @@ Data lands in `data/national/` (gitignored — a fetched artifact, refreshed on
 demand); the tab appears automatically once those files exist. A source that
 returns nothing never overwrites existing data.
 
+#### Cup competitions (Leagues Cup / Champions League) — display only
+
+Cup competitions are **not** simulated either: the 2026 Leagues Cup (a phase-one
+table feeding a single-elimination knockout) and the 2026–27 Champions League (a
+36-team Swiss "league phase" feeding a knockout bracket) aren't home-and-away
+round-robins, so the season model doesn't apply. Instead they get a **display-only
+"Competitions" tab** — each competition's current standings plus its results and
+upcoming fixtures grouped by round — scraped (no key) from the competition's
+**Wikipedia** article. `leagues/competitions.py` reads the standings `wikitable`s and
+the `{{Football box}}` match tables (sharing the Wikipedia client in `leagues/wiki.py`
+with the national-team ingest). As with any scrape, the page markup can shift, so the
+parser may occasionally need a tweak.
+
+```bash
+venv/bin/python -m leagues.competitions all              # Leagues Cup + UCL -> data/competitions/*.json
+venv/bin/python -m leagues.update --refresh --competitions   # refresh leagues + competitions
+```
+
+Data lands in `data/competitions/` (gitignored); the tab appears automatically once
+those files exist, and an empty fetch never overwrites existing data.
+
 ### 2. Fit and simulate a season
 
 `run_sims` fits the attack/defense model on played matches, simulates the
@@ -353,7 +375,12 @@ leagues/
   match.py                Poisson match primitive (λ → W/D/L probabilities)
   simulator.py            round-robin season engine + tiebreaker resolver
   run_sims.py             Monte Carlo driver
+  wiki.py                 shared Wikipedia REST client (national + competitions)
+  national.py             USMNT/USWNT results + fixtures (display-only)
+  competitions.py         Leagues Cup / Champions League standings + results (display-only)
   generate_page.py        HTML report generator
   update.py               one-command ingest + simulate + report
 data/leagues/<key>/       teams.csv, matches.csv (+ generated sim_results.json)
+data/national/<key>.json  fetched national-team games (gitignored)
+data/competitions/<key>.json  fetched cup standings + results (gitignored)
 ```

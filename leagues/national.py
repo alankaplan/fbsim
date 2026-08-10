@@ -29,21 +29,17 @@ Usage
 from __future__ import annotations
 
 import argparse
-import html
 import json
 import re
 import sys
-import time
-import urllib.error
-import urllib.parse
-import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+
+from .wiki import article_html, text
 
 # Keep only games this recent (or in the future); the section already scopes to ~a year.
 RECENT_DAYS = 400
 
-WIKI_REST = "https://en.wikipedia.org/api/rest_v1/page/html"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 NATIONAL_ROOT = REPO_ROOT / "data" / "national"
 
@@ -57,39 +53,6 @@ NATIONAL = [
 ]
 
 _US_RE = re.compile(r"united states|(^|\W)usa(\W|$)", re.I)
-
-# ---------------------------------------------------------------------------
-# HTTP (throttled + retried).
-# ---------------------------------------------------------------------------
-_THROTTLE_S = 0.4
-_last_call = [0.0]
-_HEADERS = {"User-Agent": "fbsim/1.0 (national-team fixtures; contact via repo)"}
-
-
-def _article_html(article: str, tries: int = 3) -> str:
-    """The article's full HTML via the Wikipedia REST API (Parsoid markup)."""
-    url = f"{WIKI_REST}/{urllib.parse.quote(article, safe='')}"
-    last_exc = None
-    for attempt in range(tries):
-        wait = _THROTTLE_S - (time.monotonic() - _last_call[0])
-        if wait > 0:
-            time.sleep(wait)
-        try:
-            req = urllib.request.Request(url, headers=_HEADERS)
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                return resp.read().decode("utf-8")
-        except urllib.error.HTTPError as exc:
-            last_exc = exc
-            if exc.code not in (429, 500, 502, 503, 504):
-                raise
-        except Exception as exc:
-            last_exc = exc
-        finally:
-            _last_call[0] = time.monotonic()
-        if attempt < tries - 1:
-            time.sleep(2 * (2 ** attempt))
-    raise last_exc
-
 
 # ---------------------------------------------------------------------------
 # Section slicing + Football box parsing (modern {{Football box collapsible}}).
@@ -108,19 +71,11 @@ def _section_slice(doc: str) -> str:
     return rest[:min(ends)] if ends else rest
 
 
-def _text(fragment: str) -> str:
-    """HTML fragment -> plain text (strip tags, refs, entities, extra space)."""
-    fragment = re.sub(r"<[^>]+>", " ", fragment)
-    fragment = html.unescape(fragment)
-    fragment = re.sub(r"\[\d+\]", "", fragment)        # [1] ref marks
-    return re.sub(r"\s+", " ", fragment).strip()
-
-
 def _team_name(td_html: str) -> str:
     """Team name from a `.vcard attendee` cell, with flag-icon spans removed."""
     frag = re.sub(r'<span class="flagicon.*?</span>\s*</span>', " ", td_html, flags=re.I | re.S)
     frag = re.sub(r'<span class="flagicon[^"]*">.*?</span>', " ", frag, flags=re.I | re.S)
-    return _text(frag)
+    return text(frag)
 
 
 _MONTHS = {m: i for i, m in enumerate(
@@ -169,12 +124,12 @@ def _parse_boxes(section_html: str, today: date | None = None) -> list[dict]:
         venue = "home" if us_home else "away"
         td0 = tds[0][1] if tds else ""
         small = re.search(r"<small[^>]*>(.*?)</small>", td0, re.S)
-        comp = _text(small.group(1)) if small else ""
-        date_txt = _text(re.sub(r"<small.*?</small>", " ", td0, flags=re.S))
+        comp = text(small.group(1)) if small else ""
+        date_txt = text(re.sub(r"<small.*?</small>", " ", td0, flags=re.S))
         score = ""
         for a, c in tds:
             if "text-align:center" in a:
-                score = _text(c)
+                score = text(c)
                 break
         sm = re.search(r"(\d+)\s*[–−\-]\s*(\d+)", score)
         completed = bool(sm)
@@ -206,7 +161,7 @@ def fetch_games(entry: dict, season: int | None = None) -> list[dict]:
     """A national team's results + upcoming games, scraped from its Wikipedia article."""
     article = entry["article"]
     try:
-        doc = _article_html(article)
+        doc = article_html(article)
     except Exception as exc:
         print(f"  [national] {entry['key']}: Wikipedia fetch failed ({type(exc).__name__})")
         return []
