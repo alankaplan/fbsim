@@ -167,6 +167,15 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .branch .b-d { font-size: 12px; font-weight: 600; }
   .branch .b-d.good { color: #3fb950; } .branch .b-d.bad { color: #f85149; }
   .branch .b-s { font-size: 11px; color: #6e7681; margin-top: 4px; }
+  /* Top-games game cards (phones only). */
+  .gcard { border-bottom: 1px solid #21262d; padding: 10px 2px; }
+  .gc-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .gc-when { color: #e6edf3; }
+  .gc-lg { color: #8b949e; font-size: 11px; text-align: right; }
+  .gc-teams { margin: 5px 0; font-size: 14px; }
+  .gc-teams .vs { color: #6e7681; font-size: 12px; margin: 0 6px; }
+  .gc-odds { display: flex; align-items: center; gap: 8px; color: #8b949e; font-size: 12px; }
+  .gc-odds .wdl { width: 130px; }
   /* Phone-friendly: tighten spacing, wrap control rows, drop secondary columns. */
   @media (max-width: 640px) {
     header { padding: 14px 14px 0; }
@@ -952,6 +961,23 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       return schedSortAsc ? x - y : y - x;
     });
 
+    // Phones: render each game as a stacked card (date · league, teams, compact odds bar).
+    const mobile = window.matchMedia && window.matchMedia("(max-width:640px)").matches;
+    if (mobile) {
+      $("sched-table").innerHTML = rows.length ? rows.map(f => {
+        const odds = f.win == null ? "" :
+          `<div class="gc-odds"><span class="wdl"><span class="w" style="width:${f.win*100}%"></span>`
+          + `<span class="d" style="width:${f.draw*100}%"></span><span class="l" style="width:${f.loss*100}%"></span></span>`
+          + `<span>${(f.win*100).toFixed(0)}/${(f.draw*100).toFixed(0)}/${(f.loss*100).toFixed(0)}%</span></div>`;
+        return `<div class="gcard"><div class="gc-top"><span class="gc-when">${esc(kickoff(f))}</span>`
+          + `<span class="gc-lg">${esc(f._league)}</span></div>`
+          + `<div class="gc-teams">${selName(f, f.home_name)} <span class="vs">v</span> ${selName(f, f.away_name)}</div>`
+          + `${odds}</div>`;
+      }).join("")
+      : `<div style="color:#8b949e;padding:16px">No games at this threshold — lower it to include more, or follow a team above.</div>`;
+      return;
+    }
+
     const th = cols.map(([c, l, al, , , sec]) =>
       `<th data-col="${c}" style="text-align:${al}" class="${sec?'col-sec ':''}${c===schedSortCol?(schedSortAsc?'sort-asc':'sort-desc'):''}">${l}</th>`).join("");
     const bd = rows.length
@@ -1129,6 +1155,11 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
 
   leagueTabs();
   setView("main");
+  // Re-render Top games when crossing the phone breakpoint (table <-> cards).
+  if (window.matchMedia)
+    window.matchMedia("(max-width:640px)").addEventListener("change", () => {
+      if (view === "schedule") renderScheduleTable();
+    });
 })();
 </script>
 </body>
