@@ -167,6 +167,22 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .branch .b-d { font-size: 12px; font-weight: 600; }
   .branch .b-d.good { color: #3fb950; } .branch .b-d.bad { color: #f85149; }
   .branch .b-s { font-size: 11px; color: #6e7681; margin-top: 4px; }
+  /* Phone-friendly: tighten spacing, wrap control rows, drop secondary columns. */
+  @media (max-width: 640px) {
+    header { padding: 14px 14px 0; }
+    main { padding: 14px 14px 48px; }
+    h1 { font-size: 17px; }
+    body { font-size: 13px; }
+    nav { flex-wrap: wrap; gap: 2px; }
+    nav a { padding: 7px 10px; }
+    .lg-btn.top { margin-left: 0; }
+    th, td { padding: 5px 7px; }
+    .col-sec { display: none; }
+    .tp-panel { width: min(260px, 86vw); }
+    input[type=search] { width: 100%; }
+    .wdl { width: 110px; }
+    .bar-track { width: 48px; }
+  }
 </style>
 </head>
 <body>
@@ -188,6 +204,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <div id="fixtures-view" style="display:none"></div>
   <div id="schedule-view" style="display:none"></div>
   <div id="players-view" style="display:none"></div>
+  <div id="players_all-view" style="display:none"></div>
   <div id="national-view" style="display:none"></div>
   <div id="competitions-view" style="display:none"></div>
   <div id="team-view" style="display:none"></div>
@@ -232,12 +249,25 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
   function saveTeams() {
     try { localStorage.setItem("fbsim.topTeams", JSON.stringify([...selectedTeams])); } catch (e) {}
   }
+  const compKey = (k, i) => k + "\t" + i;            // "<compKey>\t<roundIndex>" (schedule view)
+  let selectedRounds = new Set();
+  try {                                              // restore picked competition stages
+    const valid = new Set();
+    (COMPETITIONS || []).forEach(c => (c.rounds || []).forEach((r, i) => valid.add(compKey(c.key, i))));
+    JSON.parse(localStorage.getItem("fbsim.topRounds") || "[]")
+      .forEach(x => { if (valid.has(x)) selectedRounds.add(x); });
+  } catch (e) {}
+  function saveRounds() {
+    try { localStorage.setItem("fbsim.topRounds", JSON.stringify([...selectedRounds])); } catch (e) {}
+  }
   let teamDDOpen = false, teamFilter = "";
+  let compDDOpen = false;
   let filter = "";
   let teamCode = null;
   let treePath = [], treeTeam = null;              // odds-tree drill-down state
   let teamTab = "summary";                         // team page sub-tab: summary | players
   let plSort = "goals", plAsc = false;             // players-table sort
+  let taSort = "ga", taAsc = false;                // cross-league Top Players sort
 
   const $ = (id) => document.getElementById(id);
   const pct = (x) => (x === 0 ? '<span class="zero">0</span>' : x.toFixed(1));
@@ -252,21 +282,25 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     return `rgba(88,166,255,${a.toFixed(3)})`;
   }
 
+  const anyPlayers = () => Object.keys(LEAGUES).some(k => (LEAGUES[k].players || []).length);
   function leagueTabs() {
-    // Top games / National teams / Competitions are cross-league (no single league applies).
-    const crossLeague = (view==='schedule' || view==='national' || view==='competitions');
+    // Top games / National / Competitions / Top players are cross-league (no single league applies).
+    const crossLeague = (view==='schedule' || view==='national' || view==='competitions' || view==='players_all');
     const lg = keys.map(k =>
       `<button class="lg-btn ${(!crossLeague&&k===cur)?'active':''}" data-k="${k}">${esc(LEAGUES[k].league.name)}</button>`
     ).join("");
     const top = `<button class="lg-btn top ${view==='schedule'?'active':''}" data-top="1">Top games</button>`;
+    const pl = anyPlayers()
+      ? `<button class="lg-btn top ${view==='players_all'?'active':''}" data-players="1">Top Players</button>` : "";
     const nat = (NATIONAL && NATIONAL.length)
       ? `<button class="lg-btn top ${view==='national'?'active':''}" data-nat="1">National teams</button>` : "";
     const cup = (COMPETITIONS && COMPETITIONS.length)
       ? `<button class="lg-btn top ${view==='competitions'?'active':''}" data-cup="1">Competitions</button>` : "";
-    $("league-tabs").innerHTML = lg + top + nat + cup;
+    $("league-tabs").innerHTML = lg + top + pl + nat + cup;
     $("league-tabs").querySelectorAll("button").forEach(b =>
       b.onclick = () => {
         if (b.dataset.top) { setView("schedule"); return; }
+        if (b.dataset.players) { setView("players_all"); return; }
         if (b.dataset.nat) { setView("national"); return; }
         if (b.dataset.cup) { setView("competitions"); return; }
         cur = b.dataset.k; teamCode = null;
@@ -293,6 +327,11 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
         `Cup standings, results and upcoming fixtures · kickoff in US Pacific time`;
       return;
     }
+    if (view === "players_all") {  // cross-league top players
+      $("hdr-badge").innerHTML = "";
+      $("hdr-sub").textContent = `Top 100 players across all leagues · by goals + assists`;
+      return;
+    }
     const L = LEAGUES[cur], m = L.meta;
     $("hdr-badge").innerHTML = m.used_xg
       ? '<span class="badge xg">FBref xG</span>' : '<span class="badge">goals model</span>';
@@ -307,19 +346,20 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
 
   function setView(v) {
     view = v;
-    ["main","matrix","fixtures","schedule","players","national","competitions","team"].forEach(x =>
+    ["main","matrix","fixtures","schedule","players","players_all","national","competitions","team"].forEach(x =>
       $(x+"-view").style.display = (x===v ? "" : "none"));
     $("nav").querySelectorAll("a").forEach(a =>
       a.classList.toggle("active", a.dataset.view===v));
     $("nav-team").style.display = (v==="team") ? "" : "none";
-    // cross-cutting views (Top games / National teams / Competitions) skip the per-league tabs
-    $("nav").style.display = (v==="schedule"||v==="national"||v==="competitions") ? "none" : "";
+    // cross-cutting views (Top games / Top players / National / Competitions) skip the per-league tabs
+    $("nav").style.display = (v==="schedule"||v==="players_all"||v==="national"||v==="competitions") ? "none" : "";
     head(); leagueTabs();
     if (v==="main") renderMain();
     else if (v==="matrix") renderMatrix();
     else if (v==="fixtures") renderFixtures();
     else if (v==="schedule") renderSchedule();
     else if (v==="players") renderPlayers();
+    else if (v==="players_all") renderTopPlayers();
     else if (v==="national") renderNational();
     else if (v==="competitions") renderCompetitions();
     else if (v==="team") renderTeam();
@@ -373,7 +413,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
         const when = done ? esc(m.date || "") : esc(kickoff(m));
         let score;
         if (done) {
-          const cls = m.hs > m.as ? "win" : (m.hs < m.as ? "loss" : "draw");
+          const cls = m.hs > m.as ? "w" : (m.hs < m.as ? "l" : "d");
           score = `<span class="res ${cls}">${m.hs}–${m.as}</span>`;
         } else { score = '<span class="pos">v</span>'; }
         return `<tr><td>${when}</td><td>${esc(m.home || "")}</td>`
@@ -400,7 +440,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
   }
 
   // ---- Players (league-wide "Top players" + per-team squad) ----
-  // [key, label, align, cell(p), sortVal(p), teamViewHidden?]
+  // [key, label, align, cell(p), sortVal(p), teamViewHidden?, secondary?]
   function playerCols() {
     return [
       ["player_name","Player","left", p=>esc(p.player_name),                 p=>p.player_name],
@@ -411,8 +451,8 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       ["goals","G","right", p=>p.goals,                                      p=>p.goals],
       ["assists","A","right", p=>p.assists,                                  p=>p.assists],
       ["xg","xG","right", p=>p.xg.toFixed(1),                                p=>p.xg],
-      ["xa","xA","right", p=>p.xa.toFixed(1),                                p=>p.xa],
-      ["shots","Sh","right", p=>(p.shots||""),                               p=>p.shots],
+      ["xa","xA","right", p=>p.xa.toFixed(1),                                p=>p.xa,    false, true],
+      ["shots","Sh","right", p=>(p.shots||""),                               p=>p.shots, false, true],
     ];
   }
   function renderPlayersTable(elId, players, teamView) {
@@ -431,9 +471,9 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       return plAsc ? r : -r;
     });
     const th = cols.map(c =>
-      `<th data-col="${c[0]}" style="text-align:${c[2]}" class="${c[0]===plSort?(plAsc?'sort-asc':'sort-desc'):''}">${c[1]}</th>`).join("");
+      `<th data-col="${c[0]}" style="text-align:${c[2]}" class="${c[6]?'col-sec ':''}${c[0]===plSort?(plAsc?'sort-asc':'sort-desc'):''}">${c[1]}</th>`).join("");
     const body = sorted.map(p =>
-      `<tr>${cols.map(c => `<td style="text-align:${c[2]}">${c[3](p)}</td>`).join("")}</tr>`).join("");
+      `<tr>${cols.map(c => `<td class="${c[6]?'col-sec':''}" style="text-align:${c[2]}">${c[3](p)}</td>`).join("")}</tr>`).join("");
     el.innerHTML = `<div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
     el.querySelectorAll("th[data-col]").forEach(h => h.onclick = () => {
       const c = h.dataset.col;
@@ -454,6 +494,67 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     renderPlayersTable("players-table", L.players || [], false);
   }
 
+  // ---- Top Players (cross-league: top 100 currently playing, by goals + assists) ----
+  function topPlayersData() {
+    const rows = [];
+    Object.keys(LEAGUES).forEach(k => (LEAGUES[k].players || []).forEach(p => {
+      if (!(p.minutes > 0)) return;                  // "currently playing"
+      rows.push(Object.assign({}, p, {
+        _lk: k, _league: LEAGUES[k].league.name, ga: (p.goals || 0) + (p.assists || 0) }));
+    }));
+    return rows;
+  }
+  function renderTopPlayers() {
+    const cols = [
+      ["_league","League","left", p=>esc(p._league),                          p=>p._league],
+      ["player_name","Player","left", p=>esc(p.player_name),                  p=>p.player_name],
+      ["team","Team","left", p=>p.team_code ? `<a data-team="${p.team_code}" data-lk="${p._lk}">${esc(p.team_code)}</a>` : esc(p.team_name||""), p=>p.team_name],
+      ["position","Pos","left", p=>esc(p.position||""),                       p=>p.position||""],
+      ["matches","Apps","right", p=>p.matches,                                p=>p.matches],
+      ["minutes","Min","right", p=>p.minutes,                                 p=>p.minutes],
+      ["goals","G","right", p=>p.goals,                                       p=>p.goals],
+      ["assists","A","right", p=>p.assists,                                   p=>p.assists],
+      ["ga","G+A","right", p=>`<b>${p.ga}</b>`,                               p=>p.ga],
+      ["xg","xG","right", p=>p.xg.toFixed(1),                                 p=>p.xg, true],
+      ["xa","xA","right", p=>p.xa.toFixed(1),                                 p=>p.xa, true],
+      ["shots","Sh","right", p=>(p.shots||""),                               p=>p.shots, true],
+    ];
+    // Fixed membership: the top 100 by goals + assists; then re-sort for display.
+    let pool = topPlayersData().sort((a,b) =>
+      (b.ga-a.ga) || (b.goals-a.goals) || String(a.player_name).localeCompare(String(b.player_name)));
+    pool = pool.slice(0, 100);
+    if (!pool.length) {
+      $("players_all-view").innerHTML = `<div class="legend">No player data loaded — run
+        <code>python -m leagues.update --players</code> to fetch it.</div>`;
+      return;
+    }
+    const sc = cols.find(c => c[0]===taSort) || cols[0];
+    const shown = pool.slice().sort((a,b) => {
+      const va=sc[4](a), vb=sc[4](b);
+      let r = (typeof va==="number" && typeof vb==="number") ? va-vb : String(va).localeCompare(String(vb));
+      r = taAsc ? r : -r;
+      return r || (b.ga-a.ga) || (b.goals-a.goals) || String(a.player_name).localeCompare(String(b.player_name));
+    });
+    const th = `<th>#</th>` + cols.map(c =>
+      `<th data-col="${c[0]}" style="text-align:${c[2]}" class="${c[5]?'col-sec ':''}${c[0]===taSort?(taAsc?'sort-asc':'sort-desc'):''}">${c[1]}</th>`).join("");
+    const body = shown.map((p,i) =>
+      `<tr><td class="pos">${i+1}</td>` + cols.map(c =>
+        `<td class="${c[5]?'col-sec':''}" style="text-align:${c[2]}">${c[3](p)}</td>`).join("") + `</tr>`).join("");
+    $("players_all-view").innerHTML =
+      `<div class="sec-h">Top Players</div>
+       <div class="legend">The top 100 players currently playing across all leagues, ranked by
+         <b>G+A</b> (goals + assists). Click a header to sort; click a team to open it.</div>
+       <div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
+    $("players_all-view").querySelectorAll("th[data-col]").forEach(h => h.onclick = () => {
+      const c = h.dataset.col;
+      if (c===taSort) taAsc = !taAsc; else { taSort = c; taAsc = (c==="player_name"||c==="_league"||c==="position"); }
+      renderTopPlayers();
+    });
+    $("players_all-view").querySelectorAll("a[data-team]").forEach(a => a.onclick = () => {
+      cur = a.dataset.lk; teamCode = a.dataset.team; teamTab = "summary"; setView("team");
+    });
+  }
+
   // ---- Standings odds table ----
   // Columns are built per league so the odds headers carry league-specific
   // labels (Title vs Shield, UCL vs Playoff) and the Europe / relegation bands
@@ -461,7 +562,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
   function columnsFor(L, barFn) {
     const g = L.league;
     const cols = [
-      ["cur_rank","#", r=>`<td class="pos">${r.cur_rank}</td>`],
+      ["_xrank","#", r=>`<td class="pos">${r._xrank}</td>`],
       ["name","Team", r=>`<td><a data-team="${r.code}">${esc(r.name)}</a></td>`],
       ["played","Pld", r=>`<td>${r.played}</td>`],
       ["cur_pts","Pts", r=>`<td>${r.cur_pts}</td>`],
@@ -489,6 +590,8 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
   }
   function renderMain() {
     const L = LEAGUES[cur], g = L.league;
+    // Projected finishing position (1..N by expected rank) shown in the '#' column.
+    L.teams.slice().sort((a,b)=>a.exp_rank-b.exp_rank).forEach((t,i)=>{ t._xrank = i+1; });
     const maxTitle = Math.max(...L.teams.map(t=>t.title_pct), 1);
     const barFn = r => `<span class="bar-track"><span class="bar-fill" style="width:${(r.title_pct/maxTitle*100).toFixed(1)}%"></span></span>`;
     const cols = columnsFor(L, barFn);
@@ -502,15 +605,15 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     if (g.relegation_slots>0) bands.push(`<b>${g.drop_label}%</b> bottom ${g.relegation_slots}`);
     $("main-view").innerHTML =
       `<input type="search" id="flt" placeholder="filter teams…" value="${esc(filter)}">
-       <div class="legend"><b>Proj</b> mean final points · ${bands.join(" · ")} ·
-         <b>xRank</b> expected finishing position</div>
+       <div class="legend"><b>#</b> projected finish · <b>Proj</b> mean final points · ${bands.join(" · ")} ·
+         <b>xRank</b> expected finishing position (mean)</div>
        <div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
     $("flt").oninput = (e) => { filter = e.target.value.toLowerCase(); renderMain(); };
     $("main-view").querySelectorAll("th[data-col]").forEach(h =>
       h.onclick = () => {
         const c = h.dataset.col;
         if (c===sortCol) sortAsc = !sortAsc;
-        else { sortCol = c; sortAsc = (c==="name"||c==="exp_rank"||c==="cur_rank"); }
+        else { sortCol = c; sortAsc = (c==="name"||c==="exp_rank"||c==="_xrank"); }
         renderMain();
       });
     $("main-view").querySelectorAll("a[data-team]").forEach(a =>
@@ -564,46 +667,63 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     const d = f.date || dt;
     return d ? d + "T12:00:00Z" : "";
   }
+  const isPlayed = f => f.home_goals != null && f.home_goals !== "";
+  function scoreCell(f) {  // played -> actual colored score (home perspective); else gray xG forecast
+    if (isPlayed(f)) {
+      const gf = +f.home_goals, ga = +f.away_goals;
+      const cls = gf > ga ? "w" : (gf < ga ? "l" : "d");
+      return `<span class="res ${cls}">${gf}–${ga}</span>`;
+    }
+    return f.lam_home == null ? "" : `<span style="color:#8b949e">${f.lam_home.toFixed(1)}–${f.lam_away.toFixed(1)}</span>`;
+  }
   function fixtureCols() {
-    // [key, label, align, cell(f), sortVal(f)]
+    // [key, label, align, cell(f), sortVal(f), secondary?] — forecast cells blank for played rows.
     return [
-      ["kickoff", "Kickoff", "left",   f => esc(kickoff(f)),                 f => f.datetime_utc || f.date || ""],
+      ["kickoff", "Kickoff", "left",   f => esc(kickoff(f)),                 f => kickoffSort(f)],
       ["home",    "Home",    "right",  f => esc(f.home_name),                f => f.home_name],
-      ["xg",      "xG",      "center", f => `<span style="color:#8b949e">${f.lam_home.toFixed(1)}–${f.lam_away.toFixed(1)}</span>`, f => f.lam_home - f.lam_away],
+      ["xg",      "xG / Score","center",scoreCell,                           f => isPlayed(f) ? 99 : (f.lam_home==null ? -1 : f.lam_home - f.lam_away)],
       ["away",    "Away",    "left",   f => esc(f.away_name),                f => f.away_name],
-      ["wdl",     "W / D / L","center",f => `<span class="wdl"><span class="w" style="width:${f.win*100}%"></span><span class="d" style="width:${f.draw*100}%"></span><span class="l" style="width:${f.loss*100}%"></span></span>`, f => f.win],
-      ["win",     "H",       "right",  f => `${(f.win*100).toFixed(0)}%`,    f => f.win],
-      ["draw",    "D",       "right",  f => `${(f.draw*100).toFixed(0)}%`,   f => f.draw],
-      ["loss",    "A",       "right",  f => `${(f.loss*100).toFixed(0)}%`,   f => f.loss],
-      ["info_pct","Info%",   "right",  f => `${(f.info_pct ?? 0).toFixed(2)}%`, f => (f.info_pct ?? 0)],
-      ["post_bits","H after", "right",  f => `${fmtBits(f.post_bits ?? 0)}`,     f => (f.post_bits ?? 0)],
+      ["wdl",     "W / D / L","center",f => f.win==null ? "" : `<span class="wdl"><span class="w" style="width:${f.win*100}%"></span><span class="d" style="width:${f.draw*100}%"></span><span class="l" style="width:${f.loss*100}%"></span></span>`, f => f.win ?? -1],
+      ["win",     "H",       "right",  f => f.win==null ? "" : `${(f.win*100).toFixed(0)}%`,   f => f.win ?? -1],
+      ["draw",    "D",       "right",  f => f.draw==null ? "" : `${(f.draw*100).toFixed(0)}%`, f => f.draw ?? -1],
+      ["loss",    "A",       "right",  f => f.loss==null ? "" : `${(f.loss*100).toFixed(0)}%`, f => f.loss ?? -1],
+      ["info_pct","Info%",   "right",  f => f.info_pct==null ? "" : `${f.info_pct.toFixed(2)}%`, f => (f.info_pct ?? -1), true],
+      ["post_bits","H after", "right",  f => f.post_bits==null ? "" : `${fmtBits(f.post_bits)}`,  f => (f.post_bits ?? -1), true],
     ];
   }
   function renderFixtures() {
     const L = LEAGUES[cur];
-    if (!L.fixtures.length) {
-      $("fixtures-view").innerHTML = `<div class="legend">Season complete — no remaining fixtures.</div>`;
+    const all = (L.results || []).concat(L.fixtures || []);
+    if (!all.length) {
+      $("fixtures-view").innerHTML = `<div class="legend">No fixtures or results loaded for this league.</div>`;
       return;
     }
     const cols = fixtureCols();
     const sv = (cols.find(c => c[0] === fixtSortCol) || cols[0])[4];
-    const rows = L.fixtures.slice().sort((a, b) => {
+    const rows = all.slice().sort((a, b) => {
       let x = sv(a), y = sv(b);
-      if (typeof x === "string") return fixtSortAsc ? String(x).localeCompare(y) : String(y).localeCompare(x);
+      if (typeof x === "string" || typeof y === "string")
+        return fixtSortAsc ? String(x).localeCompare(String(y)) : String(y).localeCompare(String(x));
       return fixtSortAsc ? x - y : y - x;
     });
-    const th = cols.map(([c, l, al]) =>
-      `<th data-col="${c}" style="text-align:${al}" class="${c===fixtSortCol?(fixtSortAsc?'sort-asc':'sort-desc'):''}">${l}</th>`).join("");
-    const body = rows.map(f =>
-      `<tr>${cols.map(([, , al, cell]) => `<td style="text-align:${al}">${cell(f)}</td>`).join("")}</tr>`).join("");
+    // Divider before the first upcoming game (only meaningful in the default kickoff-ascending view).
+    const firstFut = (fixtSortCol === "kickoff" && fixtSortAsc) ? rows.findIndex(f => !isPlayed(f)) : -1;
+    const th = cols.map(([c, l, al, , , sec]) =>
+      `<th data-col="${c}" style="text-align:${al}" class="${sec?'col-sec ':''}${c===fixtSortCol?(fixtSortAsc?'sort-asc':'sort-desc'):''}">${l}</th>`).join("");
+    const body = rows.map((f, i) => {
+      const nowCls = i === firstFut ? ' class="now"' : '';
+      return `<tr${nowCls}>${cols.map(([, , al, cell, , sec]) =>
+        `<td class="${sec?'col-sec':''}" style="text-align:${al}">${cell(f)}</td>`).join("")}</tr>`;
+    }).join("");
     $("fixtures-view").innerHTML =
-      `<div class="legend">Remaining fixtures with kickoff (US Pacific), model expected goals,
+      `<div class="legend">All league games — played results (final score) and remaining fixtures
+        with kickoff (US Pacific), model expected goals,
         <span style="color:#3fb950">home</span> / <span style="color:#8b949e">draw</span> /
         <span style="color:#f85149">away</span> win probabilities, and
         <b>Info%</b> — the expected % drop in the title race's uncertainty (entropy) once the
         result is known — and <b>H after</b>, the expected title-race entropy (bits) still
-        remaining once this game's round is played, declining to 0 by season's end. Sort by
-        Kickoff to watch H after tick down. Click a header to sort.</div>
+        remaining once this game's round is played, declining to 0 by season's end. The
+        <span style="color:#f78166">orange line</span> marks the next game. Click a header to sort.</div>
        <div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
     $("fixtures-view").querySelectorAll("th[data-col]").forEach(h =>
       h.onclick = () => {
@@ -631,7 +751,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       ["win",     "H",       "right",  f => f.win==null ? "" : `${(f.win*100).toFixed(0)}%`,  f => f.win ?? -1],
       ["draw",    "D",       "right",  f => f.draw==null ? "" : `${(f.draw*100).toFixed(0)}%`, f => f.draw ?? -1],
       ["loss",    "A",       "right",  f => f.loss==null ? "" : `${(f.loss*100).toFixed(0)}%`, f => f.loss ?? -1],
-      ["info_pct","Info%",   "right",  f => f.info_pct==null ? "" : `${f.info_pct.toFixed(2)}%`, f => (f.info_pct ?? -1)],
+      ["info_pct","Info%",   "right",  f => f.info_pct==null ? "" : `${f.info_pct.toFixed(2)}%`, f => (f.info_pct ?? -1), true],
     ];
   }
   function teamDropdown() {
@@ -667,6 +787,24 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       l.style.display = (!q || l.dataset.name.includes(q)) ? "" : "none");
     $("team-panel").querySelectorAll(".tp-grp").forEach(g => g.style.display = q ? "none" : "");
   }
+  // Dropdown of competition stages: each round is "<round> and beyond" for its competition.
+  function compDropdown() {
+    if (!(COMPETITIONS || []).length) return "";
+    const groups = COMPETITIONS.map(c => {
+      const items = (c.rounds || []).map((r, i) => {
+        const key = compKey(c.key, i), on = selectedRounds.has(key) ? " checked" : "";
+        return `<label><input type="checkbox" data-round="${esc(key)}"${on}>${esc(r.name)}</label>`;
+      }).join("");
+      return items ? `<div class="tp-grp">${esc(c.name)}</div>${items}` : "";
+    }).join("");
+    if (!groups) return "";
+    return `<div class="tp-dd">
+      <button class="tp-btn" id="comp-btn">Competitions (${selectedRounds.size}) ▾</button>
+      <div class="tp-panel" id="comp-panel" style="display:${compDDOpen ? '' : 'none'}">
+        <div class="legend" style="margin:2px 4px 6px">Adds all upcoming games in that stage and beyond.</div>
+        ${groups}
+      </div></div>`;
+  }
   // A league's most-decisive upcoming games, in Info% order, taken until its
   // champion-race entropy falls to/below the threshold (nothing if already below).
   function topGamesFor(k) {
@@ -694,12 +832,14 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
         <b>Info%</b>) — just enough to pull its title-race <b>entropy</b> below the threshold you
         set, so a league in a tight race contributes more games than a settled one — plus every
         remaining game of any team you follow (including the national teams, whose games are
-        shown for reference without model odds). Click a header to sort.</div>
+        shown for reference without model odds), and every upcoming game of any competition
+        stage you pick (that round and beyond). Click a header to sort.</div>
        <div class="topn-row">
          <label class="topn"><span>Title-race entropy ≤</span>
            <input type="number" min="0" step="0.1" value="${threshold}" id="thr-input">
            <span>bits</span></label>
          ${teamDropdown()}
+         ${compDropdown()}
        </div>
        <div id="sched-readout" class="topn-row"></div>
        <div id="sched-table" class="wrap"></div>`;
@@ -723,6 +863,19 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
         $("team-btn").textContent = `Teams (${selectedTeams.size}) ▾`;
         renderScheduleTable();
       });
+    if ($("comp-btn")) {
+      $("comp-btn").onclick = () => {
+        compDDOpen = !compDDOpen;
+        $("comp-panel").style.display = compDDOpen ? "" : "none";
+      };
+      $("comp-panel").querySelectorAll("input[data-round]").forEach(cb =>
+        cb.onchange = () => {
+          if (cb.checked) selectedRounds.add(cb.dataset.round); else selectedRounds.delete(cb.dataset.round);
+          saveRounds();
+          $("comp-btn").textContent = `Competitions (${selectedRounds.size}) ▾`;
+          renderScheduleTable();
+        });
+    }
     applyTeamFilter();
     renderReadout();
     renderScheduleTable();
@@ -767,6 +920,25 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
         });
       });
     });
+    // (d) upcoming games of each followed competition stage — that round and beyond
+    selectedRounds.forEach(key => {
+      const [ck, iStr] = key.split("\t");
+      const comp = (COMPETITIONS || []).find(c => c.key === ck);
+      if (!comp) return;
+      (comp.rounds || []).slice(+iStr).forEach(rd => {         // this stage onward
+        (rd.matches || []).forEach(g => {
+          if (g.status !== "scheduled") return;                // upcoming only
+          const id = "cmp::" + ck + "::" + g.event_id;
+          if (seen.has(id)) return;
+          seen.add(id);
+          rows.push({
+            _league: comp.name + " · " + rd.name, _lk: "__competition__", _competition: true,
+            date: g.date, datetime_utc: g.datetime_utc || "",
+            home_name: g.home, away_name: g.away,
+          });
+        });
+      });
+    });
 
     const sv = (cols.find(c => c[0] === schedSortCol) || cols[0])[4];
     rows.sort((a, b) => {
@@ -775,10 +947,10 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       return schedSortAsc ? x - y : y - x;
     });
 
-    const th = cols.map(([c, l, al]) =>
-      `<th data-col="${c}" style="text-align:${al}" class="${c===schedSortCol?(schedSortAsc?'sort-asc':'sort-desc'):''}">${l}</th>`).join("");
+    const th = cols.map(([c, l, al, , , sec]) =>
+      `<th data-col="${c}" style="text-align:${al}" class="${sec?'col-sec ':''}${c===schedSortCol?(schedSortAsc?'sort-asc':'sort-desc'):''}">${l}</th>`).join("");
     const bd = rows.length
-      ? rows.map(f => `<tr>${cols.map(([, , al, cell]) => `<td style="text-align:${al}">${cell(f)}</td>`).join("")}</tr>`).join("")
+      ? rows.map(f => `<tr>${cols.map(([, , al, cell, , sec]) => `<td class="${sec?'col-sec':''}" style="text-align:${al}">${cell(f)}</td>`).join("")}</tr>`).join("")
       : `<tr><td colspan="${cols.length}" style="color:#8b949e;padding:16px">No games at this threshold — lower it to include more, or follow a team above.</td></tr>`;
     $("sched-table").innerHTML = `<table><thead><tr>${th}</tr></thead><tbody>${bd}</tbody></table>`;
     $("sched-table").querySelectorAll("th[data-col]").forEach(h =>
