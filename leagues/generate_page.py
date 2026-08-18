@@ -176,12 +176,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     nav { flex-wrap: wrap; gap: 2px; }
     nav a { padding: 7px 10px; }
     .lg-btn.top { margin-left: 0; }
-    th, td { padding: 5px 7px; }
+    table { font-size: 12px; }
+    th, td { padding: 4px 6px; }
+    td { white-space: normal; }          /* let long team/player names wrap instead of scroll */
     .col-sec { display: none; }
     .tp-panel { width: min(260px, 86vw); }
     input[type=search] { width: 100%; }
-    .wdl { width: 110px; }
-    .bar-track { width: 48px; }
+    .bar-track { display: none; }        /* Title% bar: show the number alone on phones */
   }
 </style>
 </head>
@@ -399,13 +400,16 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     function standingsTable(grp) {
       const rows = (grp.rows || []).map((r, i) =>
         `<tr><td class="pos">${esc(r.pos || (i + 1))}</td><td>${esc(r.team || "")}</td>`
-        + `<td>${r.pld ?? ""}</td><td>${r.w ?? ""}</td><td>${r.d ?? ""}</td><td>${r.l ?? ""}</td>`
-        + `<td>${r.gf ?? ""}</td><td>${r.ga ?? ""}</td><td>${r.gd ?? ""}</td>`
+        + `<td>${r.pld ?? ""}</td>`
+        + `<td class="col-sec">${r.w ?? ""}</td><td class="col-sec">${r.d ?? ""}</td><td class="col-sec">${r.l ?? ""}</td>`
+        + `<td class="col-sec">${r.gf ?? ""}</td><td class="col-sec">${r.ga ?? ""}</td><td class="col-sec">${r.gd ?? ""}</td>`
         + `<td><strong>${r.pts ?? ""}</strong></td></tr>`).join("");
       const cap = grp.title ? `<div class="sec-h">${esc(grp.title)}</div>` : "";
       return cap + `<div class="wrap"><table><thead><tr>
-        <th>#</th><th>Team</th><th>Pld</th><th>W</th><th>D</th><th>L</th>
-        <th>GF</th><th>GA</th><th>GD</th><th>Pts</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+        <th>#</th><th>Team</th><th>Pld</th>
+        <th class="col-sec">W</th><th class="col-sec">D</th><th class="col-sec">L</th>
+        <th class="col-sec">GF</th><th class="col-sec">GA</th><th class="col-sec">GD</th>
+        <th>Pts</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     }
     function roundTable(rd) {
       const rows = (rd.matches || []).map(m => {
@@ -445,12 +449,12 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     return [
       ["player_name","Player","left", p=>esc(p.player_name),                 p=>p.player_name],
       ["team","Team","left", p=>`<a data-team="${p.team_code}">${esc(p.team_code||p.team_name)}</a>`, p=>p.team_name, true],
-      ["position","Pos","left", p=>esc(p.position||""),                      p=>p.position||""],
-      ["matches","Apps","right", p=>p.matches,                               p=>p.matches],
-      ["minutes","Min","right", p=>p.minutes,                                p=>p.minutes],
+      ["position","Pos","left", p=>esc(p.position||""),                      p=>p.position||"",  false, true],
+      ["matches","Apps","right", p=>p.matches,                               p=>p.matches,       false, true],
+      ["minutes","Min","right", p=>p.minutes,                                p=>p.minutes,       false, true],
       ["goals","G","right", p=>p.goals,                                      p=>p.goals],
       ["assists","A","right", p=>p.assists,                                  p=>p.assists],
-      ["xg","xG","right", p=>p.xg.toFixed(1),                                p=>p.xg],
+      ["xg","xG","right", p=>p.xg.toFixed(1),                                p=>p.xg,            false, true],
       ["xa","xA","right", p=>p.xa.toFixed(1),                                p=>p.xa,    false, true],
       ["shots","Sh","right", p=>(p.shots||""),                               p=>p.shots, false, true],
     ];
@@ -506,12 +510,12 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
   }
   function renderTopPlayers() {
     const cols = [
-      ["_league","League","left", p=>esc(p._league),                          p=>p._league],
+      ["_league","League","left", p=>esc(p._league),                          p=>p._league, true],
       ["player_name","Player","left", p=>esc(p.player_name),                  p=>p.player_name],
       ["team","Team","left", p=>p.team_code ? `<a data-team="${p.team_code}" data-lk="${p._lk}">${esc(p.team_code)}</a>` : esc(p.team_name||""), p=>p.team_name],
-      ["position","Pos","left", p=>esc(p.position||""),                       p=>p.position||""],
-      ["matches","Apps","right", p=>p.matches,                                p=>p.matches],
-      ["minutes","Min","right", p=>p.minutes,                                 p=>p.minutes],
+      ["position","Pos","left", p=>esc(p.position||""),                       p=>p.position||"", true],
+      ["matches","Apps","right", p=>p.matches,                                p=>p.matches, true],
+      ["minutes","Min","right", p=>p.minutes,                                 p=>p.minutes, true],
       ["goals","G","right", p=>p.goals,                                       p=>p.goals],
       ["assists","A","right", p=>p.assists,                                   p=>p.assists],
       ["ga","G+A","right", p=>`<b>${p.ga}</b>`,                               p=>p.ga],
@@ -560,22 +564,23 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
   // labels (Title vs Shield, UCL vs Playoff) and the Europe / relegation bands
   // are dropped for leagues that don't have them (e.g. MLS).
   function columnsFor(L, barFn) {
+    // [key, label, cell(r), secondary?] — secondary columns (and their cells) drop on phones.
     const g = L.league;
     const cols = [
       ["_xrank","#", r=>`<td class="pos">${r._xrank}</td>`],
       ["name","Team", r=>`<td><a data-team="${r.code}">${esc(r.name)}</a></td>`],
       ["played","Pld", r=>`<td>${r.played}</td>`],
       ["cur_pts","Pts", r=>`<td>${r.cur_pts}</td>`],
-      ["cur_gd","GD", r=>`<td>${r.cur_gd>0?'+':''}${r.cur_gd}</td>`],
-      ["proj_pts","Proj", r=>`<td>${r.proj_pts.toFixed(1)}</td>`],
+      ["cur_gd","GD", r=>`<td class="col-sec">${r.cur_gd>0?'+':''}${r.cur_gd}</td>`, true],
+      ["proj_pts","Proj", r=>`<td class="col-sec">${r.proj_pts.toFixed(1)}</td>`, true],
       ["title_pct",g.title_label+"%", r=>`<td>${barFn(r)}${pct(r.title_pct)}</td>`],
       ["ucl_pct",g.qual_label+"%", r=>`<td class="ucl">${pct(r.ucl_pct)}</td>`],
     ];
     if (g.europa_slots>0)
-      cols.push(["europe_pct",g.qual2_label+"%", r=>`<td class="eur">${pct(r.europe_pct)}</td>`]);
+      cols.push(["europe_pct",g.qual2_label+"%", r=>`<td class="eur col-sec">${pct(r.europe_pct)}</td>`, true]);
     if (g.relegation_slots>0)
-      cols.push(["releg_pct",g.drop_label+"%", r=>`<td class="rel">${pct(r.releg_pct)}</td>`]);
-    cols.push(["exp_rank","xRank", r=>`<td>${r.exp_rank.toFixed(2)}</td>`]);
+      cols.push(["releg_pct",g.drop_label+"%", r=>`<td class="rel col-sec">${pct(r.releg_pct)}</td>`, true]);
+    cols.push(["exp_rank","xRank", r=>`<td class="col-sec">${r.exp_rank.toFixed(2)}</td>`, true]);
     return cols;
   }
   function sortedTeams() {
@@ -595,8 +600,8 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     const maxTitle = Math.max(...L.teams.map(t=>t.title_pct), 1);
     const barFn = r => `<span class="bar-track"><span class="bar-fill" style="width:${(r.title_pct/maxTitle*100).toFixed(1)}%"></span></span>`;
     const cols = columnsFor(L, barFn);
-    const th = cols.map(([c,l]) =>
-      `<th data-col="${c}" class="${c===sortCol?(sortAsc?'sort-asc':'sort-desc'):''}">${l}</th>`).join("");
+    const th = cols.map(([c,l,,sec]) =>
+      `<th data-col="${c}" class="${sec?'col-sec ':''}${c===sortCol?(sortAsc?'sort-asc':'sort-desc'):''}">${l}</th>`).join("");
     const body = sortedTeams().map(r =>
       `<tr>${cols.map(([,,cell]) => cell(r)).join("")}</tr>`).join("");
     const bands = [`<b>${g.title_label}%</b> finish 1st`,
@@ -683,10 +688,10 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       ["home",    "Home",    "right",  f => esc(f.home_name),                f => f.home_name],
       ["xg",      "xG / Score","center",scoreCell,                           f => isPlayed(f) ? 99 : (f.lam_home==null ? -1 : f.lam_home - f.lam_away)],
       ["away",    "Away",    "left",   f => esc(f.away_name),                f => f.away_name],
-      ["wdl",     "W / D / L","center",f => f.win==null ? "" : `<span class="wdl"><span class="w" style="width:${f.win*100}%"></span><span class="d" style="width:${f.draw*100}%"></span><span class="l" style="width:${f.loss*100}%"></span></span>`, f => f.win ?? -1],
-      ["win",     "H",       "right",  f => f.win==null ? "" : `${(f.win*100).toFixed(0)}%`,   f => f.win ?? -1],
-      ["draw",    "D",       "right",  f => f.draw==null ? "" : `${(f.draw*100).toFixed(0)}%`, f => f.draw ?? -1],
-      ["loss",    "A",       "right",  f => f.loss==null ? "" : `${(f.loss*100).toFixed(0)}%`, f => f.loss ?? -1],
+      ["wdl",     "W / D / L","center",f => f.win==null ? "" : `<span class="wdl"><span class="w" style="width:${f.win*100}%"></span><span class="d" style="width:${f.draw*100}%"></span><span class="l" style="width:${f.loss*100}%"></span></span>`, f => f.win ?? -1, true],
+      ["win",     "H",       "right",  f => f.win==null ? "" : `${(f.win*100).toFixed(0)}%`,   f => f.win ?? -1, true],
+      ["draw",    "D",       "right",  f => f.draw==null ? "" : `${(f.draw*100).toFixed(0)}%`, f => f.draw ?? -1, true],
+      ["loss",    "A",       "right",  f => f.loss==null ? "" : `${(f.loss*100).toFixed(0)}%`, f => f.loss ?? -1, true],
       ["info_pct","Info%",   "right",  f => f.info_pct==null ? "" : `${f.info_pct.toFixed(2)}%`, f => (f.info_pct ?? -1), true],
       ["post_bits","H after", "right",  f => f.post_bits==null ? "" : `${fmtBits(f.post_bits)}`,  f => (f.post_bits ?? -1), true],
     ];
@@ -743,14 +748,14 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     // National rows carry no model output (xG / W-D-L / Info%), so those cells blank out.
     return [
       ["kickoff", "Kickoff", "left",   f => esc(kickoff(f)),  f => kickoffSort(f)],
-      ["league",  "League",  "left",   f => esc(f._league),   f => f._league],
+      ["league",  "League",  "left",   f => esc(f._league),   f => f._league, true],
       ["home",    "Home",    "right",  f => selName(f, f.home_name), f => f.home_name],
-      ["xg",      "xG",      "center", f => f.lam_home==null ? "" : `<span style="color:#8b949e">${f.lam_home.toFixed(1)}–${f.lam_away.toFixed(1)}</span>`, f => f.lam_home==null ? -1 : f.lam_home - f.lam_away],
+      ["xg",      "xG",      "center", f => f.lam_home==null ? "" : `<span style="color:#8b949e">${f.lam_home.toFixed(1)}–${f.lam_away.toFixed(1)}</span>`, f => f.lam_home==null ? -1 : f.lam_home - f.lam_away, true],
       ["away",    "Away",    "left",   f => selName(f, f.away_name), f => f.away_name],
-      ["wdl",     "W / D / L","center",f => f.win==null ? "" : `<span class="wdl"><span class="w" style="width:${f.win*100}%"></span><span class="d" style="width:${f.draw*100}%"></span><span class="l" style="width:${f.loss*100}%"></span></span>`, f => f.win ?? -1],
-      ["win",     "H",       "right",  f => f.win==null ? "" : `${(f.win*100).toFixed(0)}%`,  f => f.win ?? -1],
-      ["draw",    "D",       "right",  f => f.draw==null ? "" : `${(f.draw*100).toFixed(0)}%`, f => f.draw ?? -1],
-      ["loss",    "A",       "right",  f => f.loss==null ? "" : `${(f.loss*100).toFixed(0)}%`, f => f.loss ?? -1],
+      ["wdl",     "W / D / L","center",f => f.win==null ? "" : `<span class="wdl"><span class="w" style="width:${f.win*100}%"></span><span class="d" style="width:${f.draw*100}%"></span><span class="l" style="width:${f.loss*100}%"></span></span>`, f => f.win ?? -1, true],
+      ["win",     "H",       "right",  f => f.win==null ? "" : `${(f.win*100).toFixed(0)}%`,  f => f.win ?? -1, true],
+      ["draw",    "D",       "right",  f => f.draw==null ? "" : `${(f.draw*100).toFixed(0)}%`, f => f.draw ?? -1, true],
+      ["loss",    "A",       "right",  f => f.loss==null ? "" : `${(f.loss*100).toFixed(0)}%`, f => f.loss ?? -1, true],
       ["info_pct","Info%",   "right",  f => f.info_pct==null ? "" : `${f.info_pct.toFixed(2)}%`, f => (f.info_pct ?? -1), true],
     ];
   }

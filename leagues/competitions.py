@@ -46,6 +46,7 @@ COMPETITIONS = [
 _MONTHS = {m: i for i, m in enumerate(
     ["January", "February", "March", "April", "May", "June", "July", "August",
      "September", "October", "November", "December"], start=1)}
+_MONTHS.update({m[:3]: i for m, i in list(_MONTHS.items())})   # + "Jan".."Dec" abbreviations
 
 # Standings header text -> canonical column key (exact matches after cleaning).
 _COL = {
@@ -269,11 +270,13 @@ def _score_pair(cell_text: str) -> tuple[int, int] | None:
     return (int(m.group(1)), int(m.group(2))) if m else None
 
 
-def _parse_series(doc: str) -> list[dict]:
+def _parse_series(doc: str, years: tuple[int, ...]) -> list[dict]:
     """Every `wikitable sports-series` tie (two-legged or single) -> canonical rows.
 
     Layout is `Team 1 | Agg./Score | Team 2 | [1st leg | 2nd leg]`; we take the tie result
-    from the aggregate/score column (the middle cell between the two teams)."""
+    from the aggregate/score column (the middle cell between the two teams). For unplayed
+    ties that column holds the scheduled *date* instead of a score (e.g. `25 Aug`), which we
+    parse into `date`; the leg columns are a fallback date source for two-legged ties."""
     heads = _headings(doc)
     rows: list[dict] = []
     for tbl in re.finditer(r'<table([^>]*)>(.*?)</table>', doc, re.S):
@@ -304,9 +307,15 @@ def _parse_series(doc: str) -> list[dict]:
                 continue
             pair = _score_pair(text(cells[s_i]))
             done = pair is not None
+            iso = ""
+            if not done:                               # upcoming tie: the score cell (or a leg
+                for j in (s_i, *(k for k in range(len(cells)) if k not in (h_i, a_i))):
+                    iso = _parse_date(text(cells[j]), years)   # cell) holds the scheduled date
+                    if iso:
+                        break
             rows.append({
                 "event_id": f"{rnd}|{re.sub(r'[^a-z0-9]', '', home.lower())}|{re.sub(r'[^a-z0-9]', '', away.lower())}",
-                "date": "", "datetime_utc": "", "round": rnd,
+                "date": iso, "datetime_utc": iso, "round": rnd,
                 "home": home or "TBD", "away": away or "TBD",
                 "hs": pair[0] if done else "",
                 "as": pair[1] if done else "",
@@ -329,7 +338,7 @@ def fetch_competition(entry: dict) -> dict:
         return {"standings": [], "rounds": []}
 
     standings = _parse_standings(doc)
-    matches = _parse_matches(doc, years) + _parse_series(doc)
+    matches = _parse_matches(doc, years) + _parse_series(doc, years)
 
     # Group matches by round, preserving first-seen (document) order.
     rounds: list[dict] = []
