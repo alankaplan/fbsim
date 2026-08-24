@@ -408,6 +408,10 @@ def main() -> None:
                     help="ignore the preseason prior (prior.json) if present")
     ap.add_argument("--prior-weight", type=float, default=3.0,
                     help="strength of the preseason prior (~pseudo-matches)")
+    ap.add_argument("--unknown-weight", type=float, default=3.0,
+                    help="regression toward league average for teams absent from the "
+                         "prior (promoted / no prior); ~pseudo-matches, damps early-season "
+                         "overreaction (0 = old reg-only behavior)")
     ap.add_argument("--prior-regression", type=float, default=PRIOR_REGRESSION,
                     help="regress last season's ratings toward the mean "
                          "(1.0 = off, 0.0 = flat league)")
@@ -424,7 +428,8 @@ def main() -> None:
 
     prior = None if args.no_prior else load_prior(cfg, args.prior_regression)
     model = fit_model(teams, matches, reg=args.reg, recency_halflife=args.recency_halflife,
-                      prior=prior, prior_weight=args.prior_weight)
+                      prior=prior, prior_weight=args.prior_weight,
+                      unknown_weight=args.unknown_weight)
     payload = run(cfg, teams, matches, model, args.sims, args.seed,
                   resolution_sims=args.resolution_sims)
     payload["meta"]["as_of"] = args.as_of

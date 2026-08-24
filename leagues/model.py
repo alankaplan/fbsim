@@ -109,6 +109,7 @@ def fit_model(
     recency_halflife: float | None = None,
     prior: LeaguePrior | None = None,
     prior_weight: float = 3.0,
+    unknown_weight: float = 3.0,
 ) -> LeagueModel:
     """
     Fit the attack/defense model from played matches.
@@ -118,7 +119,9 @@ def fit_model(
     teams   : DataFrame with ``id`` and ``team_name`` columns (all league teams).
     matches : DataFrame with home_team_id, away_team_id, played and either
               xg_home/xg_away or home_goals/away_goals for played rows.
-    reg     : L2 shrinkage strength for teams with no prior (toward average).
+    reg     : L2 shrinkage floor toward league average (identifies the otherwise
+              shift-degenerate attack/defense split); superseded by ``unknown_weight``
+              when that is larger.
     recency_halflife : if set, matches this many rows before the last played
               game get half weight (exponential decay by played-match order).
     prior   : optional preseason prior (last season's ratings). When given,
@@ -127,17 +130,24 @@ def fit_model(
               no played matches returns the prior directly instead of raising.
     prior_weight : shrinkage strength toward the prior for teams it covers;
               higher = the prior persists longer before real games wash it out.
+    unknown_weight : shrinkage strength toward league average (rating 0) for teams
+              the prior does NOT cover — a promoted team, or every team when no
+              prior exists. ~pseudo-matches of "you're average", so a single
+              lopsided early result can't spike a team to runaway favorite; over a
+              full season it's negligible. Set 0 to fall back to ``reg`` only.
     """
     team_ids = [int(t) for t in teams["id"].tolist()]
     idx = {tid: i for i, tid in enumerate(team_ids)}
     names = [str(t) for t in teams["team_name"].tolist()]  # aligned to team_ids
     n = len(team_ids)
 
-    # Prior targets (a0/d0) and per-team penalty weights. Without a prior this is
-    # a0=d0=0 with weight `reg` everywhere — identical to shrinking toward average.
+    # Prior targets (a0/d0) and per-team penalty weights. Teams the prior covers
+    # shrink toward last season's rating (weight `prior_weight`); every other team
+    # shrinks toward league average (0) with weight `unknown_weight` (>= reg), so a
+    # promoted / prior-less team is anchored instead of overreacting to one game.
     a0 = np.zeros(n)
     d0 = np.zeros(n)
-    pw = np.full(n, reg)
+    pw = np.full(n, max(reg, unknown_weight))
     if prior is not None:
         for i, nm in enumerate(names):
             if nm in prior.attack:
