@@ -43,9 +43,10 @@ from .simulator import (SeasonFixtures, simulate_one, _rank_cluster, _accumulate
 
 LOG2 = np.log(2.0)
 
-# Bump whenever the sim_results.json payload gains/changes fields the report
-# relies on, so `update` re-simulates leagues whose on-disk result predates it.
-SCHEMA_VERSION = 5
+# Bump whenever the sim_results.json payload changes OR the model / forecast
+# behavior changes, so `update` re-simulates leagues whose on-disk result predates
+# it (self-healing on pull — a plain `update` refreshes without needing --force).
+SCHEMA_VERSION = 6
 
 RES_HISTORIES = 30      # sampled partial-season histories per round cutoff
 RES_MAXCUT = 18         # cap on distinct round cutoffs (interpolate the rest)
