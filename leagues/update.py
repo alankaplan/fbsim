@@ -273,20 +273,13 @@ def main() -> None:
                     out = build_players(cfg, pseason, psource)
                     n = sum(1 for _ in out.read_text(encoding="utf-8").splitlines()) - 1
                     print(f"  [players] {pseason} [{psource}]: {max(n, 0)} players -> {out.name}")
-                    # Understat has no player aggregates for a just-started season; FBref
-                    # publishes them from matchday 1. When the primary source came back
-                    # empty, fall back to FBref (needs the browser, so only when --fbref is
-                    # set and we're on the auto-season path — FBref wants a "2026-2027" season).
-                    if n <= 0 and psource != "fbref" and not args.season:
-                        if args.fbref:
-                            fbseason = cfg.season_for("fbref")
-                            print(f"  [players] {psource} had 0 for {cfg.key} — falling back to fbref")
-                            out = build_players(cfg, fbseason, "fbref")
-                            n = sum(1 for _ in out.read_text(encoding="utf-8").splitlines()) - 1
-                            print(f"  [players] {fbseason} [fbref]: {max(n, 0)} players -> {out.name}")
-                        else:
-                            print(f"  [players] {psource} had 0 for {cfg.key}; pass --fbref "
-                                  "to fall back to FBref (browser) for player stats")
+                    # Understat only aggregates player season-stats once a season is a few
+                    # weeks old, so a just-started Big-5 season yields 0 — the tables fill in
+                    # automatically when it publishes. Note it so the empty result isn't a
+                    # mystery (no FBref fallback: browser-scraping 5 leagues is too slow/flaky).
+                    if n <= 0 and psource != "fbref":
+                        print(f"  [players] {psource} has no {cfg.key} players yet (early "
+                              "season) — they'll appear once it publishes")
                 except (Exception, SystemExit) as exc:
                     print(f"  [players] skipped: {exc}")
 
