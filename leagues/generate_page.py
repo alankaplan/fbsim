@@ -176,6 +176,30 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .gc-teams .vs { color: #6e7681; font-size: 12px; margin: 0 6px; }
   .gc-odds { display: flex; align-items: center; gap: 8px; color: #8b949e; font-size: 12px; }
   .gc-odds .wdl { width: 130px; }
+  /* Clickable player name + expandable player card (modal). */
+  .pl-link { color: #e6edf3; cursor: pointer; border-bottom: 1px dotted #484f58; }
+  .pl-link:hover { color: #58a6ff; border-bottom-color: #58a6ff; text-decoration: none; }
+  .pcard-back { position: fixed; inset: 0; background: rgba(1,4,9,.72); z-index: 100;
+    display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .pcard { background: #161b22; border: 1px solid #30363d; border-radius: 12px;
+    width: min(440px, 94vw); max-height: 88vh; overflow-y: auto;
+    box-shadow: 0 12px 40px rgba(0,0,0,.6); }
+  .pcard-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+    padding: 16px 18px 12px; border-bottom: 1px solid #21262d; }
+  .pcard-h .nm { font-size: 19px; font-weight: 600; }
+  .pcard-h .mt { color: #8b949e; font-size: 12px; margin-top: 3px; }
+  .pcard-x { cursor: pointer; color: #8b949e; font-size: 22px; line-height: 1;
+    background: none; border: none; padding: 0 2px; }
+  .pcard-x:hover { color: #e6edf3; }
+  .pcard-body { padding: 12px 18px 18px; }
+  .pcard-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .pstat { background: #0d1117; border: 1px solid #21262d; border-radius: 8px;
+    padding: 9px 8px; text-align: center; }
+  .pstat .v { font-size: 18px; font-weight: 600; }
+  .pstat .k { color: #8b949e; font-size: 11px; margin-top: 2px; }
+  .pcard-sub { color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+    margin: 14px 2px 6px; }
+  .pcard-note { color: #8b949e; font-size: 12px; margin-top: 12px; }
   /* Phone-friendly: tighten spacing, wrap control rows, drop secondary columns. */
   @media (max-width: 640px) {
     header { padding: 14px 14px 0; }
@@ -456,7 +480,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
   // [key, label, align, cell(p), sortVal(p), teamViewHidden?, secondary?]
   function playerCols() {
     return [
-      ["player_name","Player","left", p=>esc(p.player_name),                 p=>p.player_name],
+      ["player_name","Player","left", p=>`<a class="pl-link">${esc(p.player_name)}</a>`, p=>p.player_name],
       ["team","Team","left", p=>`<a data-team="${p.team_code}">${esc(p.team_code||p.team_name)}</a>`, p=>p.team_name, true],
       ["position","Pos","left", p=>esc(p.position||""),                      p=>p.position||"",  false, true],
       ["matches","Apps","right", p=>p.matches,                               p=>p.matches,       false, true],
@@ -496,15 +520,76 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     el.querySelectorAll("a[data-team]").forEach(a => a.onclick = () => {
       teamCode = a.dataset.team; teamTab = "summary"; setView("team");
     });
+    el.querySelectorAll("tbody .pl-link").forEach((a, i) => a.onclick = () => showPlayerCard(sorted[i]));
   }
   function renderPlayers() {
     const L = LEAGUES[cur];
     $("players-view").innerHTML =
       `<div class="sec-h">Top players — ${esc(L.league.name)}</div>
-       <div class="legend">Season totals${L.meta.used_xg ? " (with xG)" : ""}. Click a header to sort;
-         click a team to open it.</div>
+       <div class="legend">Season totals${L.meta.used_xg ? " (with xG)" : ""}. Click a player for their
+         card, a header to sort, a team to open it.</div>
        <div id="players-table"></div>`;
     renderPlayersTable("players-table", L.players || [], false);
+  }
+
+  // ---- Player card (click a player name in any table to expand this) ----
+  // Display-only: every value comes from the player's existing stat row — no model,
+  // no fetch. Built to also host qualitative notes later without reworking the shell.
+  function _pv(v) { return (v === null || v === undefined || v === "") ? 0 : +v || 0; }
+  function _pcardEsc(e) { if (e.key === "Escape") closePlayerCard(); }
+  function closePlayerCard() {
+    const b = document.querySelector(".pcard-back");
+    if (b) b.remove();
+    document.removeEventListener("keydown", _pcardEsc);
+  }
+  function showPlayerCard(p) {
+    if (!p) return;
+    closePlayerCard();
+    const mins = _pv(p.minutes), g = _pv(p.goals), a = _pv(p.assists);
+    const xg = _pv(p.xg), xa = _pv(p.xa), sh = _pv(p.shots), ga = g + a;
+    const lk = p._lk || cur;
+    const leagueName = p._league || (LEAGUES[lk] ? LEAGUES[lk].league.name : "");
+    const teamName = p.team_name || p.team_code || "";
+    const teamLink = p.team_code
+      ? `<a class="pl-team" data-team="${p.team_code}" data-lk="${lk}">${esc(teamName)}</a>`
+      : esc(teamName);
+    const per90 = v => mins > 0 ? (v * 90 / mins).toFixed(2) : "—";
+    const tile = (v, k) => `<div class="pstat"><div class="v">${v}</div><div class="k">${k}</div></div>`;
+    const sub = [esc(p.position || "—"), teamLink, esc(leagueName)].filter(Boolean).join(" · ");
+    const hasXg = xg > 0 || xa > 0 || sh > 0;
+    const sections = [
+      `<div class="pcard-grid">${tile(g, "Goals")}${tile(a, "Assists")}${tile("<b>" + ga + "</b>", "G+A")}</div>`,
+    ];
+    if (hasXg) sections.push(
+      `<div class="pcard-sub">Expected</div>
+       <div class="pcard-grid">${tile(xg.toFixed(1), "xG")}${tile(xa.toFixed(1), "xA")}${tile(sh || "—", "Shots")}</div>`);
+    sections.push(
+      `<div class="pcard-sub">Playing time</div>
+       <div class="pcard-grid">${tile(_pv(p.matches), "Apps")}${tile(mins, "Min")}${tile(_pv(p.yellow_cards) + " / " + _pv(p.red_cards), "Y / R")}</div>`);
+    if (mins > 0) sections.push(
+      `<div class="pcard-sub">Per 90</div>
+       <div class="pcard-grid">${tile(per90(g), "G/90")}${tile(per90(a), "A/90")}${tile(per90(ga), "G+A/90")}</div>`);
+    if (xg > 0) sections.push(
+      `<div class="pcard-note">Finishing: <b>${g - xg >= 0 ? "+" : ""}${(g - xg).toFixed(1)}</b> vs xG</div>`);
+    const back = document.createElement("div");
+    back.className = "pcard-back";
+    back.innerHTML =
+      `<div class="pcard">
+         <div class="pcard-h">
+           <div><div class="nm">${esc(p.player_name)}</div><div class="mt">${sub}</div></div>
+           <button class="pcard-x" title="Close">×</button>
+         </div>
+         <div class="pcard-body">${sections.join("")}</div>
+       </div>`;
+    back.onclick = e => { if (e.target === back) closePlayerCard(); };
+    document.body.appendChild(back);
+    document.addEventListener("keydown", _pcardEsc);
+    back.querySelector(".pcard-x").onclick = closePlayerCard;
+    const tl = back.querySelector(".pl-team");
+    if (tl) tl.onclick = () => {
+      closePlayerCard();
+      cur = tl.dataset.lk; teamCode = tl.dataset.team; teamTab = "summary"; setView("team");
+    };
   }
 
   // ---- Top Players (cross-league: top 100 currently playing, by G+A per 90) ----
@@ -536,7 +621,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
   function renderTopPlayers() {
     const cols = [
       ["_league","League","left", p=>esc(p._league),                          p=>p._league, true],
-      ["player_name","Player","left", p=>esc(p.player_name),                  p=>p.player_name],
+      ["player_name","Player","left", p=>`<a class="pl-link">${esc(p.player_name)}</a>`, p=>p.player_name],
       ["team","Team","left", p=>p.team_code ? `<a data-team="${p.team_code}" data-lk="${p._lk}">${esc(p.team_code)}</a>` : esc(p.team_name||""), p=>p.team_name],
       ["position","Pos","left", p=>esc(p.position||""),                       p=>p.position||"", true],
       ["matches","Apps","right", p=>p.matches,                                p=>p.matches, true],
@@ -575,8 +660,8 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       `<div class="sec-h">Top Players</div>
        <div class="legend">The top 100 players across all leagues, ranked by <b>G+A/90</b>
          (goals + assists per 90 minutes) among regular players — a rate, so leagues further
-         into their season don't crowd out ones just starting. Click a header to sort; click a
-         team to open it.</div>
+         into their season don't crowd out ones just starting. Click a player for their card, a
+         header to sort, a team to open it.</div>
        <div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
     $("players_all-view").querySelectorAll("th[data-col]").forEach(h => h.onclick = () => {
       const c = h.dataset.col;
@@ -586,6 +671,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     $("players_all-view").querySelectorAll("a[data-team]").forEach(a => a.onclick = () => {
       cur = a.dataset.lk; teamCode = a.dataset.team; teamTab = "summary"; setView("team");
     });
+    $("players_all-view").querySelectorAll("tbody .pl-link").forEach((a, i) => a.onclick = () => showPlayerCard(shown[i]));
   }
 
   // ---- Standings odds table ----
@@ -1052,7 +1138,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     if (teamTab === "players") {
       const players = (L.players || []).filter(p => p.team_code === r.code);
       $("team-body").innerHTML = `<div class="sec-h">Squad — season totals</div>`
-        + `<div class="legend">Individual player stats for this club. Click a header to sort.</div>`
+        + `<div class="legend">Individual player stats for this club. Click a player for their card, a header to sort.</div>`
         + `<div id="team-players"></div>`;
       renderPlayersTable("team-players", players, true);
       return;
