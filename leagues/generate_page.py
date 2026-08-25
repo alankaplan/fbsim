@@ -277,7 +277,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
   let treePath = [], treeTeam = null;              // odds-tree drill-down state
   let teamTab = "summary";                         // team page sub-tab: summary | players
   let plSort = "goals", plAsc = false;             // players-table sort
-  let taSort = "ga", taAsc = false;                // cross-league Top Players sort
+  let taSort = "ga90", taAsc = false;              // cross-league Top Players sort
 
   const $ = (id) => document.getElementById(id);
   const pct = (x) => (x === 0 ? '<span class="zero">0</span>' : x.toFixed(1));
@@ -507,14 +507,30 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     renderPlayersTable("players-table", L.players || [], false);
   }
 
-  // ---- Top Players (cross-league: top 100 currently playing, by goals + assists) ----
+  // ---- Top Players (cross-league: top 100 currently playing, by G+A per 90) ----
+  // Ranking by raw cumulative G+A floods the list with whichever league has played
+  // the most games (e.g. MLS, a calendar-year season, mid-summer vs a just-started
+  // European one). Instead rank by G+A per 90 minutes, and gate eligibility on a
+  // minutes floor set *relative to each league's own progress* (a fraction of that
+  // league's busiest player) so a "regular" in a 3-game-old league qualifies just
+  // like one in a 25-game-old league — an absolute floor would re-bias to the deeper.
+  const TP_REL = 0.4;                                // must play >= 40% of a league regular's minutes
+  const TP_ABS = 90;                                 // ...and at least one full match, to steady per-90
   function topPlayersData() {
     const rows = [];
-    Object.keys(LEAGUES).forEach(k => (LEAGUES[k].players || []).forEach(p => {
-      if (!(p.minutes > 0)) return;                  // "currently playing"
-      rows.push(Object.assign({}, p, {
-        _lk: k, _league: LEAGUES[k].league.name, ga: (p.goals || 0) + (p.assists || 0) }));
-    }));
+    Object.keys(LEAGUES).forEach(k => {
+      const ps = (LEAGUES[k].players || []).filter(p => p.minutes > 0);
+      if (!ps.length) return;
+      const lgMax = ps.reduce((m, p) => Math.max(m, p.minutes), 0);
+      const floor = Math.max(TP_ABS, TP_REL * lgMax);   // scales with this league's season stage
+      ps.forEach(p => {
+        if (p.minutes < floor) return;               // not a regular for this league's stage
+        const ga = (p.goals || 0) + (p.assists || 0);
+        rows.push(Object.assign({}, p, {
+          _lk: k, _league: LEAGUES[k].league.name, ga,
+          ga90: ga * 90 / p.minutes }));
+      });
+    });
     return rows;
   }
   function renderTopPlayers() {
@@ -527,14 +543,16 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       ["minutes","Min","right", p=>p.minutes,                                 p=>p.minutes, true],
       ["goals","G","right", p=>p.goals,                                       p=>p.goals],
       ["assists","A","right", p=>p.assists,                                   p=>p.assists],
-      ["ga","G+A","right", p=>`<b>${p.ga}</b>`,                               p=>p.ga],
+      ["ga","G+A","right", p=>p.ga,                                          p=>p.ga],
+      ["ga90","G+A/90","right", p=>`<b>${p.ga90.toFixed(2)}</b>`,             p=>p.ga90],
       ["xg","xG","right", p=>p.xg.toFixed(1),                                 p=>p.xg, true],
       ["xa","xA","right", p=>p.xa.toFixed(1),                                 p=>p.xa, true],
       ["shots","Sh","right", p=>(p.shots||""),                               p=>p.shots, true],
     ];
-    // Fixed membership: the top 100 by goals + assists; then re-sort for display.
+    // Fixed membership: the top 100 by G+A per 90 (rate, not season-stage-biased total);
+    // then re-sort for display by whatever column is clicked.
     let pool = topPlayersData().sort((a,b) =>
-      (b.ga-a.ga) || (b.goals-a.goals) || String(a.player_name).localeCompare(String(b.player_name)));
+      (b.ga90-a.ga90) || (b.ga-a.ga) || String(a.player_name).localeCompare(String(b.player_name)));
     pool = pool.slice(0, 100);
     if (!pool.length) {
       $("players_all-view").innerHTML = `<div class="legend">No player data loaded — run
@@ -546,7 +564,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       const va=sc[4](a), vb=sc[4](b);
       let r = (typeof va==="number" && typeof vb==="number") ? va-vb : String(va).localeCompare(String(vb));
       r = taAsc ? r : -r;
-      return r || (b.ga-a.ga) || (b.goals-a.goals) || String(a.player_name).localeCompare(String(b.player_name));
+      return r || (b.ga90-a.ga90) || (b.ga-a.ga) || String(a.player_name).localeCompare(String(b.player_name));
     });
     const th = `<th>#</th>` + cols.map(c =>
       `<th data-col="${c[0]}" style="text-align:${c[2]}" class="${c[5]?'col-sec ':''}${c[0]===taSort?(taAsc?'sort-asc':'sort-desc'):''}">${c[1]}</th>`).join("");
@@ -555,8 +573,10 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
         `<td class="${c[5]?'col-sec':''}" style="text-align:${c[2]}">${c[3](p)}</td>`).join("") + `</tr>`).join("");
     $("players_all-view").innerHTML =
       `<div class="sec-h">Top Players</div>
-       <div class="legend">The top 100 players currently playing across all leagues, ranked by
-         <b>G+A</b> (goals + assists). Click a header to sort; click a team to open it.</div>
+       <div class="legend">The top 100 players across all leagues, ranked by <b>G+A/90</b>
+         (goals + assists per 90 minutes) among regular players — a rate, so leagues further
+         into their season don't crowd out ones just starting. Click a header to sort; click a
+         team to open it.</div>
        <div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
     $("players_all-view").querySelectorAll("th[data-col]").forEach(h => h.onclick = () => {
       const c = h.dataset.col;
