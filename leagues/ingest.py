@@ -305,8 +305,8 @@ def from_understat(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[dic
         ) from exc
 
     us = sd.Understat(leagues=cfg.fbref_league, seasons=season)
-    schedule = us.read_schedule().reset_index()
-    records = schedule.to_dict("records") if not schedule.empty else []
+    schedule = us.read_schedule()
+    records = schedule.reset_index().to_dict("records") if not schedule.empty else []
     if not records:                                   # read_seasons() gate returned nothing —
         data = understat_league_data(us, cfg, season)  # go straight to the league page
         records = _understat_dates_records(data["datesData"]) if data else []

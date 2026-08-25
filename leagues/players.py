@@ -119,8 +119,8 @@ def players_from_understat(cfg: LeagueConfig, season: str) -> list[dict]:
     except ImportError as exc:  # pragma: no cover
         raise SystemExit("The 'understat' source needs soccerdata: pip install soccerdata") from exc
     us = sd.Understat(leagues=cfg.fbref_league, seasons=season)
-    df = us.read_player_season_stats().reset_index()
-    records = df.to_dict("records") if not df.empty else []
+    df = us.read_player_season_stats()
+    records = df.reset_index().to_dict("records") if not df.empty else []
     if not records:                                   # read_seasons() gate returned nothing —
         from .ingest import understat_league_data      # hit the league page directly
         data = understat_league_data(us, cfg, season)
