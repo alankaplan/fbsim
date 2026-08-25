@@ -97,6 +97,21 @@ def _f(v):
     return "" if pd.isna(v) else round(float(v), 2)
 
 
+def _understat_players_records(players: list[dict]) -> list[dict]:
+    """Raw Understat playersData -> the flat dict shape ``players_from_understat`` reads."""
+    out = []
+    for p in players or []:
+        out.append({
+            "player": p.get("player_name", ""), "team": p.get("team_title", ""),
+            "position": p.get("position", ""),
+            "matches": p.get("games"), "minutes": p.get("time"),
+            "goals": p.get("goals"), "assists": p.get("assists"),
+            "xg": p.get("xG"), "xa": p.get("xA"), "shots": p.get("shots"),
+            "yellow_cards": p.get("yellow_cards"), "red_cards": p.get("red_cards"),
+        })
+    return out
+
+
 def players_from_understat(cfg: LeagueConfig, season: str) -> list[dict]:
     """Player season stats from Understat via soccerdata (no browser; Big-5 only)."""
     try:
@@ -105,8 +120,13 @@ def players_from_understat(cfg: LeagueConfig, season: str) -> list[dict]:
         raise SystemExit("The 'understat' source needs soccerdata: pip install soccerdata") from exc
     us = sd.Understat(leagues=cfg.fbref_league, seasons=season)
     df = us.read_player_season_stats().reset_index()
+    records = df.to_dict("records") if not df.empty else []
+    if not records:                                   # read_seasons() gate returned nothing —
+        from .ingest import understat_league_data      # hit the league page directly
+        data = understat_league_data(us, cfg, season)
+        records = _understat_players_records(data["playersData"]) if data else []
     rows = []
-    for d in df.to_dict("records"):
+    for d in records:
         rows.append({
             "player_name": d.get("player", ""), "team_name": d.get("team", ""),
             "position": d.get("position", ""),

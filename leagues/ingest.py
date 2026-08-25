@@ -235,6 +235,58 @@ def from_fixturedownload(cfg: LeagueConfig, season: str) -> tuple[list[dict], li
 # Big-5 European leagues only; its own xG model, inline in the schedule.
 # ---------------------------------------------------------------------------
 
+# Understat's per-season JSON endpoint (getLeagueData), reached directly to sidestep
+# soccerdata's read_seasons() gate — see understat_league_data.
+UNDERSTAT_URL = "https://understat.com"
+
+
+def _understat_slug(cfg: LeagueConfig) -> str | None:
+    """Understat's URL slug for a league (e.g. 'EPL', 'La_liga'), from soccerdata's
+    league dict; None for leagues Understat doesn't cover (only the Big-5 have one)."""
+    try:
+        from soccerdata._common import LEAGUE_DICT
+        entry = LEAGUE_DICT.get(cfg.fbref_league)
+        slug = entry.get("Understat") if isinstance(entry, dict) else None
+        return slug.replace(" ", "_") if slug else None
+    except Exception:  # noqa: BLE001 - any soccerdata layout change -> no bypass
+        return None
+
+
+def understat_league_data(us, cfg: LeagueConfig, season: str) -> dict | None:
+    """Fetch Understat's per-season ``getLeagueData`` (datesData/playersData/teamsData)
+    directly, bypassing soccerdata's ``read_seasons()`` enumeration.
+
+    soccerdata lists available seasons from Understat's ``/getStatData`` endpoint, which
+    early in a new season lags the live league pages (returns an empty list), so every
+    ``read_schedule``/``read_player_season_stats`` call for the current season is filtered
+    to nothing — no error, just empty. The league page itself (``/getLeagueData/<slug>/<yr>``)
+    already has the data, so we hit it directly, reusing ``us``'s TLS session + cookies.
+    Returns None when the league has no Understat slug or the call fails."""
+    slug = _understat_slug(cfg)
+    if not slug:
+        return None
+    try:
+        season_id = int(str(season)[:4])
+        url = f"{UNDERSTAT_URL}/league/{slug}/{season_id}"
+        return us._read_league_season(url, 0, season_id, no_cache=True)
+    except Exception:  # noqa: BLE001 - private API drift -> caller keeps the empty result
+        return None
+
+
+def _understat_dates_records(dates: list[dict]) -> list[dict]:
+    """Raw Understat datesData -> the flat dict shape ``from_understat``'s loop reads."""
+    out = []
+    for m in dates or []:
+        out.append({
+            "home_team": m["h"]["title"], "away_team": m["a"]["title"],
+            "is_result": bool(m.get("isResult")),
+            "home_goals": m["goals"]["h"], "away_goals": m["goals"]["a"],
+            "home_xg": m["xG"]["h"], "away_xg": m["xG"]["a"],
+            "date": m.get("datetime", ""),
+        })
+    return out
+
+
 def from_understat(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[dict]]:
     """Return (teams, matches) from Understat via soccerdata (no browser).
 
@@ -254,6 +306,10 @@ def from_understat(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[dic
 
     us = sd.Understat(leagues=cfg.fbref_league, seasons=season)
     schedule = us.read_schedule().reset_index()
+    records = schedule.to_dict("records") if not schedule.empty else []
+    if not records:                                   # read_seasons() gate returned nothing —
+        data = understat_league_data(us, cfg, season)  # go straight to the league page
+        records = _understat_dates_records(data["datesData"]) if data else []
 
     name_to_id: dict[str, int] = {}
     codes_taken: set[str] = set()
@@ -271,8 +327,7 @@ def from_understat(cfg: LeagueConfig, season: str) -> tuple[list[dict], list[dic
         return None if v is None or v != v else v   # drop NaN
 
     matches: list[dict] = []
-    for i, row in enumerate(schedule.itertuples(index=False), start=1):
-        d = row._asdict()
+    for i, d in enumerate(records, start=1):
         home, away = d.get("home_team"), d.get("away_team")
         if not home or not away:
             continue
