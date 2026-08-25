@@ -712,25 +712,41 @@ def overlay_xg(cfg: LeagueConfig, teams: list[dict], matches: list[dict],
     this overlays another source's xG (e.g. Understat) onto played games, matched
     by the ordered ``(home, away)`` pair — unique per team once in a double
     round-robin, so it's robust to date/time-zone differences between sources.
+
+    The two sources name teams differently (Understat's "Inter"/"Lyon" vs the
+    fixtures' "FC Internazionale Milano"/"Olympique Lyonnais"), so each xG-source
+    name is first resolved to the fixtures' canonical team via the shared, uniqueness
+    -guarded resolver — otherwise those clubs' games would silently keep goals, not xG.
     Returns the number of games enriched. A no-op when nothing has been played.
     """
     if not any(m["played"] for m in matches):
         return 0
+    from .players import _norm_team as _pnorm, resolve_team_code  # function-level: avoid circular import
     x_teams, x_matches = SOURCES[xg_source](cfg, season)
     xname = {t["id"]: t["team_name"] for t in x_teams}
+    # Resolve an xG-source team name to the fixtures source's canonical, so both
+    # sides of the lookup live in one namespace; unresolved names fall back to
+    # themselves (and simply overlay nothing — never a wrong game).
+    code_by_norm = {_pnorm(t["team_name"]): t["id"] for t in teams}
+    name_by_norm = {_pnorm(t["team_name"]): t["team_name"] for t in teams}
+
+    def _canon(nm: str) -> str:
+        _, canon = resolve_team_code(_pnorm(nm), code_by_norm, name_by_norm)
+        return _pnorm(canon) if canon else _pnorm(nm)
+
     lut = {}
     for m in x_matches:
         if not m["played"] or m["xg_home"] == "" or m["xg_away"] == "":
             continue
-        lut[(_norm_team(xname.get(m["home_team_id"], "")),
-             _norm_team(xname.get(m["away_team_id"], "")))] = (m["xg_home"], m["xg_away"])
+        lut[(_canon(xname.get(m["home_team_id"], "")),
+             _canon(xname.get(m["away_team_id"], "")))] = (m["xg_home"], m["xg_away"])
     tname = {t["id"]: t["team_name"] for t in teams}
     n = 0
     for m in matches:
         if not m["played"]:
             continue
-        hit = lut.get((_norm_team(tname.get(m["home_team_id"], "")),
-                       _norm_team(tname.get(m["away_team_id"], ""))))
+        hit = lut.get((_pnorm(tname.get(m["home_team_id"], "")),
+                       _pnorm(tname.get(m["away_team_id"], ""))))
         if hit:
             m["xg_home"], m["xg_away"] = hit
             n += 1

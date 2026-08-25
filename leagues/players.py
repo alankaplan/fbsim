@@ -62,15 +62,34 @@ def _norm_team(name: str) -> str:
     return " ".join(toks)
 
 
+def _stem_overlap(a_toks: set, b_toks: set, minlen: int = 4) -> bool:
+    """True if some token in each set shares a >=minlen leading-character prefix.
+
+    Bridges short source names to official ones when tokens differ but stem the same:
+    'lyon'~'lyonnais', 'inter'~'internazionale', 'brest'~'brestois', 'rennes'~'rennais'."""
+    for x in a_toks:
+        for y in b_toks:
+            n = 0
+            for ca, cb in zip(x, y):
+                if ca != cb:
+                    break
+                n += 1
+            if n >= minlen:
+                return True
+    return False
+
+
 def resolve_team_code(norm_key: str, code_by_norm: dict, name_by_norm: dict) -> tuple[str, str]:
     """Map a normalised player-source team name to a (team_code, canonical_name) from teams.csv.
 
     Exact normalised match first (the common case — Big-5 fixtures and players share a
     source). On a miss, fall back to a *unique* token-subset match: the single teams.csv
     team whose token set is a superset or subset of the player's, sharing ≥1 token — so
-    FBref's "San Jose" resolves to "San Jose Earthquakes" (SJE) unambiguously, while an
-    ambiguous or non-overlapping name returns ("", "") and is left unmatched (never
-    mis-assigned)."""
+    FBref's "San Jose" resolves to "San Jose Earthquakes" (SJE) unambiguously. Failing that,
+    a *unique* stem match (Understat's "Lyon"/"Inter"/"Brest" vs the official "Olympique
+    Lyonnais"/"Internazionale"/"Stade Brestois", which share no whole token but a ≥4-char
+    prefix). Both fallbacks assign only when exactly one team matches, so an ambiguous or
+    non-overlapping name returns ("", "") and is left unmatched — never mis-assigned."""
     if norm_key in code_by_norm:
         return code_by_norm[norm_key], name_by_norm[norm_key]
     key_toks = set(norm_key.split())
@@ -83,6 +102,11 @@ def resolve_team_code(norm_key: str, code_by_norm: dict, name_by_norm: dict) -> 
             hits.append((cand, code))
     if len(hits) == 1:
         cand, code = hits[0]
+        return code, name_by_norm[cand]
+    stem = [(cand, code) for cand, code in code_by_norm.items()
+            if _stem_overlap(key_toks, set(cand.split()))]
+    if len(stem) == 1:
+        cand, code = stem[0]
         return code, name_by_norm[cand]
     return "", ""
 
