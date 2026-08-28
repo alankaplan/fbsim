@@ -601,19 +601,33 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
   // like one in a 25-game-old league — an absolute floor would re-bias to the deeper.
   const TP_REL = 0.4;                                // must play >= 40% of a league regular's minutes
   const TP_ABS = 90;                                 // ...and at least one full match, to steady per-90
+  const TP_K = 6;                                     // empirical-Bayes prior strength (~pseudo-matches)
   function topPlayersData() {
     const rows = [];
     Object.keys(LEAGUES).forEach(k => {
       const ps = (LEAGUES[k].players || []).filter(p => p.minutes > 0);
       if (!ps.length) return;
+      // Smooth each player's G+A/90 toward the league's mean rate (shrinkage handles the
+      // differing minutes denominators), then rank that smoothed rate into a within-league
+      // percentile — the per-league "adjustment", so a player is scored vs his own league.
+      const exp = ps.map(p => p.minutes / 90);
+      const ev = ps.map(p => (p.goals || 0) + (p.assists || 0));
+      const sumEv = ev.reduce((a, b) => a + b, 0), sumExp = exp.reduce((a, b) => a + b, 0);
+      const m0 = sumExp > 0 ? sumEv / sumExp : 0;      // league minutes-weighted mean G+A/90
+      const sm = ps.map((p, i) => (ev[i] + m0 * TP_K) / (exp[i] + TP_K));
+      const N = ps.length;
+      const pct = sm.map(s => {
+        let below = 0, eq = 0;
+        for (const v of sm) { if (v < s) below++; else if (v === s) eq++; }
+        return N > 1 ? 100 * (below + 0.5 * eq) / N : 100;
+      });
       const lgMax = ps.reduce((m, p) => Math.max(m, p.minutes), 0);
       const floor = Math.max(TP_ABS, TP_REL * lgMax);   // scales with this league's season stage
-      ps.forEach(p => {
+      ps.forEach((p, i) => {
         if (p.minutes < floor) return;               // not a regular for this league's stage
-        const ga = (p.goals || 0) + (p.assists || 0);
         rows.push(Object.assign({}, p, {
-          _lk: k, _league: LEAGUES[k].league.name, ga,
-          ga90: ga * 90 / p.minutes }));
+          _lk: k, _league: LEAGUES[k].league.name, ga: ev[i],
+          ga90: ev[i] * 90 / p.minutes, pct: pct[i] }));
       });
     });
     return rows;
@@ -630,6 +644,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       ["assists","A","right", p=>p.assists,                                   p=>p.assists],
       ["ga","G+A","right", p=>p.ga,                                          p=>p.ga],
       ["ga90","G+A/90","right", p=>`<b>${p.ga90.toFixed(2)}</b>`,             p=>p.ga90],
+      ["pct","Lg%","right", p=>p.pct.toFixed(0),                              p=>p.pct],
       ["xg","xG","right", p=>p.xg.toFixed(1),                                 p=>p.xg, true],
       ["xa","xA","right", p=>p.xa.toFixed(1),                                 p=>p.xa, true],
       ["shots","Sh","right", p=>(p.shots||""),                               p=>p.shots, true],
@@ -660,8 +675,9 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       `<div class="sec-h">Top Players</div>
        <div class="legend">The top 100 players across all leagues, ranked by <b>G+A/90</b>
          (goals + assists per 90 minutes) among regular players — a rate, so leagues further
-         into their season don't crowd out ones just starting. Click a player for their card, a
-         header to sort, a team to open it.</div>
+         into their season don't crowd out ones just starting. <b>Lg%</b> is the percentile of
+         each player's sample-smoothed G+A/90 within their own league (100 = best in league).
+         Click a player for their card, a header to sort, a team to open it.</div>
        <div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
     $("players_all-view").querySelectorAll("th[data-col]").forEach(h => h.onclick = () => {
       const c = h.dataset.col;
