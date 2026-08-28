@@ -644,7 +644,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       ["assists","A","right", p=>p.assists,                                   p=>p.assists],
       ["ga","G+A","right", p=>p.ga,                                          p=>p.ga],
       ["ga90","G+A/90","right", p=>`<b>${p.ga90.toFixed(2)}</b>`,             p=>p.ga90],
-      ["pct","Lg%","right", p=>p.pct.toFixed(0),                              p=>p.pct],
+      ["pct","Lg%","right", p=>p.pct.toFixed(1),                              p=>p.pct],
       ["xg","xG","right", p=>p.xg.toFixed(1),                                 p=>p.xg, true],
       ["xa","xA","right", p=>p.xa.toFixed(1),                                 p=>p.xa, true],
       ["shots","Sh","right", p=>(p.shots||""),                               p=>p.shots, true],
