@@ -50,6 +50,20 @@ PLAYER_FIELDS = ["player_name", "team_name", "team_code", "position", "matches",
 _TEAM_STOP = {"fc", "afc", "cf", "sc", "ac", "ssc", "us", "cd", "rc", "ud", "as",
               "ss", "sv", "club", "de", "the", "1", "calcio"}
 
+# Hard abbreviations the token-subset / >=4-char-stem matcher can't bridge (e.g. fixturedownload's
+# "Man Utd"/"Spurs" vs Understat's "Manchester United"/"Tottenham"). Keyed by the *fully normalised*
+# short form -> the canonical normalised form; applied to every name so both sources collapse to one
+# key. Full-string only, so there are no false positives. Extend as new feeds surface.
+_CLUB_ALIASES = {
+    # Alias BOTH Manchester clubs, not just Utd: expanding only "Man Utd" would leave the
+    # token "manchester" stem-colliding with Understat's "Manchester City" (which else matches
+    # "Man City" via the "city" stem) and knock City out. Aliasing both makes each an exact hit.
+    "man utd": "manchester united", "man united": "manchester united",
+    "man city": "manchester city",
+    "spurs": "tottenham",
+    "wolves": "wolverhampton wanderers",
+}
+
 
 def _fold(s: str) -> str:
     """Lowercase and strip diacritics so 'San José' == 'San Jose', 'Montréal' == 'Montreal'."""
@@ -59,7 +73,8 @@ def _fold(s: str) -> str:
 
 def _norm_team(name: str) -> str:
     toks = [t for t in re.split(r"[\s.\-']+", _fold(name)) if t and t not in _TEAM_STOP]
-    return " ".join(toks)
+    key = " ".join(toks)
+    return _CLUB_ALIASES.get(key, key)
 
 
 def _stem_overlap(a_toks: set, b_toks: set, minlen: int = 4) -> bool:
