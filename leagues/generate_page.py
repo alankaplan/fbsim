@@ -1075,6 +1075,28 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
         });
       });
     });
+    // (e) a followed club's cup games, even when that competition/stage isn't picked —
+    // following a team should surface everything it plays, not just its league fixtures.
+    // (home_lk/home_team are tagged server-side, so this is a plain equality check.)
+    selectedTeams.forEach(key => {
+      const [k, name] = key.split("\t");
+      if (k === "__national__") return;
+      (COMPETITIONS || []).forEach(comp => (comp.rounds || []).forEach(rd => {
+        (rd.matches || []).forEach(g => {
+          if (g.status !== "scheduled") return;                // upcoming only, as in (d)
+          if (!((g.home_lk === k && g.home_team === name) ||
+                (g.away_lk === k && g.away_team === name))) return;
+          const id = "cmp::" + comp.key + "::" + g.event_id;   // same id as (d) -> dedupes
+          if (seen.has(id)) return;
+          seen.add(id);
+          rows.push({
+            _league: comp.name + " · " + rd.name, _lk: "__competition__", _competition: true,
+            date: g.date, datetime_utc: g.datetime_utc || "",
+            home_name: g.home, away_name: g.away,
+          });
+        });
+      }));
+    });
 
     const sv = (cols.find(c => c[0] === schedSortCol) || cols[0])[4];
     rows.sort((a, b) => {
@@ -1352,13 +1374,56 @@ def read_competitions() -> list[dict]:
     return _read_json_dir("competitions")
 
 
+def tag_competition_teams(competitions: list[dict], league_keys) -> list[dict]:
+    """Tag each cup match with the league team it corresponds to, when we can identify one.
+
+    Cup articles name clubs their own way ("Inter Miami", "Bayern Munich") while the league
+    tables use the fixtures source's names, so matching them needs the same fuzzy resolver the
+    player tables use. Doing it here — once, in Python — lets the report show a followed club's
+    cup games with a plain equality check instead of re-implementing name matching in the page.
+    A name is only tagged when exactly one league claims it, so an ambiguous name stays untagged
+    rather than being attributed to the wrong club.
+    """
+    lookups = {k: _team_lookup(k) for k in league_keys}
+
+    def resolve(name: str) -> tuple[str, str]:
+        """(league key, canonical name) for a cup entrant, or ("", "") if not confidently ours.
+
+        Deliberately stricter than the player-table resolver: a cup field is full of clubs that
+        aren't in any league we model, so the >=4-char stem tier would mis-assign them (Liga MX's
+        "Atlas" stem-matches "Atlanta United"). Here a wrong tag is worse than no tag, so we take
+        an exact normalised match first, then a *unique* token-subset match, and never a stem.
+        """
+        key = _norm_team(name or "")
+        if not key:
+            return "", ""
+        exact = [(k, nbn[key]) for k, (cbn, nbn) in lookups.items() if key in cbn]
+        if exact:                                  # exact wins over any looser reading
+            return exact[0] if len(exact) == 1 else ("", "")
+        toks = set(key.split())
+        subset = []
+        for k, (cbn, nbn) in lookups.items():
+            m = [c for c in cbn if set(c.split()) and (toks <= set(c.split()) or set(c.split()) <= toks)]
+            if len(m) == 1:                        # unambiguous within that league
+                subset.append((k, nbn[m[0]]))
+        return subset[0] if len(subset) == 1 else ("", "")
+
+    for comp in competitions:
+        for rnd in comp.get("rounds", []):
+            for g in rnd.get("matches", []):
+                g["home_lk"], g["home_team"] = resolve(g.get("home", ""))
+                g["away_lk"], g["away_team"] = resolve(g.get("away", ""))
+    return competitions
+
+
 def build(leagues_data: dict) -> str:
     for key, ld in leagues_data.items():           # attach player tables (independent of sims)
         ld.setdefault("players", read_players(key))
+    competitions = tag_competition_teams(read_competitions(), list(leagues_data))
     return (HTML_TEMPLATE
             .replace("__DATA_PLACEHOLDER__", json.dumps(leagues_data))
             .replace("__NATIONAL_PLACEHOLDER__", json.dumps(read_national()))
-            .replace("__COMPETITIONS_PLACEHOLDER__", json.dumps(read_competitions())))
+            .replace("__COMPETITIONS_PLACEHOLDER__", json.dumps(competitions)))
 
 
 def main() -> None:
