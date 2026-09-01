@@ -62,6 +62,14 @@ _CLUB_ALIASES = {
     "man city": "manchester city",
     "spurs": "tottenham",
     "wolves": "wolverhampton wanderers",
+    # Bundesliga: two are genuine *ambiguities* the stem matcher rightly refuses to guess
+    # ("bayern" also stem-hits Bayer Leverkusen; "borussia" hits both Borussias), and Köln is
+    # an English exonym sharing nothing with "koln". Aliasing resolves each at the exact stage.
+    "bayern munich": "bayern munchen",
+    "borussia m gladbach": "borussia monchengladbach",
+    "m gladbach": "borussia monchengladbach",
+    "gladbach": "borussia monchengladbach",
+    "cologne": "koln", "koeln": "koln",
 }
 
 
