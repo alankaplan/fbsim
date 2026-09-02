@@ -602,12 +602,15 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
   const TP_REL = 0.4;                                // must play >= 40% of a league regular's minutes
   const TP_ABS = 90;                                 // ...and at least one full match, to steady per-90
   const TP_K = 6;                                     // empirical-Bayes prior strength (~pseudo-matches)
-  // PLACEHOLDER league strength, for the cross-league Tough% column: s_L is "the Lg% a player
-  // from this league would have in the toughest league", so the toughest league scores 100.
-  // These are eyeballed guesses meant to be replaced with a real measure (UEFA coefficients,
-  // cross-league cup results, ...). NOTE nwsl is a women's league — scoring it on the same axis
-  // as the men's leagues is apples-to-oranges; its number is a placeholder, not a claim.
-  const TP_LEAGUE_SCORE = { eng: 100, esp: 96, ita: 93, de: 92, fr: 85, mls: 65, nwsl: 60 };
+  // PLACEHOLDER league strength for the cross-league "Tough z" column, as a handicap in standard
+  // deviations (0 = the toughest league). Applied as a SUBTRACTION rather than a percentile scale:
+  // percentiles compress the tails, so scaling them leaves a weak league's stars indistinguishable
+  // and caps them below their league's score forever. An SD handicap has no ceiling, so a dominant
+  // player in a weaker league can still outrank a good one in a stronger league.
+  // Eyeballed guesses, to be replaced with a real measure (UEFA coefficients, cross-league cup
+  // results, ...). NOTE nwsl is a women's league — putting it on the men's axis is
+  // apples-to-oranges; its number is a placeholder, not a claim.
+  const TP_LEAGUE_HANDICAP = { eng: 0, esp: 0.15, ita: 0.25, de: 0.3, fr: 0.5, mls: 1.2, nwsl: 1.4 };
   function topPlayersData() {
     const rows = [];
     Object.keys(LEAGUES).forEach(k => {
@@ -629,15 +632,19 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       });
       const lgMax = ps.reduce((m, p) => Math.max(m, p.minutes), 0);
       const floor = Math.max(TP_ABS, TP_REL * lgMax);   // scales with this league's season stage
-      // Cross-league: rescale the within-league percentile onto the toughest league's scale,
-      // so best-in-league lands exactly on that league's score and the toughest league is
-      // unchanged. Lg% answers "vs your own league"; Tough% answers "vs the best league".
-      const lgScore = TP_LEAGUE_SCORE[k] != null ? TP_LEAGUE_SCORE[k] : 100;
+      // Cross-league: standardise the smoothed rate within the league (SDs from that league's
+      // average player), then subtract the league's strength handicap. Lg% answers "vs your own
+      // league"; Tough z answers "vs the toughest league", on a scale where the elite stay spread
+      // out instead of being squashed into the top percentile point.
+      const mu = sm.reduce((a, b) => a + b, 0) / N;
+      const sd = Math.sqrt(sm.reduce((a, b) => a + (b - mu) * (b - mu), 0) / N);
+      const hcap = TP_LEAGUE_HANDICAP[k] != null ? TP_LEAGUE_HANDICAP[k] : 0;
       ps.forEach((p, i) => {
         if (p.minutes < floor) return;               // not a regular for this league's stage
         rows.push(Object.assign({}, p, {
           _lk: k, _league: LEAGUES[k].league.name, ga: ev[i],
-          ga90: ev[i] * 90 / p.minutes, pct: pct[i], tough: pct[i] * lgScore / 100 }));
+          ga90: ev[i] * 90 / p.minutes, pct: pct[i],
+          tough: (sd > 0 ? (sm[i] - mu) / sd : 0) - hcap }));
       });
     });
     return rows;
@@ -655,7 +662,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       ["ga","G+A","right", p=>p.ga,                                          p=>p.ga],
       ["ga90","G+A/90","right", p=>`<b>${p.ga90.toFixed(2)}</b>`,             p=>p.ga90],
       ["pct","Lg%","right", p=>p.pct.toFixed(1),                              p=>p.pct],
-      ["tough","Tough%","right", p=>p.tough.toFixed(1),                       p=>p.tough],
+      ["tough","Tough z","right", p=>(p.tough>=0?"+":"")+p.tough.toFixed(2),  p=>p.tough],
       ["xg","xG","right", p=>p.xg.toFixed(1),                                 p=>p.xg, true],
       ["xa","xA","right", p=>p.xa.toFixed(1),                                 p=>p.xa, true],
       ["shots","Sh","right", p=>(p.shots||""),                               p=>p.shots, true],
@@ -688,8 +695,10 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
          (goals + assists per 90 minutes) among regular players — a rate, so leagues further
          into their season don't crowd out ones just starting. <b>Lg%</b> is the percentile of
          each player's sample-smoothed G+A/90 within their own league (100 = best in league);
-         <b>Tough%</b> rescales that onto the toughest league (Lg% x a per-league strength score),
-         i.e. roughly where they'd rank in the strongest league.
+         <b>Tough z</b> is that rate in standard deviations above an average player, after
+         subtracting their league's strength handicap (0 = the toughest league's baseline) — so
+         unlike a percentile it has no ceiling, and a dominant player in a weaker league can still
+         outrank a good one in a stronger league.
          Click a player for their card, a header to sort, a team to open it.</div>
        <div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
     $("players_all-view").querySelectorAll("th[data-col]").forEach(h => h.onclick = () => {
