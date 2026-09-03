@@ -186,6 +186,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     box-shadow: 0 12px 40px rgba(0,0,0,.6); }
   .pcard-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
     padding: 16px 18px 12px; border-bottom: 1px solid #21262d; }
+  .pc-id { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .pc-photo { width: 56px; height: 56px; border-radius: 50%; flex: 0 0 auto;
+    object-fit: cover; background: #0d1117; border: 1px solid #30363d; }
+  .pc-initials { display: flex; align-items: center; justify-content: center;
+    color: #8b949e; font-size: 18px; font-weight: 600; letter-spacing: .02em; }
   .pcard-h .nm { font-size: 19px; font-weight: 600; }
   .pcard-h .mt { color: #8b949e; font-size: 12px; margin-top: 3px; }
   .pcard-x { cursor: pointer; color: #8b949e; font-size: 22px; line-height: 1;
@@ -558,6 +563,13 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     const per90 = v => mins > 0 ? (v * 90 / mins).toFixed(2) : "—";
     const tile = (v, k) => `<div class="pstat"><div class="v">${v}</div><div class="k">${k}</div></div>`;
     const sub = [esc(p.position || "—"), teamLink, esc(leagueName)].filter(Boolean).join(" · ");
+    // Headshot, when one was cached for this player. Remote URL, so it simply doesn't load
+    // offline — fall back to initials on error rather than showing a broken-image icon.
+    const initials = String(p.player_name || "?").split(/\s+/).filter(Boolean)
+      .slice(0, 2).map(w => w[0]).join("").toUpperCase();
+    const avatar = p.img
+      ? `<img class="pc-photo" src="${esc(p.img)}" alt="">`
+      : `<div class="pc-photo pc-initials">${esc(initials)}</div>`;
     const hasXg = xg > 0 || xa > 0 || sh > 0;
     const sections = [
       `<div class="pcard-grid">${tile(g, "Goals")}${tile(a, "Assists")}${tile("<b>" + ga + "</b>", "G+A")}</div>`,
@@ -571,6 +583,10 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     if (mins > 0) sections.push(
       `<div class="pcard-sub">Per 90</div>
        <div class="pcard-grid">${tile(per90(g), "G/90")}${tile(per90(a), "A/90")}${tile(per90(ga), "G+A/90")}</div>`);
+    if (p.img && (p.img_by || p.img_lic))          // CC-BY-SA: attribution is required
+      sections.push(`<div class="pcard-note">Photo: ${p.img_page
+        ? `<a href="${esc(p.img_page)}" target="_blank" rel="noopener">${esc(p.img_by || "Wikipedia")}</a>`
+        : esc(p.img_by || "Wikipedia")}${p.img_lic ? " &middot; " + esc(p.img_lic) : ""}</div>`);
     if (xg > 0) sections.push(
       `<div class="pcard-note">Finishing: <b>${g - xg >= 0 ? "+" : ""}${(g - xg).toFixed(1)}</b> vs xG</div>`);
     const back = document.createElement("div");
@@ -578,7 +594,9 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     back.innerHTML =
       `<div class="pcard">
          <div class="pcard-h">
-           <div><div class="nm">${esc(p.player_name)}</div><div class="mt">${sub}</div></div>
+           <div class="pc-id">${avatar}
+             <div><div class="nm">${esc(p.player_name)}</div><div class="mt">${sub}</div></div>
+           </div>
            <button class="pcard-x" title="Close">×</button>
          </div>
          <div class="pcard-body">${sections.join("")}</div>
@@ -587,6 +605,13 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     document.body.appendChild(back);
     document.addEventListener("keydown", _pcardEsc);
     back.querySelector(".pcard-x").onclick = closePlayerCard;
+    const photo = back.querySelector("img.pc-photo");
+    if (photo) photo.onerror = () => {                // offline / dead URL -> initials
+      const d = document.createElement("div");
+      d.className = "pc-photo pc-initials";
+      d.textContent = initials;
+      photo.replaceWith(d);
+    };
     const tl = back.querySelector(".pl-team");
     if (tl) tl.onclick = () => {
       closePlayerCard();
@@ -1399,6 +1424,20 @@ def read_national() -> list[dict]:
     return _read_json_dir("national")
 
 
+def read_headshots(key: str) -> dict:
+    """player name -> {img, page, by, lic} from data/headshots/<key>.json (may not exist).
+
+    Only URLs are stored; the page references them, so nothing is downloaded or
+    redistributed and the report stays a single small file."""
+    path = DATA_ROOT.parent / "headshots" / f"{key}.json"
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8")).get("players", {}) or {}
+    except (ValueError, OSError):
+        return {}
+
+
 def read_competitions() -> list[dict]:
     """Load every data/competitions/*.json (Leagues Cup / Champions League)."""
     return _read_json_dir("competitions")
@@ -1449,6 +1488,13 @@ def tag_competition_teams(competitions: list[dict], league_keys) -> list[dict]:
 def build(leagues_data: dict) -> str:
     for key, ld in leagues_data.items():           # attach player tables (independent of sims)
         ld.setdefault("players", read_players(key))
+        shots = read_headshots(key)                # optional headshot URLs for the player card
+        for pl in ld["players"]:
+            hit = shots.get(pl.get("player_name", ""))
+            if hit and hit.get("img"):
+                pl["img"] = hit["img"]
+                pl["img_page"], pl["img_by"], pl["img_lic"] = (
+                    hit.get("page", ""), hit.get("by", ""), hit.get("lic", ""))
     competitions = tag_competition_teams(read_competitions(), list(leagues_data))
     return (HTML_TEMPLATE
             .replace("__DATA_PLACEHOLDER__", json.dumps(leagues_data))

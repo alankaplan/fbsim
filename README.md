@@ -376,12 +376,14 @@ leagues/
   match.py                Poisson match primitive (λ → W/D/L probabilities)
   simulator.py            round-robin season engine + tiebreaker resolver
   run_sims.py             Monte Carlo driver
-  wiki.py                 shared Wikipedia REST client (national + competitions)
+  wiki.py                 shared Wikipedia REST + API client (national/competitions/headshots)
   national.py             USMNT/USWNT results + fixtures (display-only)
   competitions.py         Leagues Cup / Champions League standings + results (display-only)
+  headshots.py            player headshot URLs from Wikipedia (opt-in; player cards)
   generate_page.py        HTML report generator
   update.py               one-command ingest + simulate + report
 data/leagues/<key>/       teams.csv, matches.csv (+ generated sim_results.json)
 data/national/<key>.json  fetched national-team games (gitignored)
 data/competitions/<key>.json  fetched cup standings + results (gitignored)
+data/headshots/<key>.json  cached player headshot URLs (gitignored)
 ```

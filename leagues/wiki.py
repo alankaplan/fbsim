@@ -14,6 +14,7 @@ client — keeping request spacing sane when several articles are fetched in one
 from __future__ import annotations
 
 import html
+import json
 import re
 import time
 import urllib.error
@@ -21,6 +22,7 @@ import urllib.parse
 import urllib.request
 
 WIKI_REST = "https://en.wikipedia.org/api/rest_v1/page/html"
+WIKI_API = "https://en.wikipedia.org/w/api.php"
 
 # HTTP (throttled + retried).
 _THROTTLE_S = 0.4
@@ -40,6 +42,38 @@ def article_html(article: str, tries: int = 3) -> str:
             req = urllib.request.Request(url, headers=_HEADERS)
             with urllib.request.urlopen(req, timeout=60) as resp:
                 return resp.read().decode("utf-8")
+        except urllib.error.HTTPError as exc:
+            last_exc = exc
+            if exc.code not in (429, 500, 502, 503, 504):
+                raise
+        except Exception as exc:  # noqa: BLE001 - retried below
+            last_exc = exc
+        finally:
+            _last_call[0] = time.monotonic()
+        if attempt < tries - 1:
+            time.sleep(2 * (2 ** attempt))
+    assert last_exc is not None
+    raise last_exc
+
+
+def api_json(tries: int = 3, **params) -> dict:
+    """Query the MediaWiki API on en.wikipedia.org, sharing this module's throttle + backoff.
+
+    Used for lookups the REST article endpoint can't do in one call (lead images, file
+    licensing). en.wikipedia.org can serve metadata for Commons-hosted files too, so this
+    single host covers everything without talking to commons.wikimedia.org directly."""
+    params.setdefault("format", "json")
+    params.setdefault("formatversion", "2")
+    url = WIKI_API + "?" + urllib.parse.urlencode(params)
+    last_exc: Exception | None = None
+    for attempt in range(tries):
+        wait = _THROTTLE_S - (time.monotonic() - _last_call[0])
+        if wait > 0:
+            time.sleep(wait)
+        try:
+            req = urllib.request.Request(url, headers=_HEADERS)
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             last_exc = exc
             if exc.code not in (429, 500, 502, 503, 504):
