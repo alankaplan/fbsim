@@ -487,6 +487,8 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       ["minutes","Min","right", p=>p.minutes,                                p=>p.minutes,       false, true],
       ["goals","G","right", p=>p.goals,                                      p=>p.goals],
       ["assists","A","right", p=>p.assists,                                  p=>p.assists],
+      ["pct","Lg%","right", p=>p.pct==null?"":p.pct.toFixed(1),               p=>p.pct==null?-1:p.pct],
+      ["tough","Tough z","right", p=>p.tough==null?"":(p.tough>=0?"+":"")+p.tough.toFixed(2), p=>p.tough==null?-99:p.tough],
       ["xg","xG","right", p=>p.xg.toFixed(1),                                p=>p.xg,            false, true],
       ["xa","xA","right", p=>p.xa.toFixed(1),                                p=>p.xa,    false, true],
       ["shots","Sh","right", p=>(p.shots||""),                               p=>p.shots, false, true],
@@ -529,7 +531,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
        <div class="legend">Season totals${L.meta.used_xg ? " (with xG)" : ""}. Click a player for their
          card, a header to sort, a team to open it.</div>
        <div id="players-table"></div>`;
-    renderPlayersTable("players-table", L.players || [], false);
+    renderPlayersTable("players-table", leagueMetrics(cur), false);
   }
 
   // ---- Player card (click a player name in any table to expand this) ----
@@ -611,40 +613,45 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
   // results, ...). NOTE nwsl is a women's league — putting it on the men's axis is
   // apples-to-oranges; its number is a placeholder, not a claim.
   const TP_LEAGUE_HANDICAP = { eng: 0, esp: 0.15, ita: 0.25, de: 0.3, fr: 0.5, mls: 1.2, nwsl: 1.4 };
+  // Per-league player metrics (Lg% + Tough z), computed over the WHOLE league and memoised.
+  // Kept league-wide on purpose: a club's squad view must still rank its players against the
+  // league, not against team-mates. Memoised because the percentile step is O(N^2) and every
+  // sort click re-renders. Returns the league's minutes>0 players, each annotated.
+  const _lgMetrics = {};
+  function leagueMetrics(k) {
+    if (_lgMetrics[k]) return _lgMetrics[k];
+    const ps = (LEAGUES[k].players || []).filter(p => p.minutes > 0);
+    if (!ps.length) return (_lgMetrics[k] = []);
+    const exp = ps.map(p => p.minutes / 90);
+    const ev = ps.map(p => (p.goals || 0) + (p.assists || 0));
+    const sumEv = ev.reduce((a, b) => a + b, 0), sumExp = exp.reduce((a, b) => a + b, 0);
+    const m0 = sumExp > 0 ? sumEv / sumExp : 0;      // league minutes-weighted mean G+A/90
+    const sm = ps.map((p, i) => (ev[i] + m0 * TP_K) / (exp[i] + TP_K));
+    const N = ps.length;
+    const mu = sm.reduce((a, b) => a + b, 0) / N;
+    const sd = Math.sqrt(sm.reduce((a, b) => a + (b - mu) * (b - mu), 0) / N);
+    const hcap = TP_LEAGUE_HANDICAP[k] != null ? TP_LEAGUE_HANDICAP[k] : 0;
+    const out = ps.map((p, i) => {
+      let below = 0, eq = 0;
+      for (const v of sm) { if (v < sm[i]) below++; else if (v === sm[i]) eq++; }
+      return Object.assign({}, p, {
+        _lk: k, _league: LEAGUES[k].league.name, ga: ev[i],
+        ga90: ev[i] * 90 / p.minutes,
+        pct: N > 1 ? 100 * (below + 0.5 * eq) / N : 100,
+        tough: (sd > 0 ? (sm[i] - mu) / sd : 0) - hcap });
+    });
+    return (_lgMetrics[k] = out);
+  }
   function topPlayersData() {
     const rows = [];
     Object.keys(LEAGUES).forEach(k => {
-      const ps = (LEAGUES[k].players || []).filter(p => p.minutes > 0);
+      const ps = leagueMetrics(k);
       if (!ps.length) return;
-      // Smooth each player's G+A/90 toward the league's mean rate (shrinkage handles the
-      // differing minutes denominators), then rank that smoothed rate into a within-league
-      // percentile — the per-league "adjustment", so a player is scored vs his own league.
-      const exp = ps.map(p => p.minutes / 90);
-      const ev = ps.map(p => (p.goals || 0) + (p.assists || 0));
-      const sumEv = ev.reduce((a, b) => a + b, 0), sumExp = exp.reduce((a, b) => a + b, 0);
-      const m0 = sumExp > 0 ? sumEv / sumExp : 0;      // league minutes-weighted mean G+A/90
-      const sm = ps.map((p, i) => (ev[i] + m0 * TP_K) / (exp[i] + TP_K));
-      const N = ps.length;
-      const pct = sm.map(s => {
-        let below = 0, eq = 0;
-        for (const v of sm) { if (v < s) below++; else if (v === s) eq++; }
-        return N > 1 ? 100 * (below + 0.5 * eq) / N : 100;
-      });
       const lgMax = ps.reduce((m, p) => Math.max(m, p.minutes), 0);
       const floor = Math.max(TP_ABS, TP_REL * lgMax);   // scales with this league's season stage
-      // Cross-league: standardise the smoothed rate within the league (SDs from that league's
-      // average player), then subtract the league's strength handicap. Lg% answers "vs your own
-      // league"; Tough z answers "vs the toughest league", on a scale where the elite stay spread
-      // out instead of being squashed into the top percentile point.
-      const mu = sm.reduce((a, b) => a + b, 0) / N;
-      const sd = Math.sqrt(sm.reduce((a, b) => a + (b - mu) * (b - mu), 0) / N);
-      const hcap = TP_LEAGUE_HANDICAP[k] != null ? TP_LEAGUE_HANDICAP[k] : 0;
-      ps.forEach((p, i) => {
+      ps.forEach(p => {
         if (p.minutes < floor) return;               // not a regular for this league's stage
-        rows.push(Object.assign({}, p, {
-          _lk: k, _league: LEAGUES[k].league.name, ga: ev[i],
-          ga90: ev[i] * 90 / p.minutes, pct: pct[i],
-          tough: (sd > 0 ? (sm[i] - mu) / sd : 0) - hcap }));
+        rows.push(p);                                // already carries ga/ga90/pct/tough
       });
     });
     return rows;
@@ -1196,7 +1203,8 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     $("team-view").querySelectorAll(".subtabs a").forEach(a =>
       a.onclick = () => { teamTab = a.dataset.tt; renderTeam(); });
     if (teamTab === "players") {
-      const players = (L.players || []).filter(p => p.team_code === r.code);
+      // filter AFTER leagueMetrics so Lg%/Tough z rank against the league, not team-mates
+      const players = leagueMetrics(cur).filter(p => p.team_code === r.code);
       $("team-body").innerHTML = `<div class="sec-h">Squad — season totals</div>`
         + `<div class="legend">Individual player stats for this club. Click a player for their card, a header to sort.</div>`
         + `<div id="team-players"></div>`;
