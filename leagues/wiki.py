@@ -27,7 +27,23 @@ WIKI_API = "https://en.wikipedia.org/w/api.php"
 # HTTP (throttled + retried).
 _THROTTLE_S = 0.4
 _last_call = [0.0]
-_HEADERS = {"User-Agent": "fbsim/1.0 (football fixtures + results; contact via repo)"}
+# Wikimedia's User-Agent policy asks for a descriptive agent with a real contact URL; requests
+# without one can be refused (enforcement varies by client network, so this can fail on one
+# machine while working on another).
+_HEADERS = {"User-Agent": "fbsim/1.0 (https://github.com/alankaplan/fbsim)"}
+
+
+class WikiHTTPError(RuntimeError):
+    """An HTTP error from Wikipedia that keeps the status code and a snippet of the body.
+
+    urllib's HTTPError stringifies to little more than its class name once it escapes the
+    call site, which left callers reporting a bare "HTTPError" and no way to tell a
+    rate-limit from a blocked user agent. Carry the detail so callers can print it."""
+
+    def __init__(self, code: int, reason: str, body: str = ""):
+        self.code, self.reason, self.body = code, reason, (body or "")[:300]
+        detail = f" — {self.body}" if self.body else ""
+        super().__init__(f"HTTP {code} {reason}{detail}")
 
 
 def article_html(article: str, tries: int = 3) -> str:
@@ -43,9 +59,13 @@ def article_html(article: str, tries: int = 3) -> str:
             with urllib.request.urlopen(req, timeout=60) as resp:
                 return resp.read().decode("utf-8")
         except urllib.error.HTTPError as exc:
-            last_exc = exc
+            try:
+                body = exc.read().decode("utf-8", "replace")
+            except Exception:  # noqa: BLE001 - body is best-effort context only
+                body = ""
+            last_exc = WikiHTTPError(exc.code, exc.reason, body)
             if exc.code not in (429, 500, 502, 503, 504):
-                raise
+                raise last_exc from exc
         except Exception as exc:  # noqa: BLE001 - retried below
             last_exc = exc
         finally:
@@ -75,9 +95,13 @@ def api_json(tries: int = 3, **params) -> dict:
             with urllib.request.urlopen(req, timeout=45) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
-            last_exc = exc
+            try:
+                body = exc.read().decode("utf-8", "replace")
+            except Exception:  # noqa: BLE001 - body is best-effort context only
+                body = ""
+            last_exc = WikiHTTPError(exc.code, exc.reason, body)
             if exc.code not in (429, 500, 502, 503, 504):
-                raise
+                raise last_exc from exc
         except Exception as exc:  # noqa: BLE001 - retried below
             last_exc = exc
         finally:

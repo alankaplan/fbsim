@@ -42,6 +42,7 @@ from .wiki import api_json
 HEADSHOTS_ROOT = DATA_ROOT.parent / "headshots"
 THUMB_PX = 200
 DEFAULT_LIMIT = 60                      # top-N players per league by G+A
+MAX_FAIL_STREAK = 5                     # stop rather than grind through hundreds of refusals
 
 # The article intro must look like a footballer's, or we treat it as a miss.
 _FOOTBALL = re.compile(r"\bfootball(er)?\b|\bsoccer\b", re.I)
@@ -121,22 +122,33 @@ def build_headshots(key: str, limit: int, refresh: bool) -> Path:
             cache = {}
 
     names = top_players(key, limit)
-    hits = misses = looked = 0
+    hits = misses = errors = looked = 0
+    streak = 0                                   # consecutive failures -> we're being refused
     for name in names:
         if name in cache and not refresh:        # negative cache too: don't re-ask for known misses
             continue
         looked += 1
         try:
             found = _lookup(name) or _lookup(f"{name} (footballer)")
+            streak = 0
         except Exception as exc:  # noqa: BLE001 - one bad name must not kill the run
-            print(f"  [headshots] {name}: lookup failed ({type(exc).__name__})")
-            found = None
+            print(f"  [headshots] {name}: lookup failed — {exc}")
+            errors += 1
+            streak += 1
+            # A failed request tells us nothing about the player, so DON'T cache it as a miss:
+            # that would permanently mark them photo-less. Leave them out; a later run retries.
+            if streak >= MAX_FAIL_STREAK:
+                print(f"  [headshots] {key}: giving up after {streak} consecutive failures — "
+                      "the request is being refused, not the players missing. Nothing cached "
+                      "for them; fix the error above and re-run.")
+                break
+            continue
         if found:
             author, lic = _credit(found.pop("file", ""))
             cache[name] = {**found, "by": author, "lic": lic}
             hits += 1
         else:
-            cache[name] = {"img": ""}            # recorded miss -> no repeat lookups
+            cache[name] = {"img": ""}            # a real miss -> no repeat lookups
             misses += 1
 
     have = sum(1 for v in cache.values() if v.get("img"))
@@ -145,7 +157,8 @@ def build_headshots(key: str, limit: int, refresh: bool) -> Path:
                "players": cache}
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    print(f"  [headshots] {key}: {looked} looked up ({hits} found, {misses} not found); "
+    err = f", {errors} failed (not cached)" if errors else ""
+    print(f"  [headshots] {key}: {looked} looked up ({hits} found, {misses} not found{err}); "
           f"{have}/{len(cache)} cached with a photo -> {out.name}")
     return out
 
@@ -156,7 +169,8 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=DEFAULT_LIMIT,
                     help=f"top-N players per league by G+A (default {DEFAULT_LIMIT})")
     ap.add_argument("--refresh", action="store_true",
-                    help="re-look-up everything, ignoring cached hits and misses")
+                    help="re-look-up everything, ignoring cached hits and misses (use this to "
+                         "clear misses recorded by an earlier broken run)")
     args = ap.parse_args()
 
     keys = list(LEAGUES) if args.league == "all" else [get_league(args.league).key]
