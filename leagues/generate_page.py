@@ -508,6 +508,10 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       ["assists","A","right", p=>p.assists,                                  p=>p.assists],
       ["pct","Lg%","right", p=>p.pct==null?"":p.pct.toFixed(1),               p=>p.pct==null?-1:p.pct],
       ["tough","Tough z","right", p=>p.tough==null?"":(p.tough>=0?"+":"")+p.tough.toFixed(2), p=>p.tough==null?-99:p.tough],
+      ["gab90","G+A+B/90","right", p=>p.gab90==null?"":`<b>${p.gab90.toFixed(2)}</b>`, p=>p.gab90==null?-1:p.gab90],
+      ["gabPct","B Lg%","right", p=>p.gabPct==null?"":p.gabPct.toFixed(1),          p=>p.gabPct==null?-1:p.gabPct],
+      ["gabZ","B z","right", p=>p.gabZ==null?"":(p.gabZ>=0?"+":"")+p.gabZ.toFixed(2), p=>p.gabZ==null?-99:p.gabZ],
+      ["xg_buildup","Bld","right", p=>(+p.xg_buildup||0).toFixed(1),                p=>+p.xg_buildup||0, false, true],
       ["xg","xG","right", p=>p.xg.toFixed(1),                                p=>p.xg,            false, true],
       ["xa","xA","right", p=>p.xa.toFixed(1),                                p=>p.xa,    false, true],
       ["shots","Sh","right", p=>(p.shots||""),                               p=>p.shots, false, true],
@@ -547,8 +551,11 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     const L = LEAGUES[cur];
     $("players-view").innerHTML =
       `<div class="sec-h">Top players — ${esc(L.league.name)}</div>
-       <div class="legend">Season totals${L.meta.used_xg ? " (with xG)" : ""}. Click a player for their
-         card, a header to sort, a team to open it.</div>
+       <div class="legend">Season totals${L.meta.used_xg ? " (with xG)" : ""}.
+         <b>G+A+B/90</b> adds <b>Bld</b> (xG buildup — the xG of possessions a player was in,
+         excluding their own shots and key passes) to goals and assists, so deep players who never
+         finish moves still register; it is an Understat figure, blank for MLS/NWSL. Click a player
+         for their card, a header to sort, a team to open it.</div>
        <div id="players-table"></div>`;
     renderPlayersTable("players-table", leagueMetrics(cur), false);
   }
@@ -665,6 +672,11 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
   // results, ...). NOTE nwsl is a women's league — putting it on the men's axis is
   // apples-to-oranges; its number is a placeholder, not a claim.
   const TP_LEAGUE_HANDICAP = { eng: 0, esp: 0.15, ita: 0.25, de: 0.3, fr: 0.5, mls: 1.2, nwsl: 1.4 };
+  // Weight on buildup in the combined metric. G+A already sums two different acts, so adding a
+  // third goal-equivalent is the same kind of move; xGBuildup is the right term because it
+  // EXCLUDES the player's own shots and key passes, so it can't double-count the G and A beside
+  // it. Weight 1 treats a unit of buildup xG as a unit of end product; tune here.
+  const TP_BUILDUP_W = 1;
   // Per-league player metrics (Lg% + Tough z), computed over the WHOLE league and memoised.
   // Kept league-wide on purpose: a club's squad view must still rank its players against the
   // league, not against team-mates. Memoised because the percentile step is O(N^2) and every
@@ -683,14 +695,27 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     const mu = sm.reduce((a, b) => a + b, 0) / N;
     const sd = Math.sqrt(sm.reduce((a, b) => a + (b - mu) * (b - mu), 0) / N);
     const hcap = TP_LEAGUE_HANDICAP[k] != null ? TP_LEAGUE_HANDICAP[k] : 0;
+    // Combined metric: goals + assists + buildup, so a deep player who never shoots can still
+    // register. Same empirical-Bayes smoothing and same percentile/z treatment as G+A/90, just a
+    // different underlying rate — no new statistics to justify.
+    const evb = ps.map((p, i) => ev[i] + TP_BUILDUP_W * (+p.xg_buildup || 0));
+    const sumEvb = evb.reduce((a, b) => a + b, 0);
+    const m0b = sumExp > 0 ? sumEvb / sumExp : 0;
+    const smb = ps.map((p, i) => (evb[i] + m0b * TP_K) / (exp[i] + TP_K));
+    const mub = smb.reduce((a, b) => a + b, 0) / N;
+    const sdb = Math.sqrt(smb.reduce((a, b) => a + (b - mub) * (b - mub), 0) / N);
     const out = ps.map((p, i) => {
-      let below = 0, eq = 0;
+      let below = 0, eq = 0, belowB = 0, eqB = 0;
       for (const v of sm) { if (v < sm[i]) below++; else if (v === sm[i]) eq++; }
+      for (const v of smb) { if (v < smb[i]) belowB++; else if (v === smb[i]) eqB++; }
       return Object.assign({}, p, {
         _lk: k, _league: LEAGUES[k].league.name, ga: ev[i],
         ga90: ev[i] * 90 / p.minutes,
         pct: N > 1 ? 100 * (below + 0.5 * eq) / N : 100,
-        tough: (sd > 0 ? (sm[i] - mu) / sd : 0) - hcap });
+        tough: (sd > 0 ? (sm[i] - mu) / sd : 0) - hcap,
+        gab: evb[i], gab90: evb[i] * 90 / p.minutes,
+        gabPct: N > 1 ? 100 * (belowB + 0.5 * eqB) / N : 100,
+        gabZ: (sdb > 0 ? (smb[i] - mub) / sdb : 0) - hcap });
     });
     return (_lgMetrics[k] = out);
   }
@@ -722,6 +747,10 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       ["ga90","G+A/90","right", p=>`<b>${p.ga90.toFixed(2)}</b>`,             p=>p.ga90],
       ["pct","Lg%","right", p=>p.pct.toFixed(1),                              p=>p.pct],
       ["tough","Tough z","right", p=>(p.tough>=0?"+":"")+p.tough.toFixed(2),  p=>p.tough],
+      ["gab90","G+A+B/90","right", p=>p.gab90==null?"":`<b>${p.gab90.toFixed(2)}</b>`, p=>p.gab90==null?-1:p.gab90],
+      ["gabPct","B Lg%","right", p=>p.gabPct==null?"":p.gabPct.toFixed(1),          p=>p.gabPct==null?-1:p.gabPct],
+      ["gabZ","B z","right", p=>p.gabZ==null?"":(p.gabZ>=0?"+":"")+p.gabZ.toFixed(2), p=>p.gabZ==null?-99:p.gabZ],
+      ["xg_buildup","Bld","right", p=>(+p.xg_buildup||0).toFixed(1),                p=>+p.xg_buildup||0, true],
       ["xg","xG","right", p=>p.xg.toFixed(1),                                 p=>p.xg, true],
       ["xa","xA","right", p=>p.xa.toFixed(1),                                 p=>p.xa, true],
       ["shots","Sh","right", p=>(p.shots||""),                               p=>p.shots, true],
@@ -757,7 +786,13 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
          <b>Tough z</b> is that rate in standard deviations above an average player, after
          subtracting their league's strength handicap (0 = the toughest league's baseline) — so
          unlike a percentile it has no ceiling, and a dominant player in a weaker league can still
-         outrank a good one in a stronger league.
+         outrank a good one in a stronger league. <b>G+A+B/90</b> adds <b>Bld</b> (xG buildup: the
+         xG of possessions a player was involved in, excluding their own shots and key passes) to
+         goals and assists, so defenders and deep midfielders who never finish moves still register;
+         <b>B Lg%</b> and <b>B z</b> are the same league-percentile and cross-league z built on it.
+         Buildup is an Understat figure, so it is blank for MLS/NWSL. Nothing here measures
+         <i>defending</i> — buildup credits helping to create attacks, not stopping them — and
+         nothing measures goalkeeping, so keepers and stopper-type defenders stay under-ranked.
          Click a player for their card, a header to sort, a team to open it.</div>
        <div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
     $("players_all-view").querySelectorAll("th[data-col]").forEach(h => h.onclick = () => {
@@ -1416,13 +1451,14 @@ def read_players(key: str) -> list[dict]:
     if not path.exists():
         return []
     code_by_norm, name_by_norm = _team_lookup(key)
-    ints = ("matches", "minutes", "goals", "assists", "shots", "yellow_cards", "red_cards")
+    ints = ("matches", "minutes", "goals", "assists", "shots", "yellow_cards", "red_cards",
+            "key_passes")
     out = []
     with path.open(encoding="utf-8") as f:
         for r in csv.DictReader(f):
             for k in ints:
                 r[k] = int(r[k]) if r.get(k) not in ("", None) else 0
-            for k in ("xg", "xa"):
+            for k in ("xg", "xa", "xg_chain", "xg_buildup"):
                 r[k] = float(r[k]) if r.get(k) not in ("", None) else 0.0
             raw = r.get("team_name", "")
             code, canon = resolve_team_code(_norm_team(raw), code_by_norm, name_by_norm)

@@ -44,7 +44,7 @@ from .ingest import DATA_ROOT, ensure_league_dict
 
 PLAYER_FIELDS = ["player_name", "team_name", "team_code", "position", "matches",
                  "minutes", "goals", "assists", "xg", "xa", "shots",
-                 "yellow_cards", "red_cards"]
+                 "yellow_cards", "red_cards", "key_passes", "xg_chain", "xg_buildup"]
 
 # Tokens dropped when matching a player-source team name to teams.csv.
 _TEAM_STOP = {"fc", "afc", "cf", "sc", "ac", "ssc", "us", "cd", "rc", "ud", "as",
@@ -155,6 +155,11 @@ def _understat_players_records(players: list[dict]) -> list[dict]:
             "goals": p.get("goals"), "assists": p.get("assists"),
             "xg": p.get("xG"), "xa": p.get("xA"), "shots": p.get("shots"),
             "yellow_cards": p.get("yellow_cards"), "red_cards": p.get("red_cards"),
+            # Involvement measures Understat sends on every row. xg_buildup is the xG of
+            # possessions the player was in, EXCLUDING their own shots and key passes — so it
+            # adds to goals+assists without double-counting them.
+            "key_passes": p.get("key_passes"),
+            "xg_chain": p.get("xGChain"), "xg_buildup": p.get("xGBuildup"),
         })
     return out
 
@@ -181,6 +186,8 @@ def players_from_understat(cfg: LeagueConfig, season: str) -> list[dict]:
             "goals": _i(d.get("goals")), "assists": _i(d.get("assists")),
             "xg": _f(d.get("xg")), "xa": _f(d.get("xa")), "shots": _i(d.get("shots")),
             "yellow_cards": _i(d.get("yellow_cards")), "red_cards": _i(d.get("red_cards")),
+            "key_passes": _i(d.get("key_passes")),
+            "xg_chain": _f(d.get("xg_chain")), "xg_buildup": _f(d.get("xg_buildup")),
         })
     return rows
 
@@ -228,6 +235,9 @@ def players_from_fbref(cfg: LeagueConfig, season: str) -> list[dict]:
             "goals": _i(g(d, "Performance/Gls")), "assists": _i(g(d, "Performance/Ast")),
             "xg": _f(g(d, "Expected/xG")), "xa": _f(g(d, "Expected/xAG", "Expected/xA")),
             "shots": "",  # not in the 'standard' table
+            # Involvement stats live in FBref's other stat types, not 'standard', so US leagues
+            # have no buildup figure and their combined metric collapses to goals+assists.
+            "key_passes": "", "xg_chain": "", "xg_buildup": "",
             "yellow_cards": _i(g(d, "Performance/CrdY")), "red_cards": _i(g(d, "Performance/CrdR")),
         })
     return rows
