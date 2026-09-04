@@ -1,76 +1,900 @@
 {
   "_readme": "Curated player notes extracted from podcast/press briefings pasted into the assistant. Hand-reviewed and version-controlled: no live model runs at build time. Notes are DISPLAY-ONLY - they never feed the simulator. Every note keeps its source and, where possible, a verbatim quote, so a reader can judge it. Names that a transcript garbled are parked in `unresolved` rather than guessed at, because attaching a note to the wrong player is worse than dropping it.",
-  "updated": "2026-08-25T00:00:00Z",
+  "updated": "2026-09-01T00:00:00Z",
   "sources": {
     "fw-2026-08-24": {
       "show": "Football Weekly",
       "title": "Manchester United mauled and sorry Spurs mark Premier League kick-off",
       "date": "2026-08-24"
+    },
+    "fw-2026-08-25": {
+      "show": "Football Weekly",
+      "title": "Palmer purrs but Sánchez shaky as Chelsea start with a win",
+      "date": "2026-08-25"
+    },
+    "fw-2026-08-27": {
+      "show": "Football Weekly",
+      "title": "Sávio lands at Spurs, Celtic crash out and are Villa in crisis?",
+      "date": "2026-08-27"
+    },
+    "fw-2026-08-31": {
+      "show": "Football Weekly",
+      "title": "Bruno Fernandes brilliance and Spurs remain pointless",
+      "date": "2026-08-31"
+    },
+    "fw-2026-09-01": {
+      "show": "Football Weekly",
+      "title": "Saka strike maintains Arsenal's perfect start, plus deadline day",
+      "date": "2026-09-01"
     }
   },
   "players": [
-    { "name": "Harry Maguire", "team": "Manchester United", "source": "fw-2026-08-24", "date": "2026-08-24",
-      "tags": ["error"], "confidence": "high",
+    {
+      "name": "Harry Maguire",
+      "team": "Manchester United",
+      "source": "fw-2026-08-24",
+      "date": "2026-08-24",
+      "tags": [
+        "error"
+      ],
+      "confidence": "high",
       "note": "Marked and fouled his own teammate on Hull's opening goal, preventing a block on the shot.",
-      "quote": "Harry Maguire marking one of his own players and marking him so well that he fouled him." },
-
-    { "name": "Emiliano Martinez", "team": "Aston Villa", "source": "fw-2026-08-24", "date": "2026-08-24",
-      "tags": ["absence"], "confidence": "medium",
-      "note": "Missing from a decimated Villa spine in the 4-0 loss at Brighton (surname-only in the briefing)." },
-    { "name": "Ollie Watkins", "team": "Aston Villa", "source": "fw-2026-08-24", "date": "2026-08-24",
-      "tags": ["absence"], "confidence": "medium",
-      "note": "Absent as Villa's spine was decimated; the side lacked depth and conceded four in 30 minutes." },
-    { "name": "Diego Carlos", "team": "Aston Villa", "source": "fw-2026-08-24", "date": "2026-08-24",
-      "tags": ["absence"], "confidence": "medium",
-      "note": "Listed among the absentees that left Villa's spine decimated." },
-    { "name": "Youri Tielemans", "team": "Aston Villa", "source": "fw-2026-08-24", "date": "2026-08-24",
-      "tags": ["absence"], "confidence": "medium",
-      "note": "Listed among the absentees that left Villa's spine decimated." },
-    { "name": "Ezri Konsa", "team": "Aston Villa", "source": "fw-2026-08-24", "date": "2026-08-24",
-      "tags": ["absence"], "confidence": "medium",
-      "note": "Listed among the absentees that left Villa's spine decimated." },
-    { "name": "Amadou Onana", "team": "Aston Villa", "source": "fw-2026-08-24", "date": "2026-08-24",
-      "tags": ["absence"], "confidence": "medium",
-      "note": "Listed among the absentees that left Villa's spine decimated." },
-
-    { "name": "Jan Paul van Hecke", "team": "Brighton", "source": "fw-2026-08-24", "date": "2026-08-24",
-      "tags": ["absence"], "confidence": "medium",
-      "note": "Named among key Brighton players missing, though Brighton still won 4-0." },
-    { "name": "Danny Welbeck", "team": "Brighton", "source": "fw-2026-08-24", "date": "2026-08-24",
-      "tags": ["absence"], "confidence": "medium",
-      "note": "Named among key Brighton players missing, though Brighton still won 4-0." },
-    { "name": "Vuskovic", "team": "Brighton", "source": "fw-2026-08-24", "date": "2026-08-24",
-      "tags": ["breakout"], "confidence": "medium",
-      "note": "19-year-old Croatian international; standout in defence, contrasting with struggling high-priced signings elsewhere (surname-only in the briefing)." },
-
-    { "name": "Anthony Elanga", "team": "Newcastle United", "source": "fw-2026-08-24", "date": "2026-08-24",
-      "tags": ["form"], "confidence": "high",
+      "quote": "Harry Maguire marking one of his own players and marking him so well that he fouled him."
+    },
+    {
+      "name": "Emiliano Martinez",
+      "team": "Aston Villa",
+      "source": "fw-2026-08-24",
+      "date": "2026-08-24",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "medium",
+      "note": "Missing from a decimated Villa spine in the 4-0 loss at Brighton (surname-only in the briefing)."
+    },
+    {
+      "name": "Ollie Watkins",
+      "team": "Aston Villa",
+      "source": "fw-2026-08-24",
+      "date": "2026-08-24",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "medium",
+      "note": "Absent as Villa's spine was decimated; the side lacked depth and conceded four in 30 minutes."
+    },
+    {
+      "name": "Diego Carlos",
+      "team": "Aston Villa",
+      "source": "fw-2026-08-24",
+      "date": "2026-08-24",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "medium",
+      "note": "Listed among the absentees that left Villa's spine decimated."
+    },
+    {
+      "name": "Youri Tielemans",
+      "team": "Aston Villa",
+      "source": "fw-2026-08-24",
+      "date": "2026-08-24",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "medium",
+      "note": "Listed among the absentees that left Villa's spine decimated."
+    },
+    {
+      "name": "Ezri Konsa",
+      "team": "Aston Villa",
+      "source": "fw-2026-08-24",
+      "date": "2026-08-24",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "medium",
+      "note": "Listed among the absentees that left Villa's spine decimated."
+    },
+    {
+      "name": "Amadou Onana",
+      "team": "Aston Villa",
+      "source": "fw-2026-08-24",
+      "date": "2026-08-24",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "medium",
+      "note": "Listed among the absentees that left Villa's spine decimated."
+    },
+    {
+      "name": "Jan Paul van Hecke",
+      "team": "Brighton",
+      "source": "fw-2026-08-24",
+      "date": "2026-08-24",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "medium",
+      "note": "Named among key Brighton players missing, though Brighton still won 4-0."
+    },
+    {
+      "name": "Danny Welbeck",
+      "team": "Brighton",
+      "source": "fw-2026-08-24",
+      "date": "2026-08-24",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "medium",
+      "note": "Named among key Brighton players missing, though Brighton still won 4-0."
+    },
+    {
+      "name": "Vuskovic",
+      "team": "Brighton",
+      "source": "fw-2026-08-24",
+      "date": "2026-08-24",
+      "tags": [
+        "breakout"
+      ],
+      "confidence": "medium",
+      "note": "19-year-old Croatian international; standout in defence, contrasting with struggling high-priced signings elsewhere (surname-only in the briefing)."
+    },
+    {
+      "name": "Anthony Elanga",
+      "team": "Newcastle United",
+      "source": "fw-2026-08-24",
+      "date": "2026-08-24",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
       "note": "A counter-attacking threat against Liverpool's very high line in the 2-2 draw.",
-      "quote": "They are like the 'Slow Horses' of football... MI5 misfits... but they were full of running." },
-    { "name": "Yoane Wissa", "team": "Newcastle United", "source": "fw-2026-08-24", "date": "2026-08-24",
-      "tags": ["form"], "confidence": "high",
+      "quote": "They are like the 'Slow Horses' of football... MI5 misfits... but they were full of running."
+    },
+    {
+      "name": "Yoane Wissa",
+      "team": "Newcastle United",
+      "source": "fw-2026-08-24",
+      "date": "2026-08-24",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
       "note": "A counter-attacking threat against Liverpool's very high line in the 2-2 draw.",
-      "quote": "They are like the 'Slow Horses' of football... MI5 misfits... but they were full of running." },
-    { "name": "Lewis Miley", "team": "Newcastle United", "source": "fw-2026-08-24", "date": "2026-08-24",
-      "tags": ["breakout"], "confidence": "high",
-      "note": "At 20, part of a young Newcastle midfield pivot; the performance was seen as a marked improvement on last season." },
-
-    { "name": "Ibrahim Sangare", "team": "Brentford", "source": "fw-2026-08-24", "date": "2026-08-24",
-      "tags": ["debut"], "confidence": "medium",
-      "note": "Seamless debut in midfield, cited as evidence of Brentford's succession planning (surname-only in the briefing)." },
-
-    { "name": "Enzo Fernandez", "team": "Chelsea", "source": "fw-2026-08-24", "date": "2026-08-24",
-      "tags": ["integration"], "confidence": "medium",
-      "note": "Named among high-value signings the briefing says need patient integration; early results are favouring settled squads." }
+      "quote": "They are like the 'Slow Horses' of football... MI5 misfits... but they were full of running."
+    },
+    {
+      "name": "Lewis Miley",
+      "team": "Newcastle United",
+      "source": "fw-2026-08-24",
+      "date": "2026-08-24",
+      "tags": [
+        "breakout"
+      ],
+      "confidence": "high",
+      "note": "At 20, part of a young Newcastle midfield pivot; the performance was seen as a marked improvement on last season."
+    },
+    {
+      "name": "Ibrahim Sangare",
+      "team": "Brentford",
+      "source": "fw-2026-08-24",
+      "date": "2026-08-24",
+      "tags": [
+        "debut"
+      ],
+      "confidence": "medium",
+      "note": "Seamless debut in midfield, cited as evidence of Brentford's succession planning (surname-only in the briefing)."
+    },
+    {
+      "name": "Enzo Fernandez",
+      "team": "Chelsea",
+      "source": "fw-2026-08-24",
+      "date": "2026-08-24",
+      "tags": [
+        "integration"
+      ],
+      "confidence": "medium",
+      "note": "Named among high-value signings the briefing says need patient integration; early results are favouring settled squads."
+    },
+    {
+      "name": "Cole Palmer",
+      "team": "Chelsea",
+      "source": "fw-2026-08-25",
+      "date": "2026-08-25",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Silky and fluid in the 3-2 win at Fulham, scoring a cheeky goal; his omission from the World Cup squad is read as a wake-up call after an injury-hit campaign.",
+      "quote": "He just looked free, fluid, so silky, so clever on the ball... the goal was brilliant. He kind of gives Leno the eyes, makes it look like he's going to pass it back into the middle and then just rolls it through his legs. It's so cheeky. It's so Cole Palmer."
+    },
+    {
+      "name": "Robert Sanchez",
+      "team": "Chelsea",
+      "source": "fw-2026-08-25",
+      "date": "2026-08-25",
+      "tags": [
+        "weakness"
+      ],
+      "confidence": "high",
+      "note": "Poorly positioned for both Fulham goals; the panic he transmits unsettles the defence. Seen as the single thing keeping Chelsea to top-four rather than title contention.",
+      "quote": "It's not just the first goal with Josh King. It's also things like just the the panic that he transmits... It just makes the defense nervy, I think. This is Sanchez's fourth season as Chelsea's number one, and it just feels like he's been an issue for all of that period."
+    },
+    {
+      "name": "Joao Pedro",
+      "team": "Chelsea",
+      "source": "fw-2026-08-25",
+      "date": "2026-08-25",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Part of a Chelsea front three with Palmer and Rogers described as one of the most exciting attacking units in the league."
+    },
+    {
+      "name": "Morgan Rogers",
+      "team": "Chelsea",
+      "source": "fw-2026-08-25",
+      "date": "2026-08-25",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Part of a Chelsea front three with Palmer and Joao Pedro described as one of the most exciting attacking units in the league."
+    },
+    {
+      "name": "Mike Penders",
+      "team": "Chelsea",
+      "source": "fw-2026-08-25",
+      "date": "2026-08-25",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "medium",
+      "note": "Named as the young Belgian keeper Chelsea could turn to in place of Robert Sanchez."
+    },
+    {
+      "name": "Enzo Fernandez",
+      "team": "Chelsea",
+      "source": "fw-2026-08-25",
+      "date": "2026-08-25",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "Persistent rumours of a move to Manchester City; Chelsea want a replacement lined up before sanctioning an exit."
+    },
+    {
+      "name": "Liam Delap",
+      "team": "Chelsea",
+      "source": "fw-2026-08-25",
+      "date": "2026-08-25",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "Likely to join Nottingham Forest after being distanced from Chelsea's first-team training."
+    },
+    {
+      "name": "Mykhailo Mudryk",
+      "team": "Chelsea",
+      "source": "fw-2026-08-25",
+      "date": "2026-08-25",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "medium",
+      "note": "Possible loan interest from Strasbourg; a move to Leeds United is considered unlikely."
+    },
+    {
+      "name": "Alex Scott",
+      "team": "Bournemouth",
+      "source": "fw-2026-08-25",
+      "date": "2026-08-25",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "medium",
+      "note": "Of interest to Chelsea as an Enzo Fernandez replacement, though Bournemouth are unwilling to sell."
+    },
+    {
+      "name": "Adam Wharton",
+      "team": "Crystal Palace",
+      "source": "fw-2026-08-25",
+      "date": "2026-08-25",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "medium",
+      "note": "Of interest to Chelsea as an Enzo Fernandez replacement, though Crystal Palace are unwilling to sell."
+    },
+    {
+      "name": "Ethan Pinnock",
+      "team": "Brentford",
+      "source": "fw-2026-08-25",
+      "date": "2026-08-25",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "The 33-year-old is set to join Coventry City for £5m plus £1m in add-ons, on a three-year deal with an option for a fourth."
+    },
+    {
+      "name": "Bernd Leno",
+      "team": "Fulham",
+      "source": "fw-2026-08-25",
+      "date": "2026-08-25",
+      "tags": [
+        "error"
+      ],
+      "confidence": "medium",
+      "note": "Nutmegged by Cole Palmer for Chelsea's goal after being sold the dummy."
+    },
+    {
+      "name": "Josh King",
+      "team": "Fulham",
+      "source": "fw-2026-08-25",
+      "date": "2026-08-25",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Named in connection with Fulham's first goal, cited as an example of Robert Sanchez's poor positioning."
+    },
+    {
+      "name": "Ismaila Sarr",
+      "team": "Crystal Palace",
+      "source": "fw-2026-08-27",
+      "date": "2026-08-27",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "Subject of intense transfer rumours as Oliver Glasner struggles to keep his squad core together."
+    },
+    {
+      "name": "Jean-Philippe Mateta",
+      "team": "Crystal Palace",
+      "source": "fw-2026-08-27",
+      "date": "2026-08-27",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "Subject of intense transfer rumours as Oliver Glasner struggles to keep his squad core together."
+    },
+    {
+      "name": "Adam Wharton",
+      "team": "Crystal Palace",
+      "source": "fw-2026-08-27",
+      "date": "2026-08-27",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "Called a 'jewel' and close to irreplaceable for his sublime passing and tactical awareness, amid heavy transfer interest."
+    },
+    {
+      "name": "Ollie Watkins",
+      "team": "Aston Villa",
+      "source": "fw-2026-08-27",
+      "date": "2026-08-27",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "Impending departure to Saudi Arabia, attributed to 'generational wealth', as part of a scattergun Villa rebuild."
+    },
+    {
+      "name": "Nicholas Jackson",
+      "team": "Aston Villa",
+      "source": "fw-2026-08-27",
+      "date": "2026-08-27",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "Arriving at Villa, a significant shift in the club's striking options as Ollie Watkins leaves."
+    },
+    {
+      "name": "Emiliano Martinez",
+      "team": "Aston Villa",
+      "source": "fw-2026-08-27",
+      "date": "2026-08-27",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "medium",
+      "note": "Named among the long-serving players whose high turnover is seen as a possible breaking point for Villa's European ambitions (surname only)."
+    },
+    {
+      "name": "Ezri Konsa",
+      "team": "Aston Villa",
+      "source": "fw-2026-08-27",
+      "date": "2026-08-27",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "medium",
+      "note": "Named among the long-serving players whose high turnover is seen as a possible breaking point for Villa's European ambitions (surname only)."
+    },
+    {
+      "name": "Savio",
+      "team": "Tottenham Hotspur",
+      "source": "fw-2026-08-27",
+      "date": "2026-08-27",
+      "tags": [
+        "transfer",
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Arrived at Spurs from Manchester City (previously Savinho) and impressed in the 5-1 Carabao Cup win over Charlton; part of a heavy bet on unproven ex-City talent."
+    },
+    {
+      "name": "Marmush",
+      "team": "Tottenham Hotspur",
+      "source": "fw-2026-08-27",
+      "date": "2026-08-27",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "medium",
+      "note": "Named as arriving at Spurs from Manchester City; spelt 'Marmush' in the briefing, so the exact player is uncertain."
+    },
+    {
+      "name": "Niko Gonzalez",
+      "team": "Newcastle United",
+      "source": "fw-2026-08-27",
+      "date": "2026-08-27",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "medium",
+      "note": "Signed by Newcastle from Manchester City for a reported £50m despite being seen as surplus at City; name form uncertain."
+    },
+    {
+      "name": "Mikey Moore",
+      "team": "Tottenham Hotspur",
+      "source": "fw-2026-08-27",
+      "date": "2026-08-27",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Impressed in Spurs' 5-1 Carabao Cup win over Charlton."
+    },
+    {
+      "name": "Robert Sanchez",
+      "team": "Chelsea",
+      "source": "fw-2026-08-27",
+      "date": "2026-08-27",
+      "tags": [
+        "weakness"
+      ],
+      "confidence": "high",
+      "note": "Faces former club Brighton with Chelsea's title hopes seen as tethered to him; opponents may look to exploit the panic he transmits.",
+      "quote": "I genuinely believe that Chelsea could challenge Arsenal for the title... but they have to change a goalkeeper."
+    },
+    {
+      "name": "Kieran Dewsbury-Hall",
+      "team": "Everton",
+      "source": "fw-2026-08-27",
+      "date": "2026-08-27",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Standout performer in Everton's 4-0 Carabao Cup win over Preston."
+    },
+    {
+      "name": "Bruno Fernandes",
+      "team": "Manchester United",
+      "source": "fw-2026-08-31",
+      "date": "2026-08-31",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Credited in the episode title for a brilliant display in the 5-2 win over Ipswich."
+    },
+    {
+      "name": "Harry Maguire",
+      "team": "Manchester United",
+      "source": "fw-2026-08-31",
+      "date": "2026-08-31",
+      "tags": [
+        "error"
+      ],
+      "confidence": "high",
+      "note": "His handball in the buildup to a United goal was ruled accidental so the goal stood, which the panel argued rewarded a mis-hit shot.",
+      "quote": "What [the rule] has effectively done is reward Harry Maguire for doing his job badly. By shooting off target he's rewarded, and that just shouldn't be how the rule is."
+    },
+    {
+      "name": "Kobbie Mainoo",
+      "team": "Manchester United",
+      "source": "fw-2026-08-31",
+      "date": "2026-08-31",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "Future subject to speculation despite strong performances."
+    },
+    {
+      "name": "Marcus Rashford",
+      "team": "Manchester United",
+      "source": "fw-2026-08-31",
+      "date": "2026-08-31",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "Future subject to speculation despite strong performances."
+    },
+    {
+      "name": "Harrison Armstrong",
+      "team": "Everton",
+      "source": "fw-2026-08-31",
+      "date": "2026-08-31",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "Attempted £40m sale of the academy prospect drew fan backlash, a case study in clubs selling homegrown 'pure profit' talent to satisfy PSR."
+    },
+    {
+      "name": "Micky van de Ven",
+      "team": "Tottenham Hotspur",
+      "source": "fw-2026-08-31",
+      "date": "2026-08-31",
+      "tags": [
+        "integration"
+      ],
+      "confidence": "medium",
+      "note": "Named among Spurs players lacking preseason integration as the side went two games without a point or a goal (surname only in the briefing)."
+    },
+    {
+      "name": "Ryan Cherki",
+      "team": "Manchester City",
+      "source": "fw-2026-08-31",
+      "date": "2026-08-31",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Scored his first brace, in the 4-1 win over Crystal Palace, providing a new creative spark for City."
+    },
+    {
+      "name": "Anthony Elanga",
+      "team": "Newcastle United",
+      "source": "fw-2026-08-31",
+      "date": "2026-08-31",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "His goal in the 2-0 win at Tottenham was described as the crucial moment."
+    },
+    {
+      "name": "Morgan Gibbs-White",
+      "team": "Nottingham Forest",
+      "source": "fw-2026-08-31",
+      "date": "2026-08-31",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Liverpool's midfield struggled to contain him in a 2-2 draw in which Forest led twice."
+    },
+    {
+      "name": "Petrovic",
+      "team": "Bournemouth",
+      "source": "fw-2026-08-31",
+      "date": "2026-08-31",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Made heroic saves in the 1-1 draw with Everton (surname only in the briefing)."
+    },
+    {
+      "name": "Emiliano Martinez",
+      "team": "Chelsea",
+      "source": "fw-2026-08-31",
+      "date": "2026-08-31",
+      "tags": [
+        "transfer",
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Called 'Emmy Martinez' in the briefing: his arrival at Chelsea is cited as evidence that a high-profile goalkeeping change can shift a title race, after the Robert Sanchez problem."
+    },
+    {
+      "name": "Nico Paz",
+      "team": "Como",
+      "source": "fw-2026-08-31",
+      "date": "2026-08-31",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "medium",
+      "note": "Named as an example of the buy-back-and-sell schemes clubs use to manage their books."
+    },
+    {
+      "name": "Bukayo Saka",
+      "team": "Arsenal",
+      "source": "fw-2026-09-01",
+      "date": "2026-09-01",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Scored the only goal at Villa Park, reacting quicker than Villa's defenders, in a win described as textbook title-winning efficiency."
+    },
+    {
+      "name": "Riccardo Calafiori",
+      "team": "Arsenal",
+      "source": "fw-2026-09-01",
+      "date": "2026-09-01",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Named man of the match; his darting run created Arsenal's winner at Villa Park."
+    },
+    {
+      "name": "Eberechi Eze",
+      "team": "Arsenal",
+      "source": "fw-2026-09-01",
+      "date": "2026-09-01",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Spelt 'Eza' in the briefing: provided the weighted pass for Arsenal's goal but was criticised for an instinct to drift infield and congest the structure."
+    },
+    {
+      "name": "Lucas Digne",
+      "team": "Aston Villa",
+      "source": "fw-2026-09-01",
+      "date": "2026-09-01",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "Among nine Villa departures this summer, six of whom started the Europa League final."
+    },
+    {
+      "name": "Morgan Rogers",
+      "team": "Aston Villa",
+      "source": "fw-2026-09-01",
+      "date": "2026-09-01",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "Listed among Villa's summer departures, part of a squad overhaul that has left them without a shot on target this season."
+    },
+    {
+      "name": "Gabriel Jesus",
+      "team": "Arsenal",
+      "source": "fw-2026-09-01",
+      "date": "2026-09-01",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "medium",
+      "note": "Written 'Gabrielle Jesus' in the briefing: linked to Barcelona for a fee around £15m."
+    },
+    {
+      "name": "Mykhailo Mudryk",
+      "team": "Chelsea",
+      "source": "fw-2026-09-01",
+      "date": "2026-09-01",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "medium",
+      "note": "Written 'Michaela Mudryk' in the briefing: linked to Tottenham and a reunion with Roberto De Zerbi, having been training in Battersea Park."
+    },
+    {
+      "name": "Jack Grealish",
+      "team": "Manchester City",
+      "source": "fw-2026-09-01",
+      "date": "2026-09-01",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "Potential loan to Everton following their loss of Danjuma."
+    },
+    {
+      "name": "Julian Alvarez",
+      "team": "Atletico Madrid",
+      "source": "fw-2026-09-01",
+      "date": "2026-09-01",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "Wants to leave Spain and is rumoured to Arsenal, with Atletico seeking around £150m."
+    },
+    {
+      "name": "Arnaut Danjuma",
+      "team": "Everton",
+      "source": "fw-2026-09-01",
+      "date": "2026-09-01",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "medium",
+      "note": "Everton have lost him, prompting interest in a Jack Grealish loan (surname only in the briefing)."
+    },
+    {
+      "name": "Bradley Barcola",
+      "team": "Paris Saint-Germain",
+      "source": "fw-2026-09-01",
+      "date": "2026-09-01",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "medium",
+      "note": "Written 'Bradley Barker' in the briefing: linked to Liverpool, called a huge talent but not the best finisher."
+    },
+    {
+      "name": "Lionel Messi",
+      "team": "Inter Miami",
+      "source": "fw-2026-09-01",
+      "date": "2026-09-01",
+      "tags": [
+        "retirement"
+      ],
+      "confidence": "high",
+      "note": "Announced a second retirement from international football, saying he has nothing left to give and wants to make room for younger players.",
+      "quote": "I have loved, and will always love being part of the national team. I've given it my all. I have nothing left to give."
+    }
   ],
   "unresolved": [
-    { "mention": "Tali", "context": "Tottenham - deemed 'not ready' for the intensity", "source": "fw-2026-08-24" },
-    { "mention": "Van Hecker", "context": "Tottenham - deemed 'not ready'; likely a transcription of a different player, since Brighton's Van Hecke is named separately", "source": "fw-2026-08-24" },
-    { "mention": "Sessi", "context": "Tottenham - deemed 'not ready' for the intensity", "source": "fw-2026-08-24" },
-    { "mention": "Whistler", "context": "Newcastle - an 18-year-old in the midfield pivot; almost certainly a mis-transcribed surname", "source": "fw-2026-08-24" },
-    { "mention": "Christos Tollis", "context": "cited as clever Arsenal recruitment; no such Arsenal player, likely garbled", "source": "fw-2026-08-24" },
-    { "mention": "Solace", "context": "listed as a high-value signing needing integration", "source": "fw-2026-08-24" },
-    { "mention": "Bardi", "context": "listed as a high-value signing needing integration", "source": "fw-2026-08-24" },
-    { "mention": "Rogers", "context": "appears parenthetically beside Diego Carlos in Villa's absentee list; unclear whether a separate player (Morgan Rogers) is meant", "source": "fw-2026-08-24" }
+    {
+      "mention": "Tali",
+      "context": "Tottenham - deemed 'not ready' for the intensity",
+      "source": "fw-2026-08-24"
+    },
+    {
+      "mention": "Van Hecker",
+      "context": "Tottenham - deemed 'not ready'; likely a transcription of a different player, since Brighton's Van Hecke is named separately",
+      "source": "fw-2026-08-24"
+    },
+    {
+      "mention": "Sessi",
+      "context": "Tottenham - deemed 'not ready' for the intensity",
+      "source": "fw-2026-08-24"
+    },
+    {
+      "mention": "Whistler",
+      "context": "Newcastle - an 18-year-old in the midfield pivot; almost certainly a mis-transcribed surname",
+      "source": "fw-2026-08-24"
+    },
+    {
+      "mention": "Christos Tollis",
+      "context": "cited as clever Arsenal recruitment; no such Arsenal player, likely garbled",
+      "source": "fw-2026-08-24"
+    },
+    {
+      "mention": "Solace",
+      "context": "listed as a high-value signing needing integration",
+      "source": "fw-2026-08-24"
+    },
+    {
+      "mention": "Bardi",
+      "context": "listed as a high-value signing needing integration",
+      "source": "fw-2026-08-24"
+    },
+    {
+      "mention": "Rogers",
+      "context": "appears parenthetically beside Diego Carlos in Villa's absentee list; unclear whether a separate player (Morgan Rogers) is meant",
+      "source": "fw-2026-08-24"
+    },
+    {
+      "mention": "Tier Larry",
+      "context": "credited with a hat-trick in Everton 4-0 Preston; clearly a mis-transcribed name",
+      "source": "fw-2026-08-27"
+    },
+    {
+      "mention": "Torro",
+      "context": "Tottenham - named among players lacking preseason integration; likely mis-transcribed",
+      "source": "fw-2026-08-31"
+    },
+    {
+      "mention": "Fernandez (Tottenham)",
+      "context": "named among Spurs players lacking preseason integration; ambiguous, since Enzo Fernandez is placed at Chelsea/Man City in other briefings",
+      "source": "fw-2026-08-31"
+    },
+    {
+      "mention": "Netto",
+      "context": "Chelsea wing-back in Alonso's 3-2-5; likely mis-transcribed",
+      "source": "fw-2026-08-31"
+    },
+    {
+      "mention": "Hatau",
+      "context": "Chelsea wing-back in Alonso's 3-2-5; likely mis-transcribed",
+      "source": "fw-2026-08-31"
+    },
+    {
+      "mention": "Solos",
+      "context": "Arsenal player who struggled against Coventry and Man City and nearly saw a second yellow for pulling down McGinn; mis-transcribed",
+      "source": "fw-2026-09-01"
+    },
+    {
+      "mention": "Ibrahim Mai",
+      "context": "18-year-old forward joining Aston Villa for about £50m; name almost certainly garbled",
+      "source": "fw-2026-09-01"
+    }
+  ],
+  "out_of_scope": [
+    {
+      "mention": "Wout Faes",
+      "team": "Leicester City",
+      "league": "League One",
+      "source": "fw-2026-08-25",
+      "note": "Reportedly refusing to play amid Leicester's poor start and thin squad."
+    },
+    {
+      "mention": "Konstantinos Mavropanos",
+      "team": "West Ham",
+      "league": "Championship",
+      "source": "fw-2026-08-25",
+      "note": "Defensive errors cited in West Ham's poor start after relegation."
+    },
+    {
+      "mention": "Max Kilman",
+      "team": "West Ham",
+      "league": "Championship",
+      "source": "fw-2026-08-25",
+      "note": "Defensive errors cited in West Ham's poor start after relegation."
+    },
+    {
+      "mention": "Langstaff",
+      "team": "Salford City",
+      "league": "League Two",
+      "source": "fw-2026-08-25",
+      "note": "A quality signing Salford have failed to convert into points; surname only."
+    },
+    {
+      "mention": "Molyneux",
+      "team": "Salford City",
+      "league": "League Two",
+      "source": "fw-2026-08-25",
+      "note": "A quality signing Salford have failed to convert into points; surname only."
+    },
+    {
+      "mention": "Mason Holgate",
+      "team": "West Bromwich Albion",
+      "league": "Championship",
+      "source": "fw-2026-08-25",
+      "note": "Given an unprecedented two-game retrospective ban for a handball against Norwich, setting a new EFL disciplinary precedent."
+    },
+    {
+      "mention": "Cristiano Ronaldo",
+      "team": "Al-Nassr",
+      "league": "Saudi Pro League",
+      "source": "fw-2026-08-27",
+      "note": "Substituted at half-time by Ange Postecoglou with the side 2-0 down; they won 3-2, read as a shift in the player/manager power dynamic."
+    },
+    {
+      "mention": "Callum McGregor",
+      "team": "Celtic",
+      "league": "Scottish Premiership",
+      "source": "fw-2026-08-27",
+      "note": "Celtic captain, criticised after the collapse against Lask ('Papier-mâché')."
+    },
+    {
+      "mention": "Neil Harris",
+      "team": "Cambridge United",
+      "league": "EFL",
+      "source": "fw-2026-08-31",
+      "note": "Manager, after a late loss to Huddersfield ('We've been proper mugged off')."
+    }
   ]
 }

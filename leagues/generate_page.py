@@ -216,7 +216,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     background: #21262d; color: #8b949e; vertical-align: 1px; }
   .pc-tag.injury, .pc-tag.absence { background: #4a1d1d; color: #f8b4b4; }
   .pc-tag.breakout, .pc-tag.form { background: #10331f; color: #7ee2a8; }
-  .pc-tag.error { background: #45260a; color: #f0b429; }
+  .pc-tag.error, .pc-tag.weakness { background: #45260a; color: #f0b429; }
+  .pc-tag.transfer { background: #12283f; color: #79c0ff; }
+  .pc-tag.retirement { background: #2b1f45; color: #c4a5f5; }
   /* Phone-friendly: tighten spacing, wrap control rows, drop secondary columns. */
   @media (max-width: 640px) {
     header { padding: 14px 14px 0; }
@@ -1513,8 +1515,10 @@ def attach_player_notes(leagues_data: dict) -> None:
             "conf": n.get("confidence", ""), "src": src.get("show", ""),
         })
     if unmatched:
+        shown = ", ".join(f"'{u}'" for u in sorted(set(unmatched))[:8])
+        extra = len(set(unmatched)) - 8
         print(f"  [notes] {len(unmatched)} note(s) not attached (no unique player match): "
-              + ", ".join(f"'{u}'" for u in unmatched))
+              + shown + (f", +{extra} more" if extra > 0 else ""))
 
 
 def read_competitions() -> list[dict]:
