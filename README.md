@@ -386,4 +386,5 @@ data/leagues/<key>/       teams.csv, matches.csv (+ generated sim_results.json)
 data/national/<key>.json  fetched national-team games (gitignored)
 data/competitions/<key>.json  fetched cup standings + results (gitignored)
 data/headshots/<key>.json  cached player headshot URLs (gitignored)
+data/notes/players.json   curated briefing notes shown on player cards (committed)
 ```

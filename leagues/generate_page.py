@@ -43,7 +43,7 @@ from pathlib import Path
 
 from .config import LEAGUES
 from .ingest import DATA_ROOT
-from .players import _norm_team, resolve_team_code
+from .players import _fold, _norm_team, resolve_team_code
 
 OUT = Path(__file__).resolve().parent.parent / "leagues.html"
 
@@ -205,6 +205,18 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .pcard-sub { color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
     margin: 14px 2px 6px; }
   .pcard-note { color: #8b949e; font-size: 12px; margin-top: 12px; }
+  .pc-n { border-top: 1px solid #21262d; padding: 9px 0 2px; }
+  .pc-n:first-of-type { border-top: none; }
+  .pc-n .t { color: #c9d1d9; font-size: 13px; }
+  .pc-n .q { color: #8b949e; font-size: 12px; font-style: italic; margin-top: 4px;
+    border-left: 2px solid #30363d; padding-left: 8px; }
+  .pc-n .s { color: #6e7681; font-size: 11px; margin-top: 4px; }
+  .pc-tag { display: inline-block; font-size: 10px; text-transform: uppercase;
+    letter-spacing: .04em; padding: 1px 6px; border-radius: 9px; margin-right: 5px;
+    background: #21262d; color: #8b949e; vertical-align: 1px; }
+  .pc-tag.injury, .pc-tag.absence { background: #4a1d1d; color: #f8b4b4; }
+  .pc-tag.breakout, .pc-tag.form { background: #10331f; color: #7ee2a8; }
+  .pc-tag.error { background: #45260a; color: #f0b429; }
   /* Phone-friendly: tighten spacing, wrap control rows, drop secondary columns. */
   @media (max-width: 640px) {
     header { padding: 14px 14px 0; }
@@ -583,6 +595,19 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     if (mins > 0) sections.push(
       `<div class="pcard-sub">Per 90</div>
        <div class="pcard-grid">${tile(per90(g), "G/90")}${tile(per90(a), "A/90")}${tile(per90(ga), "G+A/90")}</div>`);
+    // Curated briefing notes. Display-only context: it never touches the model, and each note
+    // carries its date and source (plus the verbatim quote when there is one) so the reader can
+    // weigh it rather than take it as fact.
+    if ((p.notes || []).length) sections.push(
+      `<div class="pcard-sub">Notes</div>` + p.notes.map(n => {
+        const tags = (n.tags || []).map(t =>
+          `<span class="pc-tag ${esc(t)}">${esc(t)}</span>`).join("");
+        const q = n.quote ? `<div class="q">&ldquo;${esc(n.quote)}&rdquo;</div>` : "";
+        const meta = [n.src, n.date, n.conf && n.conf !== "high" ? n.conf + " confidence" : ""]
+          .filter(Boolean).join(" &middot; ");
+        return `<div class="pc-n"><div class="t">${tags}${esc(n.note)}</div>${q}` +
+               (meta ? `<div class="s">${meta}</div>` : "") + `</div>`;
+      }).join(""));
     if (p.img && (p.img_by || p.img_lic))          // CC-BY-SA: attribution is required
       sections.push(`<div class="pcard-note">Photo: ${p.img_page
         ? `<a href="${esc(p.img_page)}" target="_blank" rel="noopener">${esc(p.img_by || "Wikipedia")}</a>`
@@ -1438,6 +1463,60 @@ def read_headshots(key: str) -> dict:
         return {}
 
 
+def read_player_notes() -> dict:
+    """Curated briefing notes from data/notes/players.json (hand-reviewed, committed)."""
+    path = DATA_ROOT.parent / "notes" / "players.json"
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (ValueError, OSError):
+        return {}
+
+
+def attach_player_notes(leagues_data: dict) -> None:
+    """Hang each curated note on the player it names, when that player is unambiguous.
+
+    Briefings name people loosely — full names, bare surnames, and outright transcription
+    errors — so a note is attached only when exactly one player in the loaded leagues matches
+    (full name first, then surname). Anything ambiguous is reported and dropped rather than
+    pinned on the wrong player, which is the failure mode that actually embarrasses a report.
+    """
+    doc = read_player_notes()
+    notes = doc.get("players") or []
+    if not notes:
+        return
+    sources = doc.get("sources") or {}
+    by_full: dict[str, list] = {}
+    by_last: dict[str, list] = {}
+    for ld in leagues_data.values():
+        for pl in ld.get("players", []):
+            folded = _fold(pl.get("player_name", ""))
+            if not folded:
+                continue
+            by_full.setdefault(folded, []).append(pl)
+            by_last.setdefault(folded.split()[-1], []).append(pl)
+
+    unmatched = []
+    for n in notes:
+        folded = _fold(n.get("name", ""))
+        hits = by_full.get(folded) or []
+        if len(hits) != 1 and folded:                 # fall back to a *unique* surname
+            hits = by_last.get(folded.split()[-1], [])
+        if len(hits) != 1:
+            unmatched.append(n.get("name", "?"))
+            continue
+        src = sources.get(n.get("source"), {})
+        hits[0].setdefault("notes", []).append({
+            "note": n.get("note", ""), "quote": n.get("quote", ""),
+            "tags": n.get("tags", []), "date": n.get("date", ""),
+            "conf": n.get("confidence", ""), "src": src.get("show", ""),
+        })
+    if unmatched:
+        print(f"  [notes] {len(unmatched)} note(s) not attached (no unique player match): "
+              + ", ".join(f"'{u}'" for u in unmatched))
+
+
 def read_competitions() -> list[dict]:
     """Load every data/competitions/*.json (Leagues Cup / Champions League)."""
     return _read_json_dir("competitions")
@@ -1495,6 +1574,7 @@ def build(leagues_data: dict) -> str:
                 pl["img"] = hit["img"]
                 pl["img_page"], pl["img_by"], pl["img_lic"] = (
                     hit.get("page", ""), hit.get("by", ""), hit.get("lic", ""))
+    attach_player_notes(leagues_data)              # curated briefing notes -> player cards
     competitions = tag_competition_teams(read_competitions(), list(leagues_data))
     return (HTML_TEMPLATE
             .replace("__DATA_PLACEHOLDER__", json.dumps(leagues_data))

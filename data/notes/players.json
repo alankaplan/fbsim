@@ -1,0 +1,76 @@
+{
+  "_readme": "Curated player notes extracted from podcast/press briefings pasted into the assistant. Hand-reviewed and version-controlled: no live model runs at build time. Notes are DISPLAY-ONLY - they never feed the simulator. Every note keeps its source and, where possible, a verbatim quote, so a reader can judge it. Names that a transcript garbled are parked in `unresolved` rather than guessed at, because attaching a note to the wrong player is worse than dropping it.",
+  "updated": "2026-08-25T00:00:00Z",
+  "sources": {
+    "fw-2026-08-24": {
+      "show": "Football Weekly",
+      "title": "Manchester United mauled and sorry Spurs mark Premier League kick-off",
+      "date": "2026-08-24"
+    }
+  },
+  "players": [
+    { "name": "Harry Maguire", "team": "Manchester United", "source": "fw-2026-08-24", "date": "2026-08-24",
+      "tags": ["error"], "confidence": "high",
+      "note": "Marked and fouled his own teammate on Hull's opening goal, preventing a block on the shot.",
+      "quote": "Harry Maguire marking one of his own players and marking him so well that he fouled him." },
+
+    { "name": "Emiliano Martinez", "team": "Aston Villa", "source": "fw-2026-08-24", "date": "2026-08-24",
+      "tags": ["absence"], "confidence": "medium",
+      "note": "Missing from a decimated Villa spine in the 4-0 loss at Brighton (surname-only in the briefing)." },
+    { "name": "Ollie Watkins", "team": "Aston Villa", "source": "fw-2026-08-24", "date": "2026-08-24",
+      "tags": ["absence"], "confidence": "medium",
+      "note": "Absent as Villa's spine was decimated; the side lacked depth and conceded four in 30 minutes." },
+    { "name": "Diego Carlos", "team": "Aston Villa", "source": "fw-2026-08-24", "date": "2026-08-24",
+      "tags": ["absence"], "confidence": "medium",
+      "note": "Listed among the absentees that left Villa's spine decimated." },
+    { "name": "Youri Tielemans", "team": "Aston Villa", "source": "fw-2026-08-24", "date": "2026-08-24",
+      "tags": ["absence"], "confidence": "medium",
+      "note": "Listed among the absentees that left Villa's spine decimated." },
+    { "name": "Ezri Konsa", "team": "Aston Villa", "source": "fw-2026-08-24", "date": "2026-08-24",
+      "tags": ["absence"], "confidence": "medium",
+      "note": "Listed among the absentees that left Villa's spine decimated." },
+    { "name": "Amadou Onana", "team": "Aston Villa", "source": "fw-2026-08-24", "date": "2026-08-24",
+      "tags": ["absence"], "confidence": "medium",
+      "note": "Listed among the absentees that left Villa's spine decimated." },
+
+    { "name": "Jan Paul van Hecke", "team": "Brighton", "source": "fw-2026-08-24", "date": "2026-08-24",
+      "tags": ["absence"], "confidence": "medium",
+      "note": "Named among key Brighton players missing, though Brighton still won 4-0." },
+    { "name": "Danny Welbeck", "team": "Brighton", "source": "fw-2026-08-24", "date": "2026-08-24",
+      "tags": ["absence"], "confidence": "medium",
+      "note": "Named among key Brighton players missing, though Brighton still won 4-0." },
+    { "name": "Vuskovic", "team": "Brighton", "source": "fw-2026-08-24", "date": "2026-08-24",
+      "tags": ["breakout"], "confidence": "medium",
+      "note": "19-year-old Croatian international; standout in defence, contrasting with struggling high-priced signings elsewhere (surname-only in the briefing)." },
+
+    { "name": "Anthony Elanga", "team": "Newcastle United", "source": "fw-2026-08-24", "date": "2026-08-24",
+      "tags": ["form"], "confidence": "high",
+      "note": "A counter-attacking threat against Liverpool's very high line in the 2-2 draw.",
+      "quote": "They are like the 'Slow Horses' of football... MI5 misfits... but they were full of running." },
+    { "name": "Yoane Wissa", "team": "Newcastle United", "source": "fw-2026-08-24", "date": "2026-08-24",
+      "tags": ["form"], "confidence": "high",
+      "note": "A counter-attacking threat against Liverpool's very high line in the 2-2 draw.",
+      "quote": "They are like the 'Slow Horses' of football... MI5 misfits... but they were full of running." },
+    { "name": "Lewis Miley", "team": "Newcastle United", "source": "fw-2026-08-24", "date": "2026-08-24",
+      "tags": ["breakout"], "confidence": "high",
+      "note": "At 20, part of a young Newcastle midfield pivot; the performance was seen as a marked improvement on last season." },
+
+    { "name": "Ibrahim Sangare", "team": "Brentford", "source": "fw-2026-08-24", "date": "2026-08-24",
+      "tags": ["debut"], "confidence": "medium",
+      "note": "Seamless debut in midfield, cited as evidence of Brentford's succession planning (surname-only in the briefing)." },
+
+    { "name": "Enzo Fernandez", "team": "Chelsea", "source": "fw-2026-08-24", "date": "2026-08-24",
+      "tags": ["integration"], "confidence": "medium",
+      "note": "Named among high-value signings the briefing says need patient integration; early results are favouring settled squads." }
+  ],
+  "unresolved": [
+    { "mention": "Tali", "context": "Tottenham - deemed 'not ready' for the intensity", "source": "fw-2026-08-24" },
+    { "mention": "Van Hecker", "context": "Tottenham - deemed 'not ready'; likely a transcription of a different player, since Brighton's Van Hecke is named separately", "source": "fw-2026-08-24" },
+    { "mention": "Sessi", "context": "Tottenham - deemed 'not ready' for the intensity", "source": "fw-2026-08-24" },
+    { "mention": "Whistler", "context": "Newcastle - an 18-year-old in the midfield pivot; almost certainly a mis-transcribed surname", "source": "fw-2026-08-24" },
+    { "mention": "Christos Tollis", "context": "cited as clever Arsenal recruitment; no such Arsenal player, likely garbled", "source": "fw-2026-08-24" },
+    { "mention": "Solace", "context": "listed as a high-value signing needing integration", "source": "fw-2026-08-24" },
+    { "mention": "Bardi", "context": "listed as a high-value signing needing integration", "source": "fw-2026-08-24" },
+    { "mention": "Rogers", "context": "appears parenthetically beside Diego Carlos in Villa's absentee list; unclear whether a separate player (Morgan Rogers) is meant", "source": "fw-2026-08-24" }
+  ]
+}
