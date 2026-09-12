@@ -43,7 +43,7 @@ from pathlib import Path
 
 from .config import LEAGUES
 from .ingest import DATA_ROOT
-from .players import _fold, _norm_team, resolve_team_code
+from .players import _fold, _norm_team, resolve_team_code, resolve_team_multi
 
 OUT = Path(__file__).resolve().parent.parent / "leagues.html"
 
@@ -1445,8 +1445,9 @@ def read_players(key: str) -> list[dict]:
     """Load data/leagues/<key>/players.csv (if present) with numeric fields typed.
 
     Re-resolves each row's team_code from its team_name against the current teams.csv
-    (accent-folding + short-name tolerance), so an already-fetched players.csv whose
-    codes were blanked by a name mismatch is repaired here — no FBref re-fetch needed."""
+    (accent-folding, short-name tolerance, and Understat's comma-joined multi-club strings),
+    so an already-fetched players.csv whose codes were blanked by a name mismatch is repaired
+    here — no re-fetch needed."""
     path = DATA_ROOT / key / "players.csv"
     if not path.exists():
         return []
@@ -1461,7 +1462,7 @@ def read_players(key: str) -> list[dict]:
             for k in ("xg", "xa", "xg_chain", "xg_buildup"):
                 r[k] = float(r[k]) if r.get(k) not in ("", None) else 0.0
             raw = r.get("team_name", "")
-            code, canon = resolve_team_code(_norm_team(raw), code_by_norm, name_by_norm)
+            code, canon = resolve_team_multi(raw, code_by_norm, name_by_norm)
             if code:
                 r["team_code"], r["team_name"] = code, canon
             out.append(r)

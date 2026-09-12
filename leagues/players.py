@@ -70,6 +70,12 @@ _CLUB_ALIASES = {
     "m gladbach": "borussia monchengladbach",
     "gladbach": "borussia monchengladbach",
     "cologne": "koln", "koeln": "koln",
+    # MLS: FBref's initialisms share no whole token with the official names in teams.csv
+    # ("lafc" vs "Los Angeles FC"), and "rb new york" reverses "New York RB". Values are the
+    # *normalised* canonical form, since _norm_team applies this map last.
+    "lafc": "los angeles",
+    "nycfc": "new york city",
+    "rb new york": "new york rb",
 }
 
 
@@ -102,7 +108,8 @@ def _stem_overlap(a_toks: set, b_toks: set, minlen: int = 4) -> bool:
     return False
 
 
-def resolve_team_code(norm_key: str, code_by_norm: dict, name_by_norm: dict) -> tuple[str, str]:
+def resolve_team_code(norm_key: str, code_by_norm: dict, name_by_norm: dict,
+                      allow_stem: bool = True) -> tuple[str, str]:
     """Map a normalised player-source team name to a (team_code, canonical_name) from teams.csv.
 
     Exact normalised match first (the common case — Big-5 fixtures and players share a
@@ -112,7 +119,12 @@ def resolve_team_code(norm_key: str, code_by_norm: dict, name_by_norm: dict) -> 
     a *unique* stem match (Understat's "Lyon"/"Inter"/"Brest" vs the official "Olympique
     Lyonnais"/"Internazionale"/"Stade Brestois", which share no whole token but a ≥4-char
     prefix). Both fallbacks assign only when exactly one team matches, so an ambiguous or
-    non-overlapping name returns ("", "") and is left unmatched — never mis-assigned."""
+    non-overlapping name returns ("", "") and is left unmatched — never mis-assigned.
+
+    ``allow_stem=False`` drops the stem tier. Callers resolving a *guessed* name — one segment
+    of Understat's comma-joined multi-club string, say — want that: a club that isn't in this
+    league at all can still stem-match a unique wrong team ("Deportivo La Coruna" stems onto
+    "Deportivo Alaves"), and a wrong assignment is worse there than no assignment."""
     if norm_key in code_by_norm:
         return code_by_norm[norm_key], name_by_norm[norm_key]
     key_toks = set(norm_key.split())
@@ -126,11 +138,43 @@ def resolve_team_code(norm_key: str, code_by_norm: dict, name_by_norm: dict) -> 
     if len(hits) == 1:
         cand, code = hits[0]
         return code, name_by_norm[cand]
+    if not allow_stem:
+        return "", ""
     stem = [(cand, code) for cand, code in code_by_norm.items()
             if _stem_overlap(key_toks, set(cand.split()))]
     if len(stem) == 1:
         cand, code = stem[0]
         return code, name_by_norm[cand]
+    return "", ""
+
+
+def resolve_team_multi(raw: str, code_by_norm: dict, name_by_norm: dict) -> tuple[str, str]:
+    """Resolve a player-source team name that may name *several* clubs.
+
+    Understat returns ONE combined season row for a player who has turned out for two clubs in
+    the same season, with ``team_title`` as e.g. "Chelsea,Manchester City". ``_norm_team`` splits
+    on whitespace/./-/' but not commas, so the whole string matches nothing and the player
+    vanishes from both clubs' squad tables.
+
+    Try the plain name first (the overwhelmingly common case). Only on a miss, split on commas
+    and take the *last* segment that resolves: Understat lists the clubs in the order the player
+    turned out for them, so the last is where they are now — and for a player who has since left
+    this league, the last *resolvable* one is the club they actually played these minutes for.
+    Their totals still cover both spells either way.
+
+    Segments are resolved with ``allow_stem=False``. A club that isn't in this league at all can
+    still stem-match a unique wrong team ("Deportivo La Coruna" onto "Deportivo Alaves"), and
+    guessing wrong is worse than leaving the player unmatched."""
+    code, canon = resolve_team_code(_norm_team(raw), code_by_norm, name_by_norm)
+    if code or "," not in (raw or ""):
+        return code, canon
+    for part in reversed([x.strip() for x in raw.split(",")]):
+        if not part:
+            continue
+        code, canon = resolve_team_code(_norm_team(part), code_by_norm, name_by_norm,
+                                        allow_stem=False)
+        if code:
+            return code, canon
     return "", ""
 
 
@@ -269,7 +313,7 @@ def build_players(cfg: LeagueConfig, season: str, source: str) -> Path:
         if not r["player_name"] or r["minutes"] in ("", 0):   # drop non-players / no minutes
             continue
         raw = r["team_name"]
-        code, canon = resolve_team_code(_norm_team(raw), code_by_norm, name_by_norm)
+        code, canon = resolve_team_multi(raw, code_by_norm, name_by_norm)
         r["team_code"] = code
         r["team_name"] = canon or raw
         if not code and raw:                          # couldn't tie this squad to teams.csv
@@ -283,7 +327,11 @@ def build_players(cfg: LeagueConfig, season: str, source: str) -> Path:
               f"(players hidden on those team pages): {names}")
 
     out = data_dir / "players.csv"
-    if not out_rows and out.exists():              # don't clobber good data with nothing
+    # Only "existing data" if the file actually holds rows — a header-only players.csv (written
+    # by an earlier empty fetch) is nothing to keep, and reporting it as kept while the caller
+    # counts 0 rows reads as a contradiction.
+    has_rows = out.exists() and len(out.read_text(encoding="utf-8").splitlines()) > 1
+    if not out_rows and has_rows:                  # don't clobber good data with nothing
         print(f"  [players] no player data for {cfg.name} {season} — keeping existing players.csv")
         return out
     out.parent.mkdir(parents=True, exist_ok=True)
