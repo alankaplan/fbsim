@@ -1,6 +1,6 @@
 {
   "_readme": "Curated player notes extracted from podcast/press briefings pasted into the assistant. Hand-reviewed and version-controlled: no live model runs at build time. Notes are DISPLAY-ONLY - they never feed the simulator. Every note keeps its source and, where possible, a verbatim quote, so a reader can judge it. Names that a transcript garbled are parked in `unresolved` rather than guessed at, because attaching a note to the wrong player is worse than dropping it.",
-  "updated": "2026-09-07T00:00:00Z",
+  "updated": "2026-09-09T00:00:00Z",
   "sources": {
     "fw-2026-08-24": {
       "show": "Football Weekly",
@@ -36,6 +36,11 @@
       "show": "Football Weekly",
       "title": "Arsenal beat Chelsea to maintain perfect start and late drama at Everton",
       "date": "2026-09-07"
+    },
+    "fw-2026-09-09": {
+      "show": "Football Weekly",
+      "title": "Haaland at the double as Champions League returns",
+      "date": "2026-09-09"
     }
   },
   "players": [
@@ -1186,6 +1191,241 @@
       ],
       "confidence": "high",
       "note": "Scored with a single touch to set and a powerful finish from a tight angle in the 2-2 draw with Manchester United."
+    },
+    {
+      "name": "Alex Iwobi",
+      "team": "Fulham",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "unrest"
+      ],
+      "confidence": "medium",
+      "note": "Reported to have deleted social media posts after defeats, cited as a sign of dressing-room friction under Arbeloa."
+    },
+    {
+      "name": "Curtis Jones",
+      "team": "Internazionale",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "integration",
+        "error"
+      ],
+      "confidence": "medium",
+      "note": "Integrating well into Inter's midfield, though an underhit pass led to a goal."
+    },
+    {
+      "name": "Denzel Dumfries",
+      "team": "Real Madrid",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "role"
+      ],
+      "confidence": "medium",
+      "note": "Named as the preferred right-back, which is what pushes the Alexander-Arnold position question. The briefing places him at Inter, but he is in Real Madrid's squad here — it also quotes Mourinho as Real's manager and praises Real's keeper, so the summary appears to have swapped the sides of the tie."
+    },
+    {
+      "name": "Emile Smith-Rowe",
+      "team": "Fulham",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "unrest"
+      ],
+      "confidence": "medium",
+      "note": "Named alongside Iwobi as a senior player deleting social media posts amid Fulham's unrest."
+    },
+    {
+      "name": "Erling Haaland",
+      "team": "Man City",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "milestone",
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Scored twice in the 2-0 win at Porto, reaching 59 goals in 59 Champions League appearances. The briefing's point is how little he needs the ball to decide a game.",
+      "quote": "Harland's ridiculous and he needs to touch the ball five times and he can score two goals for you."
+    },
+    {
+      "name": "Ethan Mbappé",
+      "team": "LOSC Lille",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "error"
+      ],
+      "confidence": "high",
+      "note": "Sent off for an elbow in Lille's 3-2 defeat at Real Betis."
+    },
+    {
+      "name": "Ethan Nwaneri",
+      "team": "Borussia Dortmund",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "breakout"
+      ],
+      "confidence": "high",
+      "note": "The injuries to Karetsas and Konstantelias have accelerated his integration; the briefing expects an extended run and rates him in both offensive and defensive phases."
+    },
+    {
+      "name": "Gianluigi Donnarumma",
+      "team": "Man City",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "error"
+      ],
+      "confidence": "high",
+      "note": "Booked again at Porto — ten yellow cards since joining City, mostly for complaining and minor infractions, described as a pattern of silliness."
+    },
+    {
+      "name": "Giannis Konstantelias",
+      "team": "Borussia Dortmund",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Suffered an ACL tear, the second of Dortmund's two serious injuries to major signings. Spelt 'Giannis Constantellas' in the briefing."
+    },
+    {
+      "name": "Hakan Calhanoglu",
+      "team": "Internazionale",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Named in Inter's controlling midfield; spelt 'Chalanoglu' in the briefing."
+    },
+    {
+      "name": "John McGinn",
+      "team": "Aston Villa",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Scored what the panel called a beautiful curler in the 3-2 win at Club Brugge."
+    },
+    {
+      "name": "Josep Martínez",
+      "team": "Internazionale",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "error"
+      ],
+      "confidence": "high",
+      "note": "Sommer's replacement in goal: spectacular saves, but gifted Real Madrid a goal with a failed dragback in his own area. Spelt 'Yusef Martinez' in the briefing."
+    },
+    {
+      "name": "Jude Bellingham",
+      "team": "Real Madrid",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Denied by Courtois among the chances in the 2-1 win over Inter. The briefing places him at Inter, but he is in Real Madrid's squad here — it also quotes Mourinho as Real's manager and praises Real's keeper, so the summary appears to have swapped the sides of the tie."
+    },
+    {
+      "name": "Konstantinos Karetsas",
+      "team": "Borussia Dortmund",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Hospitalised with respiratory issues — one of two major Dortmund signings lost to injury. Spelt 'Constantinos Caretsas' in the briefing."
+    },
+    {
+      "name": "Nicolas Jackson",
+      "team": "Aston Villa",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Scored against Club Brugge after their keeper's error, in Villa's 3-2 win."
+    },
+    {
+      "name": "Nicolò Barella",
+      "team": "Internazionale",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Part of an Inter midfield the briefing says controlled the game despite the defeat."
+    },
+    {
+      "name": "Piotr Zielinski",
+      "team": "Internazionale",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Named in the Inter midfield credited with significant control against Real Madrid."
+    },
+    {
+      "name": "Serhou Guirassy",
+      "team": "Borussia Dortmund",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "error"
+      ],
+      "confidence": "high",
+      "note": "Scored an own goal off his face in the 3-2 win over Villarreal."
+    },
+    {
+      "name": "Thibaut Courtois",
+      "team": "Real Madrid",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Several crucial saves in the 2-1 win over Inter, described as the stabilising force in the side."
+    },
+    {
+      "name": "Trent Alexander-Arnold",
+      "team": "Real Madrid",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "role"
+      ],
+      "confidence": "high",
+      "note": "Mourinho said publicly that he is not a midfielder despite being used there for England and Liverpool, with Dumfries preferred at right-back. The briefing places him at Inter, but he is in Real Madrid's squad here — it also quotes Mourinho as Real's manager and praises Real's keeper, so the summary appears to have swapped the sides of the tie.",
+      "quote": "Actually, Trent Alexander-Arnold played midfield with England and Liverpool, but he's not a midfielder."
+    },
+    {
+      "name": "Troy Parrott",
+      "team": "Real Betis",
+      "source": "fw-2026-09-09",
+      "date": "2026-09-09",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Scored winners against both Real Madrid and Lille; his finishing is credited with reviving Pellegrini's Betis."
     }
   ],
   "unresolved": [
@@ -1392,11 +1632,11 @@
       "note": "Tactical indecision blamed for the 2-2 draw at Everton."
     },
     {
-      "mention": "Arbola",
+      "mention": "Álvaro Arbeloa",
       "team": "Fulham",
       "league": "Premier League (manager, not a player)",
       "source": "fw-2026-09-07",
-      "note": "Name garbled in the briefing; criticised for repeatedly blaming bad luck across three winless games."
+      "note": "Criticised for repeatedly blaming bad luck across three winless games, and for friction with senior players. Named 'Arbola' in the 7 Sep briefing and identified in the 9 Sep one."
     },
     {
       "mention": "Unai Emery",
@@ -1411,6 +1651,62 @@
       "league": "retired referee",
       "source": "fw-2026-09-07",
       "note": "Podcast admissions — playing 'mini-games' with his whistle and having it in for certain players — criticised as unprofessional and damaging to active officials."
+    },
+    {
+      "mention": "Yann Sommer",
+      "team": "Club Brugge",
+      "league": "Belgian Pro League",
+      "source": "fw-2026-09-09",
+      "note": "A bizarre evening against Aston Villa — ran out of his box holding the ball and conceded a soft goal. Spelt 'Jan Sommer' in the briefing."
+    },
+    {
+      "mention": "Razvan Marin",
+      "team": "AEK Athens",
+      "league": "Greek Super League",
+      "source": "fw-2026-09-09",
+      "note": "Scored what the panel called a world-class free kick against LASK."
+    },
+    {
+      "mention": "Jarrod Bowen",
+      "team": "West Ham",
+      "league": "Championship",
+      "source": "fw-2026-09-09",
+      "note": "Scored twice in the 3-2 win over Bournemouth that took West Ham top of the Championship."
+    },
+    {
+      "mention": "Enzo Maresca",
+      "team": "Man City",
+      "league": "Premier League (manager, not a player)",
+      "source": "fw-2026-09-09",
+      "note": "City winning but not yet purring; the panel is unconvinced by the post-Guardiola identity in Europe."
+    },
+    {
+      "mention": "Jose Mourinho",
+      "team": "Real Madrid",
+      "league": "La Liga (manager, not a player)",
+      "source": "fw-2026-09-09",
+      "note": "Said publicly that Alexander-Arnold is not a midfielder."
+    },
+    {
+      "mention": "Manuel Pellegrini",
+      "team": "Real Betis",
+      "league": "La Liga (manager, not a player)",
+      "source": "fw-2026-09-09",
+      "note": "His Betis side is being revived by Parrott's finishing."
+    },
+    {
+      "mention": "George Desmond Kamarasi",
+      "team": "Southeast Dons",
+      "league": "amateur",
+      "source": "fw-2026-09-09",
+      "note": "Captain of the amateur side, reportedly in line for a traditional Ugandan throne."
+    },
+    {
+      "mention": "Álvaro Arbeloa",
+      "team": "Fulham",
+      "league": "Premier League (manager, not a player)",
+      "source": "fw-2026-09-09",
+      "note": "Fan restlessness, no defensive structure, and questions over his social competence and favouritism toward new recruits."
     }
   ]
 }
