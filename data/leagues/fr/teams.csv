@@ -1,19 +1,19 @@
 id,team_name,code
-1,Stade Rennais FC 1901,SR1
-2,Olympique de Marseille,ODM
-3,Racing Club de Lens,RCD
-4,Olympique Lyonnais,OLY
-5,AS Monaco FC,MON
-6,Le Havre AC,LE
+1,Olympique de Marseille,ODM
+2,RC Strasbourg Alsace,STR
+3,RC Lens,LEN
+4,AJ Auxerre,AJ
+5,Le Mans FC,LE
+6,Stade Brestois 29,SB2
 7,OGC Nice,NIC
-8,Toulouse FC,TOU
-9,Stade Brestois 29,SB2
-10,Lille OSC,LIL
-11,AJ Auxerre,AJ
-12,FC Lorient,LOR
-13,FC Metz,MET
-14,RC Strasbourg Alsace,STR
-15,Angers SCO,ANG
-16,Paris FC,PAR
-17,FC Nantes,NAN
-18,Paris Saint-Germain FC,PA1
+8,FC Lorient,LOR
+9,Toulouse FC,TOU
+10,Olympique Lyonnais,OLY
+11,Estac Troyes,EST
+12,Paris FC,PAR
+13,Angers SCO,ANG
+14,LOSC Lille,LOS
+15,Havre Athletic Club,HAC
+16,AS Monaco,MON
+17,Stade Rennais FC,STA
+18,Paris Saint-Germain,PA1
