@@ -1585,6 +1585,15 @@ def attach_player_notes(leagues_data: dict) -> None:
         if len(hits) != 1:
             unmatched.append(n.get("name", "?"))
             continue
+        # A lone candidate is normally the right player even if the note's club is out of date —
+        # people transfer between briefings. The exception is a MONONYM: there is exactly one
+        # "Rodri" in the data and he plays for Barcelona, so a note about Manchester City's Rodri
+        # would be pinned on him with nothing to flag it. One-word names are where collisions
+        # actually happen (Rodri, Beto, Savio, Mariano), so for those the club must agree.
+        if (n.get("team") and len(folded.split()) == 1
+                and not _same_club(n["team"], hits[0].get("team_name", ""))):
+            unmatched.append(n.get("name", "?"))
+            continue
         src = sources.get(n.get("source"), {})
         hits[0].setdefault("notes", []).append({
             "note": n.get("note", ""), "quote": n.get("quote", ""),
