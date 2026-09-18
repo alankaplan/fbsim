@@ -1513,6 +1513,16 @@ def read_player_notes() -> dict:
         return {}
 
 
+def _same_club(a: str, b: str) -> bool:
+    """True if two club names denote the same club once normalised.
+
+    Briefings write 'Newcastle United' and 'Tottenham Hotspur' where the fixture feed says
+    'Newcastle' and 'Spurs', so an equality test is too strict; a token-subset test either way
+    bridges them, and _norm_team has already folded accents and applied the club aliases."""
+    ta, tb = set(_norm_team(a).split()), set(_norm_team(b).split())
+    return bool(ta and tb) and (ta == tb or ta <= tb or tb <= ta)
+
+
 def attach_player_notes(leagues_data: dict) -> None:
     """Hang each curated note on the player it names, when that player is unambiguous.
 
@@ -1536,12 +1546,25 @@ def attach_player_notes(leagues_data: dict) -> None:
             by_full.setdefault(folded, []).append(pl)
             by_last.setdefault(folded.split()[-1], []).append(pl)
 
+    def narrow(cands: list, note: dict) -> list:
+        """Keep only candidates playing for the club the note names.
+
+        Names alone are ambiguous more often than they look: two different players called Beto
+        (Everton and Fiorentina), a Mikey Moore at Spurs and another at Koln, five Sanchezes,
+        and a mid-season mover like Malick Fofana appearing in BOTH his old and new league's
+        data. Every note records the club, so use it — this only ever narrows, so it cannot
+        attach a note that name matching alone would have rejected."""
+        team = note.get("team", "")
+        if not team or len(cands) < 2:
+            return cands
+        return [c for c in cands if _same_club(team, c.get("team_name", ""))] or cands
+
     unmatched = []
     for n in notes:
         folded = _fold(n.get("name", ""))
-        hits = by_full.get(folded) or []
+        hits = narrow(by_full.get(folded) or [], n)
         if len(hits) != 1 and folded:                 # fall back to a *unique* surname
-            hits = by_last.get(folded.split()[-1], [])
+            hits = narrow(by_last.get(folded.split()[-1], []), n)
         if len(hits) != 1:
             unmatched.append(n.get("name", "?"))
             continue
