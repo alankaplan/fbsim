@@ -1,6 +1,6 @@
 {
   "_readme": "Curated player notes extracted from podcast/press briefings pasted into the assistant. Hand-reviewed and version-controlled: no live model runs at build time. Notes are DISPLAY-ONLY - they never feed the simulator. Every note keeps its source and, where possible, a verbatim quote, so a reader can judge it. Names that a transcript garbled are parked in `unresolved` rather than guessed at, because attaching a note to the wrong player is worse than dropping it.",
-  "updated": "2026-09-11T00:00:00Z",
+  "updated": "2026-09-15T00:00:00Z",
   "sources": {
     "fw-2026-08-24": {
       "show": "Football Weekly",
@@ -46,6 +46,16 @@
       "show": "Football Weekly",
       "title": "Perfect start for the Premier League in Europe and is it crunch time for Spurs already? Football Weekly Extra",
       "date": "2026-09-11"
+    },
+    "fw-2026-09-14": {
+      "show": "Football Weekly",
+      "title": "VAR controversy decides Manchester derby as City keep pace with Arsenal",
+      "date": "2026-09-14"
+    },
+    "fw-2026-09-15": {
+      "show": "Football Weekly",
+      "title": "Kane on target, Barcelona stay perfect and Ballon d'Or debate",
+      "date": "2026-09-15"
     }
   },
   "players": [
@@ -1499,6 +1509,419 @@
       ],
       "confidence": "medium",
       "note": "Named with Palmer as Chelsea's attacking threat in the 6-3 win over Leeds."
+    },
+    {
+      "name": "Ainsley Maitland-Niles",
+      "team": "Everton",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Credited with one of the long-range goals behind Brighton's 13 in four games. NOTE the briefing places him at Brighton; the squad data has him at Everton, where the 7 Sep episode also had him scoring."
+    },
+    {
+      "name": "Bruno Fernandes",
+      "team": "Man Utd",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "controversy"
+      ],
+      "confidence": "medium",
+      "note": "Kicked by Foden in the incident that reduced City to ten men, though United still could not generate meaningful xG afterwards."
+    },
+    {
+      "name": "Bruno Guimarães",
+      "team": "Arsenal",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Scored at Sunderland against his former rivals in Arsenal's 2-0 win."
+    },
+    {
+      "name": "David Raya",
+      "team": "Arsenal",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Saved a penalty in the 2-0 win at Sunderland."
+    },
+    {
+      "name": "Enzo Fernández",
+      "team": "Chelsea",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "controversy"
+      ],
+      "confidence": "medium",
+      "note": "His offside position in the build-up to Haaland's derby winner is what ProRef apologised for: VAR established he did not play the ball but did not recognise the likely impact of where he was standing. The briefing has him at Manchester City — the 3 Sep episode reported that transfer completing — but the squad data still lists him at Chelsea.",
+      "quote": "It establishes that Enzo Fernandez did not play the ball and therefore makes any offside events subjective... the VAR did not recognize the likely impact of his position."
+    },
+    {
+      "name": "Erling Haaland",
+      "team": "Man City",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Scored the only goal of the derby. ProRef later admitted VAR erred in allowing it, having failed to weigh Enzo Fernandez's offside position."
+    },
+    {
+      "name": "Florian Wirtz",
+      "team": "Liverpool",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "weakness"
+      ],
+      "confidence": "medium",
+      "note": "Struggled again in the goalless draw with Fulham, continuing the tempo concerns raised on 7 Sep."
+    },
+    {
+      "name": "Ian Maatsen",
+      "team": "Aston Villa",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Injured in the 1-2 home defeat to Forest, with Villa looking fatigued."
+    },
+    {
+      "name": "Jorrel Hato",
+      "team": "Chelsea",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "error"
+      ],
+      "confidence": "medium",
+      "note": "Named among Chelsea's defensive errors against Hull; spelt 'Jerel Hato' in the briefing."
+    },
+    {
+      "name": "Leif Davis",
+      "team": "Ipswich",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Two assists in Ipswich's 2-1 win at Crystal Palace."
+    },
+    {
+      "name": "Lewis Dunk",
+      "team": "Brighton",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "A 30-yard strike in the 5-0 win at Coventry, put forward as a goal-of-the-season contender."
+    },
+    {
+      "name": "Malo Gusto",
+      "team": "Chelsea",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "error"
+      ],
+      "confidence": "medium",
+      "note": "Named with Fofana and Hato among Chelsea's defensive errors against Hull."
+    },
+    {
+      "name": "Mathis Cherki",
+      "team": "Man City",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "role"
+      ],
+      "confidence": "medium",
+      "note": "Substituted at half-time as part of the reshuffle the panel credits for City's control."
+    },
+    {
+      "name": "Mohamed Belloumi",
+      "team": "Hull",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Impressed in Hull's 2-2 draw at Stamford Bridge, part of a brilliant start to their season."
+    },
+    {
+      "name": "Morgan Gibbs-White",
+      "team": "Nott'm Forest",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Instrumental in Forest's 2-1 win at Aston Villa."
+    },
+    {
+      "name": "Omar Marmoush",
+      "team": "Spurs",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "weakness"
+      ],
+      "confidence": "medium",
+      "note": "Named with Savio among the signings who have not ended Spurs' goal drought."
+    },
+    {
+      "name": "Phil Foden",
+      "team": "Man City",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "error"
+      ],
+      "confidence": "high",
+      "note": "Sent off for kicking Bruno Fernandes; City reorganised around the red card and held on to win."
+    },
+    {
+      "name": "Sávio",
+      "team": "Spurs",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "weakness"
+      ],
+      "confidence": "medium",
+      "note": "Named among the attacking signings blamed for Tottenham still having no Premier League goal; spelt 'Savinho' in the briefing."
+    },
+    {
+      "name": "Wesley Fofana",
+      "team": "Chelsea",
+      "source": "fw-2026-09-14",
+      "date": "2026-09-14",
+      "tags": [
+        "error"
+      ],
+      "confidence": "medium",
+      "note": "Named among the defensive errors in the 2-2 draw with Hull; the panel calls Chelsea's defence a shambles behind a high-quality front six."
+    },
+    {
+      "name": "Anthony Gordon",
+      "team": "FC Barcelona",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "role"
+      ],
+      "confidence": "high",
+      "note": "Pivotal to Flick's vertical system: his pressing protects an extremely high backline, even though he has not scored as often as hoped.",
+      "quote": "The Spaniards always use this word 'vertical'... everything's straight line, straight at teams."
+    },
+    {
+      "name": "Boulaye Dia",
+      "team": "Lazio",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Performing exceptionally as Gattuso keeps Lazio top despite a fan boycott that has cut season tickets from 30,000 to 4,500."
+    },
+    {
+      "name": "Curtis Jones",
+      "team": "Internazionale",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "role"
+      ],
+      "confidence": "medium",
+      "note": "Named with Stones among the Britons appearing off the bench for Inter."
+    },
+    {
+      "name": "Daniel Maldini",
+      "team": "Cagliari",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "breakout"
+      ],
+      "confidence": "high",
+      "note": "Five goals already and described as a revelation. NOTE the briefing places him at Roma; the squad data has him at Cagliari."
+    },
+    {
+      "name": "Denzel Dumfries",
+      "team": "Real Madrid",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "role"
+      ],
+      "confidence": "medium",
+      "note": "Mourinho's preferred right-back, which is what keeps Alexander-Arnold out of position."
+    },
+    {
+      "name": "Ferrán Torres",
+      "team": "Paris Saint-Germain",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "breakout"
+      ],
+      "confidence": "high",
+      "note": "A revelation since leaving Barcelona: six goals in six games including a Champions League hat-trick, as PSG climb out of a slow start."
+    },
+    {
+      "name": "Gabriel Jesus",
+      "team": "FC Barcelona",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "role"
+      ],
+      "confidence": "medium",
+      "note": "Positioned as the alternative to Raphinha when Barcelona need a different shape."
+    },
+    {
+      "name": "Harry Kane",
+      "team": "FC Bayern München",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "milestone",
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Reached 150 goals for Bayern in 153 games; the panel argues his record deserves more Ballon d'Or weight than it gets, against the politics of the vote.",
+      "quote": "England actually were not rubbish at the World Cup."
+    },
+    {
+      "name": "Harry Winks",
+      "team": "Cagliari",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Central to Cagliari's best start since 1969-70 under Pisacane."
+    },
+    {
+      "name": "John Stones",
+      "team": "Internazionale",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "role"
+      ],
+      "confidence": "medium",
+      "note": "Making cameos for Inter, part of an unprecedented British contingent in Serie A."
+    },
+    {
+      "name": "Kieron Bowie",
+      "team": "Sassuolo",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Scoring crucial goals for Sassuolo; spelt 'Kieran Bowie' in the briefing."
+    },
+    {
+      "name": "Kylian Mbappe-Lottin",
+      "team": "Real Madrid",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Named with Yamal as the Ballon d'Or favourite the panel finds a tiresome inevitability."
+    },
+    {
+      "name": "Lamine Yamal",
+      "team": "FC Barcelona",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Named as one of the two front-runners for the Ballon d'Or ahead of Kane."
+    },
+    {
+      "name": "Mariano",
+      "team": "Deportivo Alavés",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "breakout"
+      ],
+      "confidence": "high",
+      "note": "Has already scored more this season than in the previous six years combined, with Alaves third."
+    },
+    {
+      "name": "Raphinha",
+      "team": "FC Barcelona",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "role"
+      ],
+      "confidence": "high",
+      "note": "Has grown into a leadership role and is flourishing as a false 9; spelt 'Rafinha' in the briefing. Barcelona's high press is described as dependent on him and Gordon staying fit."
+    },
+    {
+      "name": "Rodri",
+      "team": "Man City",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "controversy"
+      ],
+      "confidence": "medium",
+      "note": "Caught on camera saying of Valencia 'This lot are really, really bad'; Valencia fans have put it on t-shirts.",
+      "quote": "This lot are really, really bad."
+    },
+    {
+      "name": "Trent Alexander-Arnold",
+      "team": "Real Madrid",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "role"
+      ],
+      "confidence": "high",
+      "note": "Mourinho repeated that he is not a midfielder, saying he is used centrally only because of personnel shortages.",
+      "quote": "Trent's not a midfielder... we won't be doing this again."
+    },
+    {
+      "name": "Trevoh Chalobah",
+      "team": "Como",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Described as a starter for a flying side; the briefing says Parma, the squad data says Como."
     }
   ],
   "unresolved": [
@@ -1596,6 +2019,11 @@
       "mention": "Laqua",
       "context": "Chelsea - named as a notable transfer-window acquisition",
       "source": "fw-2026-09-07"
+    },
+    {
+      "mention": "Marcus Krattenbach",
+      "context": "Elversberg - long-range screamer called a goal-of-the-season contender; Elversberg are in the Bundesliga data but no such player is in the squad",
+      "source": "fw-2026-09-15"
     }
   ],
   "out_of_scope": [
@@ -1845,6 +2273,133 @@
       "league": "Premier League (manager, not a player)",
       "source": "fw-2026-09-11",
       "note": "Undefeated so far (one win, two draws) despite no transfer support, but the panel does not think the squad is equipped for a European push."
+    },
+    {
+      "mention": "Mikel Arteta",
+      "team": "Arsenal",
+      "league": "Premier League (manager, not a player)",
+      "source": "fw-2026-09-14",
+      "note": "His visibly distressed reaction to a penalty decision read as calculated pressure on officials."
+    },
+    {
+      "mention": "Michael Carrick",
+      "team": "Man Utd",
+      "league": "Premier League (manager, not a player)",
+      "source": "fw-2026-09-14",
+      "note": "Criticised for not turning United from a counter-attacking side into one that can dominate."
+    },
+    {
+      "mention": "Enzo Maresca",
+      "team": "Man City",
+      "league": "Premier League (manager, not a player)",
+      "source": "fw-2026-09-14",
+      "note": "Praised for reorganising City after Foden's red card and winning the derby with ten men."
+    },
+    {
+      "mention": "Fabian Hürzeler",
+      "team": "Brighton",
+      "league": "Premier League (manager, not a player)",
+      "source": "fw-2026-09-14",
+      "note": "Credited with prioritising long-range shooting; eight different scorers and 13 goals in four games."
+    },
+    {
+      "mention": "Roberto De Zerbi",
+      "team": "Spurs",
+      "league": "Premier League (manager, not a player)",
+      "source": "fw-2026-09-14",
+      "note": "Under pressure with Spurs still goalless, his approach called a one-trick pony opponents have worked out."
+    },
+    {
+      "mention": "Eddie Howe",
+      "team": "-",
+      "league": "Premier League (manager, not a player)",
+      "source": "fw-2026-09-14",
+      "note": "Available, and named as a potential catalyst for changes at Spurs and Manchester United."
+    },
+    {
+      "mention": "Jason Tindall",
+      "team": "-",
+      "league": "Premier League (coach, not a player)",
+      "source": "fw-2026-09-14",
+      "note": "Discussed as half of the Howe management duo the panel wants back in the league."
+    },
+    {
+      "mention": "Luděk Mikloško",
+      "team": "West Ham",
+      "league": "former player (died)",
+      "source": "fw-2026-09-14",
+      "note": "The West Ham goalkeeper's passing was marked with a tribute to his 1995 performance against Manchester United."
+    },
+    {
+      "mention": "Hansi Flick",
+      "team": "FC Barcelona",
+      "league": "La Liga (manager, not a player)",
+      "source": "fw-2026-09-15",
+      "note": "His vertical, high-intensity system has Barcelona perfect after five games, 21 goals scored."
+    },
+    {
+      "mention": "Jose Mourinho",
+      "team": "Real Madrid",
+      "league": "La Liga (manager, not a player)",
+      "source": "fw-2026-09-15",
+      "note": "His return is framed as installing habits and effort in a dressing room the club felt lacked both."
+    },
+    {
+      "mention": "Quique Sánchez Flores",
+      "team": "Deportivo Alavés",
+      "league": "La Liga (manager, not a player)",
+      "source": "fw-2026-09-15",
+      "note": "Managing a third-placed Alaves side."
+    },
+    {
+      "mention": "Carlos Corberán",
+      "team": "Valencia",
+      "league": "La Liga (manager, not a player)",
+      "source": "fw-2026-09-15",
+      "note": "Sacked with Valencia bottom on one point."
+    },
+    {
+      "mention": "Ron Gourlay",
+      "team": "Valencia",
+      "league": "La Liga (CEO, not a player)",
+      "source": "fw-2026-09-15",
+      "note": "Sacked ten days after dismissing talk of his resignation.",
+      "quote": "If you're waiting for [me to resign], your coffee is going to go cold."
+    },
+    {
+      "mention": "Gennaro Gattuso",
+      "team": "Lazio",
+      "league": "Serie A (manager, not a player)",
+      "source": "fw-2026-09-15",
+      "note": "Has Lazio top despite open war between the owner and the supporters."
+    },
+    {
+      "mention": "Claudio Lotito",
+      "team": "Lazio",
+      "league": "Serie A (owner, not a player)",
+      "source": "fw-2026-09-15",
+      "note": "Fan boycott over his perceived lack of ambition has cut season tickets from 30,000 to 4,500."
+    },
+    {
+      "mention": "Gian Piero Gasperini",
+      "team": "Roma",
+      "league": "Serie A (manager, not a player)",
+      "source": "fw-2026-09-15",
+      "note": "Second year of his project, with Roma playing brilliant football but thin in depth."
+    },
+    {
+      "mention": "Fabio Pisacane",
+      "team": "Cagliari",
+      "league": "Serie A (manager, not a player)",
+      "source": "fw-2026-09-15",
+      "note": "A Guillain-Barre survivor managing Cagliari to their best start since 1969-70."
+    },
+    {
+      "mention": "Gerard Lopez",
+      "team": "Bordeaux",
+      "league": "Regional 1 (owner, not a player)",
+      "source": "fw-2026-09-15",
+      "note": "Heavily criticised as Bordeaux fall to the sixth division and face liquidation."
     }
   ]
 }
