@@ -79,9 +79,22 @@ _CLUB_ALIASES = {
 }
 
 
+# Letters NFKD does NOT decompose: they are distinct letters, not a base plus a combining
+# accent, so the strip below leaves them untouched and 'Ødegaard' never equals 'Odegaard'.
+# Spelt-out equivalents, applied before the NFKD pass.
+_FOLD_EXTRA = str.maketrans({
+    "ø": "o", "đ": "d", "ð": "d", "ł": "l", "æ": "ae", "œ": "oe", "þ": "th", "ı": "i",
+})
+
+
 def _fold(s: str) -> str:
-    """Lowercase and strip diacritics so 'San José' == 'San Jose', 'Montréal' == 'Montreal'."""
-    nfkd = unicodedata.normalize("NFKD", str(s).lower())
+    """Lowercase and strip diacritics so 'San José' == 'San Jose', 'Montréal' == 'Montreal'.
+
+    Also spells out the letters NFKD leaves alone ('Ødegaard' -> 'odegaard', 'Łukasz' ->
+    'lukasz'), which decomposition alone would silently keep distinct — the kind of miss that
+    drops a player's notes or hides a club rather than raising an error."""
+    lowered = str(s).lower().replace("ß", "ss").translate(_FOLD_EXTRA)
+    nfkd = unicodedata.normalize("NFKD", lowered)
     return "".join(c for c in nfkd if not unicodedata.combining(c))
 
 
