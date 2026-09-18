@@ -1,6 +1,6 @@
 {
   "_readme": "Curated player notes extracted from podcast/press briefings pasted into the assistant. Hand-reviewed and version-controlled: no live model runs at build time. Notes are DISPLAY-ONLY - they never feed the simulator. Every note keeps its source and, where possible, a verbatim quote, so a reader can judge it. Names that a transcript garbled are parked in `unresolved` rather than guessed at, because attaching a note to the wrong player is worse than dropping it.",
-  "updated": "2026-09-01T00:00:00Z",
+  "updated": "2026-09-03T00:00:00Z",
   "sources": {
     "fw-2026-08-24": {
       "show": "Football Weekly",
@@ -26,6 +26,11 @@
       "show": "Football Weekly",
       "title": "Saka strike maintains Arsenal's perfect start, plus deadline day",
       "date": "2026-09-01"
+    },
+    "fw-2026-09-03": {
+      "show": "Football Weekly",
+      "title": "Arsenal take on Chelsea and deadline-day chaos: Football Weekly Extra",
+      "date": "2026-09-03"
     }
   },
   "players": [
@@ -753,6 +758,139 @@
       "confidence": "high",
       "note": "Announced a second retirement from international football, saying he has nothing left to give and wants to make room for younger players.",
       "quote": "I have loved, and will always love being part of the national team. I've given it my all. I have nothing left to give."
+    },
+    {
+      "name": "Enzo Fernandez",
+      "team": "Manchester City",
+      "source": "fw-2026-09-03",
+      "date": "2026-09-03",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "The move rumoured on 25 Aug has completed: a £125m transfer from Chelsea to Manchester City, the marquee deal of the window."
+    },
+    {
+      "name": "Phil Foden",
+      "team": "Manchester City",
+      "source": "fw-2026-09-03",
+      "date": "2026-09-03",
+      "tags": [
+        "integration"
+      ],
+      "confidence": "medium",
+      "note": "Named among the established stars the new midfield arrivals must fit around; the briefing calls City's midfield rotation a selection headache after the Fernandez signing."
+    },
+    {
+      "name": "Ryan Cherki",
+      "team": "Manchester City",
+      "source": "fw-2026-09-03",
+      "date": "2026-09-03",
+      "tags": [
+        "integration"
+      ],
+      "confidence": "medium",
+      "note": "Spelt 'Sherkey' in the briefing. Named beside Foden as an established starter whose place the new signings complicate."
+    },
+    {
+      "name": "Mykhailo Mudryk",
+      "team": "Tottenham Hotspur",
+      "source": "fw-2026-09-03",
+      "date": "2026-09-03",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "medium",
+      "note": "Spelt 'Milkyo Mudrich' in the briefing. The Spurs move flagged on 1 Sep has gone through; cited as significant investment that still leaves Tottenham's 'mentality' questioned."
+    },
+    {
+      "name": "Folarin Balogun",
+      "team": "Everton",
+      "source": "fw-2026-09-03",
+      "date": "2026-09-03",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "His move to Everton collapsed at the last minute on deadline day, leaving them without a recognised striker."
+    },
+    {
+      "name": "Tammy Abraham",
+      "team": "Everton",
+      "source": "fw-2026-09-03",
+      "date": "2026-09-03",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "A failed Everton pursuit in a window the briefing calls a shambles."
+    },
+    {
+      "name": "Joshua Zirkzee",
+      "team": "Everton",
+      "source": "fw-2026-09-03",
+      "date": "2026-09-03",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "A failed Everton pursuit; with Abraham and Balogun also missed, Everton ended the window without a striker."
+    },
+    {
+      "name": "Beto",
+      "team": "Everton",
+      "source": "fw-2026-09-03",
+      "date": "2026-09-03",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "Sold on deadline day, one of the departures that left Everton with only 18 senior players.",
+      "quote": "I think what was shaping up to be an okay transfer window for Everton turned into an absolute shambles at the end of it."
+    },
+    {
+      "name": "Iliman Ndiaye",
+      "team": "Everton",
+      "source": "fw-2026-09-03",
+      "date": "2026-09-03",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "high",
+      "note": "Sold on deadline day alongside Beto, deepening Everton's squad crisis."
+    },
+    {
+      "name": "Malick Fofana",
+      "team": "Sunderland",
+      "source": "fw-2026-09-03",
+      "date": "2026-09-03",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "medium",
+      "note": "Spelt 'Malik Fofana' in the briefing. Chose Sunderland over Crystal Palace, reportedly on a larger offer from the Sunderland chairman and the presence of a second private jet — cited as an example of the grotesqueness of modern transfers."
+    },
+    {
+      "name": "Bernd Leno",
+      "team": "Fulham",
+      "source": "fw-2026-09-03",
+      "date": "2026-09-03",
+      "tags": [
+        "milestone"
+      ],
+      "confidence": "high",
+      "note": "Poised to join Robert Huth, Dietmar Hamann and Pascal Gross as the only German players to reach 250 Premier League appearances."
+    },
+    {
+      "name": "Bruno Fernandes",
+      "team": "Manchester United",
+      "source": "fw-2026-09-03",
+      "date": "2026-09-03",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "The player a depleted Everton midfield has to neutralise, in the briefing's preview of Everton v Manchester United."
     }
   ],
   "unresolved": [
@@ -830,6 +968,21 @@
       "mention": "Ibrahim Mai",
       "context": "18-year-old forward joining Aston Villa for about £50m; name almost certainly garbled",
       "source": "fw-2026-09-01"
+    },
+    {
+      "mention": "Toyson",
+      "context": "Tottenham - named as a significant investment alongside Mudryk",
+      "source": "fw-2026-09-03"
+    },
+    {
+      "mention": "Anderson",
+      "context": "Manchester City - a midfield arrival named with Enzo Fernandez; surname only, several candidates",
+      "source": "fw-2026-09-03"
+    },
+    {
+      "mention": "Bardi",
+      "context": "Manchester City - midfielder competing for a place after the Fernandez signing; already parked from an earlier episode",
+      "source": "fw-2026-09-03"
     }
   ],
   "out_of_scope": [
@@ -895,6 +1048,49 @@
       "league": "EFL",
       "source": "fw-2026-08-31",
       "note": "Manager, after a late loss to Huddersfield ('We've been proper mugged off')."
+    },
+    {
+      "mention": "Taiwo Awoniyi",
+      "team": "Coventry City",
+      "league": "outside the ingested leagues - Coventry are not in the 2026 Premier League teams.csv",
+      "source": "fw-2026-09-03",
+      "note": "Described as Coventry's raw, hit-or-miss striker.",
+      "quote": "Sometimes maybe good, sometimes maybe s***."
+    },
+    {
+      "mention": "Kosovare Asllani",
+      "team": "London City Lionesses",
+      "league": "Women's Super League",
+      "source": "fw-2026-09-03",
+      "note": "Signed as part of the Lionesses' billionaire-backed 'Galacticos' model."
+    },
+    {
+      "mention": "Alexia Putellas",
+      "team": "London City Lionesses",
+      "league": "Women's Super League",
+      "source": "fw-2026-09-03",
+      "note": "Signed as part of the Lionesses' billionaire-backed 'Galacticos' model."
+    },
+    {
+      "mention": "Ever Oolid",
+      "team": "Manchester United Women",
+      "league": "Women's Super League",
+      "source": "fw-2026-09-03",
+      "note": "New manager, moving United toward a younger squad; name garbled in the briefing."
+    },
+    {
+      "mention": "Aaron Ramsey",
+      "team": "Oxford United",
+      "league": "EFL",
+      "source": "fw-2026-09-03",
+      "note": "Cited as an influential loan signing while Oxford navigate a registration embargo."
+    },
+    {
+      "mention": "David Moyes",
+      "team": "Everton",
+      "league": "Premier League (manager, not a player)",
+      "source": "fw-2026-09-03",
+      "note": "Described as apoplectic after deadline day, left with an 18-man senior squad."
     }
   ]
 }
