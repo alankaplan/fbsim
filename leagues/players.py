@@ -70,12 +70,18 @@ _CLUB_ALIASES = {
     "m gladbach": "borussia monchengladbach",
     "gladbach": "borussia monchengladbach",
     "cologne": "koln", "koeln": "koln",
-    # MLS: FBref's initialisms share no whole token with the official names in teams.csv
-    # ("lafc" vs "Los Angeles FC"), and "rb new york" reverses "New York RB". Values are the
-    # *normalised* canonical form, since _norm_team applies this map last.
-    "lafc": "los angeles",
-    "nycfc": "new york city",
-    "rb new york": "new york rb",
+    # MLS: FBref's initialisms share no whole token with the official names ("lafc" vs "Los
+    # Angeles FC"), and "RB New York" reverses the club's name. The feed has already renamed
+    # these clubs once ("New York RB" -> "Red Bull New York", "Los Angeles FC" -> "Los Angeles
+    # Football Club"), which silently broke the alias, so map EVERY spelling — the feed's as
+    # well as the source's — onto one key. _norm_team applies this map to both sides, so
+    # whichever spelling teams.csv carries, both collapse to the same thing.
+    "lafc": "los angeles football club",
+    "los angeles": "los angeles football club",
+    "nycfc": "new york city football club",
+    "new york city": "new york city football club",
+    "rb new york": "red bull new york",
+    "new york rb": "red bull new york",
 }
 
 
