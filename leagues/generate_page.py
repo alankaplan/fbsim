@@ -320,7 +320,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
   let treePath = [], treeTeam = null;              // odds-tree drill-down state
   let teamTab = "summary";                         // team page sub-tab: summary | players
   let plSort = "goals", plAsc = false;             // players-table sort
-  let taSort = "ga90", taAsc = false;              // cross-league Top Players sort
+  let taSort = "gabZ", taAsc = false;              // cross-league Top Players sort
 
   const $ = (id) => document.getElementById(id);
   const pct = (x) => (x === 0 ? '<span class="zero">0</span>' : x.toFixed(1));
@@ -506,15 +506,15 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       ["minutes","Min","right", p=>p.minutes,                                p=>p.minutes,       false, true],
       ["goals","G","right", p=>p.goals,                                      p=>p.goals],
       ["assists","A","right", p=>p.assists,                                  p=>p.assists],
-      ["pct","Lg%","right", p=>p.pct==null?"":p.pct.toFixed(1),               p=>p.pct==null?-1:p.pct],
-      ["tough","Tough z","right", p=>p.tough==null?"":(p.tough>=0?"+":"")+p.tough.toFixed(2), p=>p.tough==null?-99:p.tough],
-      ["gab90","G+A+B/90","right", p=>p.gab90==null?"":`<b>${p.gab90.toFixed(2)}</b>`, p=>p.gab90==null?-1:p.gab90],
-      ["gabPct","B Lg%","right", p=>p.gabPct==null?"":p.gabPct.toFixed(1),          p=>p.gabPct==null?-1:p.gabPct],
-      ["gabZ","B z","right", p=>p.gabZ==null?"":(p.gabZ>=0?"+":"")+p.gabZ.toFixed(2), p=>p.gabZ==null?-99:p.gabZ],
-      ["xg_buildup","Bld","right", p=>(+p.xg_buildup||0).toFixed(1),                p=>+p.xg_buildup||0, false, true],
+      ["pct","Lg %ile","right", p=>p.pct==null?"":p.pct.toFixed(1),               p=>p.pct==null?-1:p.pct],
+      ["tough","Cross-Lg","right", p=>p.tough==null?"":(p.tough>=0?"+":"")+p.tough.toFixed(2), p=>p.tough==null?-99:p.tough],
+      ["gab90","G+A+Bld/90","right", p=>p.gab90==null?"":`<b>${p.gab90.toFixed(2)}</b>`, p=>p.gab90==null?-1:p.gab90],
+      ["gabPct","Bld Lg %ile","right", p=>p.gabPct==null?"":p.gabPct.toFixed(1),          p=>p.gabPct==null?-1:p.gabPct],
+      ["gabZ","Bld Cross-Lg","right", p=>p.gabZ==null?"":(p.gabZ>=0?"+":"")+p.gabZ.toFixed(2), p=>p.gabZ==null?-99:p.gabZ],
+      ["xg_buildup","Buildup","right", p=>(+p.xg_buildup||0).toFixed(1),                p=>+p.xg_buildup||0, false, true],
       ["xg","xG","right", p=>p.xg.toFixed(1),                                p=>p.xg,            false, true],
       ["xa","xA","right", p=>p.xa.toFixed(1),                                p=>p.xa,    false, true],
-      ["shots","Sh","right", p=>(p.shots||""),                               p=>p.shots, false, true],
+      ["shots","Shots","right", p=>(p.shots||""),                               p=>p.shots, false, true],
     ];
   }
   function renderPlayersTable(elId, players, teamView) {
@@ -552,10 +552,12 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     $("players-view").innerHTML =
       `<div class="sec-h">Top players — ${esc(L.league.name)}</div>
        <div class="legend">Season totals${L.meta.used_xg ? " (with xG)" : ""}.
-         <b>G+A+B/90</b> adds <b>Bld</b> (xG buildup — the xG of possessions a player was in,
+         <b>G+A+Bld/90</b> adds <b>Buildup</b> (the xG of possessions a player was involved in,
          excluding their own shots and key passes) to goals and assists, so deep players who never
-         finish moves still register; it is an Understat figure, blank for MLS/NWSL. Click a player
-         for their card, a header to sort, a team to open it.</div>
+         finish moves still register; it is an Understat figure, blank for MLS/NWSL.
+         <b>Lg %ile</b> ranks a player against their own league; <b>Cross-Lg</b> puts every league
+         on one axis, in standard deviations, less a league-strength handicap. Click a player for
+         their card, a header to sort, a team to open it.</div>
        <div id="players-table"></div>`;
     renderPlayersTable("players-table", leagueMetrics(cur), false);
   }
@@ -663,7 +665,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
   const TP_REL = 0.4;                                // must play >= 40% of a league regular's minutes
   const TP_ABS = 90;                                 // ...and at least one full match, to steady per-90
   const TP_K = 6;                                     // empirical-Bayes prior strength (~pseudo-matches)
-  // PLACEHOLDER league strength for the cross-league "Tough z" column, as a handicap in standard
+  // PLACEHOLDER league strength for the cross-league "Cross-Lg" column, as a handicap in standard
   // deviations (0 = the toughest league). Applied as a SUBTRACTION rather than a percentile scale:
   // percentiles compress the tails, so scaling them leaves a weak league's stars indistinguishable
   // and caps them below their league's score forever. An SD handicap has no ceiling, so a dominant
@@ -745,20 +747,26 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       ["assists","A","right", p=>p.assists,                                   p=>p.assists],
       ["ga","G+A","right", p=>p.ga,                                          p=>p.ga],
       ["ga90","G+A/90","right", p=>`<b>${p.ga90.toFixed(2)}</b>`,             p=>p.ga90],
-      ["pct","Lg%","right", p=>p.pct.toFixed(1),                              p=>p.pct],
-      ["tough","Tough z","right", p=>(p.tough>=0?"+":"")+p.tough.toFixed(2),  p=>p.tough],
-      ["gab90","G+A+B/90","right", p=>p.gab90==null?"":`<b>${p.gab90.toFixed(2)}</b>`, p=>p.gab90==null?-1:p.gab90],
-      ["gabPct","B Lg%","right", p=>p.gabPct==null?"":p.gabPct.toFixed(1),          p=>p.gabPct==null?-1:p.gabPct],
-      ["gabZ","B z","right", p=>p.gabZ==null?"":(p.gabZ>=0?"+":"")+p.gabZ.toFixed(2), p=>p.gabZ==null?-99:p.gabZ],
-      ["xg_buildup","Bld","right", p=>(+p.xg_buildup||0).toFixed(1),                p=>+p.xg_buildup||0, true],
+      ["pct","Lg %ile","right", p=>p.pct.toFixed(1),                              p=>p.pct],
+      ["tough","Cross-Lg","right", p=>(p.tough>=0?"+":"")+p.tough.toFixed(2),  p=>p.tough],
+      ["gab90","G+A+Bld/90","right", p=>p.gab90==null?"":`<b>${p.gab90.toFixed(2)}</b>`, p=>p.gab90==null?-1:p.gab90],
+      ["gabPct","Bld Lg %ile","right", p=>p.gabPct==null?"":p.gabPct.toFixed(1),          p=>p.gabPct==null?-1:p.gabPct],
+      ["gabZ","Bld Cross-Lg","right", p=>p.gabZ==null?"":(p.gabZ>=0?"+":"")+p.gabZ.toFixed(2), p=>p.gabZ==null?-99:p.gabZ],
+      ["xg_buildup","Buildup","right", p=>(+p.xg_buildup||0).toFixed(1),                p=>+p.xg_buildup||0, true],
       ["xg","xG","right", p=>p.xg.toFixed(1),                                 p=>p.xg, true],
       ["xa","xA","right", p=>p.xa.toFixed(1),                                 p=>p.xa, true],
-      ["shots","Sh","right", p=>(p.shots||""),                               p=>p.shots, true],
+      ["shots","Shots","right", p=>(p.shots||""),                               p=>p.shots, true],
     ];
-    // Fixed membership: the top 100 by G+A per 90 (rate, not season-stage-biased total);
-    // then re-sort for display by whatever column is clicked.
+    // Fixed membership: the top 100 by "Bld Cross-Lg" — the buildup-inclusive rate expressed in
+    // standard deviations above an average player in the same league, less that league's strength
+    // handicap. Chosen over raw G+A/90 on two counts: it counts build-up, so deep players can
+    // reach a list that goals-and-assists alone left to forwards (defenders go from 5 to ~20 of
+    // the 100), and being league-adjusted it is the only one of the three that is actually a
+    // cross-league ranking rather than a raw rate that flatters weaker leagues.
+    // NOTE this puts the PLACEHOLDER league handicaps in charge of who appears, not just the
+    // order — see TP_LEAGUE_HANDICAP. Rank by gab90 instead to take them out of membership.
     let pool = topPlayersData().sort((a,b) =>
-      (b.ga90-a.ga90) || (b.ga-a.ga) || String(a.player_name).localeCompare(String(b.player_name)));
+      (b.gabZ-a.gabZ) || (b.gab90-a.gab90) || String(a.player_name).localeCompare(String(b.player_name)));
     pool = pool.slice(0, 100);
     if (!pool.length) {
       $("players_all-view").innerHTML = `<div class="legend">No player data loaded — run
@@ -770,7 +778,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
       const va=sc[4](a), vb=sc[4](b);
       let r = (typeof va==="number" && typeof vb==="number") ? va-vb : String(va).localeCompare(String(vb));
       r = taAsc ? r : -r;
-      return r || (b.ga90-a.ga90) || (b.ga-a.ga) || String(a.player_name).localeCompare(String(b.player_name));
+      return r || (b.gabZ-a.gabZ) || (b.gab90-a.gab90) || String(a.player_name).localeCompare(String(b.player_name));
     });
     const th = `<th>#</th>` + cols.map(c =>
       `<th data-col="${c[0]}" style="text-align:${c[2]}" class="${c[5]?'col-sec ':''}${c[0]===taSort?(taAsc?'sort-asc':'sort-desc'):''}">${c[1]}</th>`).join("");
@@ -779,20 +787,29 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
         `<td class="${c[5]?'col-sec':''}" style="text-align:${c[2]}">${c[3](p)}</td>`).join("") + `</tr>`).join("");
     $("players_all-view").innerHTML =
       `<div class="sec-h">Top Players</div>
-       <div class="legend">The top 100 players across all leagues, ranked by <b>G+A/90</b>
-         (goals + assists per 90 minutes) among regular players — a rate, so leagues further
-         into their season don't crowd out ones just starting. <b>Lg%</b> is the percentile of
-         each player's sample-smoothed G+A/90 within their own league (100 = best in league);
-         <b>Tough z</b> is that rate in standard deviations above an average player, after
-         subtracting their league's strength handicap (0 = the toughest league's baseline) — so
-         unlike a percentile it has no ceiling, and a dominant player in a weaker league can still
-         outrank a good one in a stronger league. <b>G+A+B/90</b> adds <b>Bld</b> (xG buildup: the
-         xG of possessions a player was involved in, excluding their own shots and key passes) to
-         goals and assists, so defenders and deep midfielders who never finish moves still register;
-         <b>B Lg%</b> and <b>B z</b> are the same league-percentile and cross-league z built on it.
-         Buildup is an Understat figure, so it is blank for MLS/NWSL. Nothing here measures
-         <i>defending</i> — buildup credits helping to create attacks, not stopping them — and
-         nothing measures goalkeeping, so keepers and stopper-type defenders stay under-ranked.
+       <div class="legend">The top 100 players across all leagues, ranked by
+         <b>Bld Cross-Lg</b>, among players with enough minutes to judge (at least 90, and 40% of
+         what a regular in their league has played — so the bar rises as each season progresses).
+         The three rate columns are built from the same two ideas.
+         <b>G+A/90</b> is goals + assists per 90 minutes — a rate, so a league six games in isn't
+         crowded out by one thirty games in. <b>G+A+Bld/90</b> adds <b>Buildup</b> to it: the xG
+         of possessions a player was involved in, <i>excluding</i> their own shots and key passes,
+         so it credits deep players who never finish moves and cannot double-count the goals and
+         assists beside it.
+         Each rate then gets two readings. <b>Lg %ile</b> and <b>Bld Lg %ile</b> rank a player
+         against their own league (100 = best in league), after smoothing toward the league
+         average so a player with a handful of minutes can't top the table on a fluke.
+         <b>Cross-Lg</b> and <b>Bld Cross-Lg</b> put every league on one axis: standard deviations
+         above an average player in their own league, minus that league's strength handicap
+         (0 = the toughest). Unlike a percentile it has no ceiling, so a dominant player in a
+         weaker league can still outrank a good one in a stronger league.
+         Two caveats worth knowing. The league handicaps are eyeballed placeholders, not a
+         measurement — and because membership is ranked by <b>Bld Cross-Lg</b>, they now decide who
+         appears here, not just the order. And nothing on this page measures <i>defending</i>:
+         buildup credits helping to create attacks, not stopping them, and no free source covers
+         goalkeeping, so keepers and stopper-type defenders stay under-ranked. Buildup is an
+         Understat figure, so it is blank for MLS/NWSL and their combined rate falls back to
+         G+A/90.
          Click a player for their card, a header to sort, a team to open it.</div>
        <div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
     $("players_all-view").querySelectorAll("th[data-col]").forEach(h => h.onclick = () => {
