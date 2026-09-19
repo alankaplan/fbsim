@@ -1878,6 +1878,17 @@
       "note": "Has already scored more this season than in the previous six years combined, with Alaves third."
     },
     {
+      "name": "Maurice Krattenmacher",
+      "team": "SV Elversberg",
+      "source": "fw-2026-09-15",
+      "date": "2026-09-15",
+      "tags": [
+        "breakout"
+      ],
+      "confidence": "medium",
+      "note": "Scored a long-distance screamer called a goal-of-the-season contender, as Elversberg — a village club of 13,000 people — shocked the league. Named 'Marcus Krattenbach' in the briefing; identified from the Elversberg squad, where he is the only Kratten- name."
+    },
+    {
       "name": "Raphinha",
       "team": "FC Barcelona",
       "source": "fw-2026-09-15",
@@ -2019,11 +2030,6 @@
       "mention": "Laqua",
       "context": "Chelsea - named as a notable transfer-window acquisition",
       "source": "fw-2026-09-07"
-    },
-    {
-      "mention": "Marcus Krattenbach",
-      "context": "Elversberg - long-range screamer called a goal-of-the-season contender; Elversberg are in the Bundesliga data but no such player is in the squad",
-      "source": "fw-2026-09-15"
     }
   ],
   "out_of_scope": [
