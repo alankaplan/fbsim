@@ -205,6 +205,34 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .pcard-sub { color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
     margin: 14px 2px 6px; }
   .pcard-note { color: #8b949e; font-size: 12px; margin-top: 12px; }
+  /* Game card */
+  .gc-v { color: #8b949e; font-weight: 400; margin: 0 4px; }
+  .gc-score { font-size: 24px; font-weight: 600; margin: 6px 0 2px; }
+  .gc-bar { display: block; margin-top: 8px; }
+  .gc-tab { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 4px; }
+  .gc-tab th { color: #8b949e; font-size: 11px; font-weight: 500; text-align: right;
+               padding: 2px 6px; white-space: nowrap; }
+  .gc-tab th:first-child, .gc-tab td:first-child { text-align: left; }
+  .gc-tab td { padding: 4px 6px; text-align: right; border-top: 1px solid #21262d;
+               font-variant-numeric: tabular-nums; }
+  .gc-tab .gc-t { color: #e6edf3; }
+  .gc-ha { color: #8b949e; font-size: 10px; border: 1px solid #30363d; border-radius: 3px;
+           padding: 0 3px; margin-left: 4px; vertical-align: middle; }
+  .gc-out td { text-align: right; }
+  .gc-out .gc-o { font-weight: 600; text-align: left; }
+  .gc-pct { display: block; color: #8b949e; font-size: 11px; }
+  .gc-sqs { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 4px; }
+  .gc-sq { flex: 1 1 190px; min-width: 0; }
+  .gc-sq-h { color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+             margin-bottom: 4px; }
+  .gc-p { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0;
+          border-top: 1px solid #21262d; font-size: 13px; }
+  .gc-p .pl-link { cursor: pointer; color: #58a6ff; }
+  .gc-p .pl-link:hover { text-decoration: underline; }
+  .gc-pv { color: #8b949e; font-size: 12px; white-space: nowrap;
+           font-variant-numeric: tabular-nums; }
+  tr.gc-row { cursor: pointer; }
+  tr.gc-row:hover td { background: #161b22; }
   .pc-n { border-top: 1px solid #21262d; padding: 9px 0 2px; }
   .pc-n:first-of-type { border-top: none; }
   .pc-n .t { color: #c9d1d9; font-size: 13px; }
@@ -566,15 +594,32 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
   // Display-only: every value comes from the player's existing stat row — no model,
   // no fetch. Built to also host qualitative notes later without reworking the shell.
   function _pv(v) { return (v === null || v === undefined || v === "") ? 0 : +v || 0; }
-  function _pcardEsc(e) { if (e.key === "Escape") closePlayerCard(); }
-  function closePlayerCard() {
+  function _cardEsc(e) { if (e.key === "Escape") closeCard(); }
+  function closeCard() {
     const b = document.querySelector(".pcard-back");
     if (b) b.remove();
-    document.removeEventListener("keydown", _pcardEsc);
+    document.removeEventListener("keydown", _cardEsc);
   }
+  // Shared modal shell. The player card and the game card both go through it so Escape, the
+  // backdrop and the close button behave identically, and opening one closes the other.
+  function showCard(headHtml, bodyHtml) {
+    closeCard();
+    const back = document.createElement("div");
+    back.className = "pcard-back";
+    back.innerHTML =
+      `<div class="pcard">
+         <div class="pcard-h">${headHtml}<button class="pcard-x" title="Close">&times;</button></div>
+         <div class="pcard-body">${bodyHtml}</div>
+       </div>`;
+    back.onclick = e => { if (e.target === back) closeCard(); };
+    document.body.appendChild(back);
+    document.addEventListener("keydown", _cardEsc);
+    back.querySelector(".pcard-x").onclick = closeCard;
+    return back;
+  }
+  const cardTile = (v, k) => `<div class="pstat"><div class="v">${v}</div><div class="k">${k}</div></div>`;
   function showPlayerCard(p) {
     if (!p) return;
-    closePlayerCard();
     const mins = _pv(p.minutes), g = _pv(p.goals), a = _pv(p.assists);
     const xg = _pv(p.xg), xa = _pv(p.xa), sh = _pv(p.shots), ga = g + a;
     const lk = p._lk || cur;
@@ -625,22 +670,10 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
         : esc(p.img_by || "Wikipedia")}${p.img_lic ? " &middot; " + esc(p.img_lic) : ""}</div>`);
     if (xg > 0) sections.push(
       `<div class="pcard-note">Finishing: <b>${g - xg >= 0 ? "+" : ""}${(g - xg).toFixed(1)}</b> vs xG</div>`);
-    const back = document.createElement("div");
-    back.className = "pcard-back";
-    back.innerHTML =
-      `<div class="pcard">
-         <div class="pcard-h">
-           <div class="pc-id">${avatar}
-             <div><div class="nm">${esc(p.player_name)}</div><div class="mt">${sub}</div></div>
-           </div>
-           <button class="pcard-x" title="Close">×</button>
-         </div>
-         <div class="pcard-body">${sections.join("")}</div>
-       </div>`;
-    back.onclick = e => { if (e.target === back) closePlayerCard(); };
-    document.body.appendChild(back);
-    document.addEventListener("keydown", _pcardEsc);
-    back.querySelector(".pcard-x").onclick = closePlayerCard;
+    const back = showCard(
+      `<div class="pc-id">${avatar}
+         <div><div class="nm">${esc(p.player_name)}</div><div class="mt">${sub}</div></div>
+       </div>`, sections.join(""));
     const photo = back.querySelector("img.pc-photo");
     if (photo) photo.onerror = () => {                // offline / dead URL -> initials
       const d = document.createElement("div");
@@ -650,9 +683,103 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     };
     const tl = back.querySelector(".pl-team");
     if (tl) tl.onclick = () => {
-      closePlayerCard();
+      closeCard();
       cur = tl.dataset.lk; teamCode = tl.dataset.team; teamTab = "summary"; setView("team");
     };
+  }
+
+  // ---- Game card (click any fixture row to expand this) ----
+  // Display-only, and every number is already in sim_results.json: the fixture carries its own
+  // W/D/L and expected goals, and BOTH teams carry a future_swings entry keyed by this game's
+  // match_number. Nothing is recomputed here, so the card cannot disagree with the tables.
+  function _gcTeam(L, code) { return (L.teams || []).find(t => t.code === code); }
+  // Whether to show a stake alongside expected finish. future_swings stores only `title` and
+  // `exp_finish` per outcome, so title% is the ONLY conditional stake available — there is no
+  // conditional relegation% or Europe% to fall back on for a team with nothing to win. Showing
+  // it for contenders only, on the team page's title_pct >= 1 rule, rather than inventing one.
+  function _gcTitleStake(t) { return !!t && t.title_pct >= 1.0; }
+  function showGameCard(lk, f) {
+    const L = LEAGUES[lk];
+    if (!L || !f) return;
+    const home = _gcTeam(L, f.home), away = _gcTeam(L, f.away);
+    const played = isPlayed(f);
+    const sections = [];
+
+    // Odds (upcoming) or the final score (played).
+    if (played) {
+      sections.push(`<div class="pcard-sub">Result</div>
+        <div class="gc-score">${scoreCell(f)}</div>`);
+    } else if (f.win != null) {
+      sections.push(`<div class="pcard-sub">Odds</div>
+        <div class="pcard-grid">${cardTile((f.win*100).toFixed(0) + "%", "Home win")
+          }${cardTile((f.draw*100).toFixed(0) + "%", "Draw")
+          }${cardTile((f.loss*100).toFixed(0) + "%", "Away win")}</div>
+        <span class="wdl gc-bar"><span class="w" style="width:${f.win*100}%"></span><span class="d" style="width:${f.draw*100}%"></span><span class="l" style="width:${f.loss*100}%"></span></span>`
+        + (f.lam_home == null ? "" :
+          `<div class="pcard-note">Model expected goals <b>${f.lam_home.toFixed(1)}</b> &ndash; <b>${f.lam_away.toFixed(1)}</b>${
+            f.info_pct == null ? "" : ` &middot; Info% <b>${f.info_pct.toFixed(2)}</b>`}</div>`));
+    }
+
+    // Where each side stands right now.
+    const posRow = (t, who) => t ? `<tr><td class="gc-t">${esc(t.name)} <span class="gc-ha">${who}</span></td>
+        <td>${t.cur_rank}</td><td>${t.played}</td><td>${t.cur_pts}</td>
+        <td>${t.cur_gd > 0 ? "+" : ""}${t.cur_gd}</td>
+        <td>${t.proj_pts == null ? "&ndash;" : t.proj_pts.toFixed(1)}</td>
+        <td>${t.exp_rank == null ? "&ndash;" : t.exp_rank.toFixed(1)}</td></tr>` : "";
+    if (home || away) sections.push(`<div class="pcard-sub">In the table</div>
+      <table class="gc-tab"><thead><tr><th></th><th>Pos</th><th>Pl</th><th>Pts</th><th>GD</th>
+        <th>Proj</th><th>Exp</th></tr></thead>
+      <tbody>${posRow(home, "H")}${posRow(away, "A")}</tbody></table>`);
+
+    // The outcome panel. The away team's own swings are keyed the same way but from its
+    // perspective, so a home win is its 'l' — get that backwards and every away side reads as
+    // the opposite of its own game.
+    const hs = home && (home.future_swings || {})[f.match_number];
+    const as = away && (away.future_swings || {})[f.match_number];
+    if (!played && (hs || as)) {
+      const hStake = _gcTitleStake(home), aStake = _gcTitleStake(away);
+      const cell = (sw, stake) => {
+        if (!sw) return `<td>&ndash;</td>`;
+        return `<td><b>${sw.exp_finish.toFixed(1)}</b>${
+          stake ? `<span class="gc-pct">${sw.title.toFixed(1)}% title</span>` : ""}</td>`;
+      };
+      const row = (label, cls, hKey, aKey) =>
+        `<tr><td class="gc-o ${cls}">${label}</td>${cell(hs && hs[hKey], hStake)}${cell(as && as[aKey], aStake)}</tr>`;
+      sections.push(`<div class="pcard-sub">If this result &hellip;</div>
+        <table class="gc-tab gc-out"><thead><tr><th></th>
+          <th>${esc(home ? home.name : "Home")}</th><th>${esc(away ? away.name : "Away")}</th></tr></thead>
+        <tbody>${row("Home win", "sw-w", "w", "l")}${row("Draw", "sw-d", "d", "d")}${row("Away win", "sw-l", "l", "w")}</tbody></table>
+        <div class="pcard-note">Each cell is that team's <b>expected finishing position</b> if the
+          game ends that way, everything else simulated${(hStake || aStake)
+            ? ", with title% beneath it for a side still in the race" : ""}.</div>`);
+    }
+
+    // Top five a side, by the same cross-league score the Top Players tab ranks on.
+    const squad = code => leagueMetrics(lk).filter(p => p.team_code === code)
+      .sort((a, b) => (b.gabZ ?? -99) - (a.gabZ ?? -99)).slice(0, 5);
+    const plist = (t, side) => {
+      if (!t) return "";
+      const ps = squad(t.code);
+      if (!ps.length) return "";
+      return `<div class="gc-sq"><div class="gc-sq-h">${esc(t.name)} <span class="gc-ha">${side}</span></div>` +
+        ps.map(p => `<div class="gc-p"><a class="pl-link">${esc(p.player_name)}</a>
+          <span class="gc-pv">${p.goals}G ${p.assists}A${
+            p.gabZ == null ? "" : ` &middot; ${p.gabZ >= 0 ? "+" : ""}${p.gabZ.toFixed(2)}`}</span></div>`).join("") +
+        `</div>`;
+    };
+    const squads = plist(home, "H") + plist(away, "A");
+    if (squads) sections.push(`<div class="pcard-sub">Top players</div>
+      <div class="gc-sqs">${squads}</div>
+      <div class="pcard-note">Five a side by <b>Bld Cross-Lg</b>. Click a name for their card.</div>`);
+
+    const title = `${esc(f.home_name || f.home)} <span class="gc-v">v</span> ${esc(f.away_name || f.away)}`;
+    const sub = [esc(kickoff(f)), esc(L.league.name)].filter(Boolean).join(" &middot; ");
+    const back = showCard(`<div><div class="nm">${title}</div><div class="mt">${sub}</div></div>`,
+                          sections.join(""));
+    // Drill through to a player without losing your place: the player card replaces this one.
+    const flat = (home ? squad(home.code) : []).concat(away ? squad(away.code) : []);
+    back.querySelectorAll(".gc-p .pl-link").forEach((a, i) =>
+      a.onclick = () => showPlayerCard(flat[i]));
   }
 
   // ---- Top Players (cross-league: top 100 currently playing, by G+A per 90) ----
@@ -980,8 +1107,8 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     const th = cols.map(([c, l, al, , , sec]) =>
       `<th data-col="${c}" style="text-align:${al}" class="${sec?'col-sec ':''}${c===fixtSortCol?(fixtSortAsc?'sort-asc':'sort-desc'):''}">${l}</th>`).join("");
     const body = rows.map((f, i) => {
-      const nowCls = i === firstFut ? ' class="now"' : '';
-      return `<tr${nowCls}>${cols.map(([, , al, cell, , sec]) =>
+      const cls = ["gc-row", i === firstFut ? "now" : ""].filter(Boolean).join(" ");
+      return `<tr class="${cls}">${cols.map(([, , al, cell, , sec]) =>
         `<td class="${sec?'col-sec':''}" style="text-align:${al}">${cell(f)}</td>`).join("")}</tr>`;
     }).join("");
     $("fixtures-view").innerHTML =
@@ -992,8 +1119,12 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
         <b>Info%</b> — the expected % drop in the title race's uncertainty (entropy) once the
         result is known — and <b>H after</b>, the expected title-race entropy (bits) still
         remaining once this game's round is played, declining to 0 by season's end. The
-        <span style="color:#f78166">orange line</span> marks the next game. Click a header to sort.</div>
+        <span style="color:#f78166">orange line</span> marks the next game. Click a game for its
+        card &mdash; odds, both teams' table position, what each result would do to them, and the
+        players. Click a header to sort.</div>
        <div class="wrap"><table><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
+    $("fixtures-view").querySelectorAll("tbody tr.gc-row").forEach((tr, i) =>
+      tr.onclick = () => showGameCard(cur, rows[i]));
     $("fixtures-view").querySelectorAll("th[data-col]").forEach(h =>
       h.onclick = () => {
         const c = h.dataset.col;
@@ -1257,10 +1388,16 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
 
     const th = cols.map(([c, l, al, , , sec]) =>
       `<th data-col="${c}" style="text-align:${al}" class="${sec?'col-sec ':''}${c===schedSortCol?(schedSortAsc?'sort-asc':'sort-desc'):''}">${l}</th>`).join("");
+    const modelRow = f => f._lk && LEAGUES[f._lk] && f.match_number != null;
     const bd = rows.length
-      ? rows.map(f => `<tr>${cols.map(([, , al, cell, , sec]) => `<td class="${sec?'col-sec':''}" style="text-align:${al}">${cell(f)}</td>`).join("")}</tr>`).join("")
+      ? rows.map(f => `<tr class="${modelRow(f) ? "gc-row" : ""}">${cols.map(([, , al, cell, , sec]) => `<td class="${sec?'col-sec':''}" style="text-align:${al}">${cell(f)}</td>`).join("")}</tr>`).join("")
       : `<tr><td colspan="${cols.length}" style="color:#8b949e;padding:16px">No games at this threshold — lower it to include more, or follow a team above.</td></tr>`;
     $("sched-table").innerHTML = `<table><thead><tr>${th}</tr></thead><tbody>${bd}</tbody></table>`;
+    // Bind against the model rows only, in their rendered order — national-team and competition
+    // rows carry no fixture data, so they stay inert rather than opening an empty card.
+    const clickable = rows.filter(modelRow);
+    $("sched-table").querySelectorAll("tbody tr.gc-row").forEach((tr, i) =>
+      tr.onclick = () => showGameCard(clickable[i]._lk, clickable[i]));
     $("sched-table").querySelectorAll("th[data-col]").forEach(h =>
       h.onclick = () => {
         const c = h.dataset.col;
@@ -1344,7 +1481,7 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
     const firstFut = sched.findIndex(x => !x.past);
     const schBody = sched.map((row, i) => {
       const f = row.f, opp = `${esc(row.opp)} <span class="pos">(${row.home ? 'H' : 'A'})</span>`;
-      const nowCls = i === firstFut ? ' class="now"' : '';
+      const nowCls = ` class="gc-row${i === firstFut ? " now" : ""}"`;
       if (row.past)
         return `<tr${nowCls}><td>${esc(f.date || "")}</td><td>${opp}</td>`
           + `<td><span class="res ${row.res.toLowerCase()}">${row.gf}–${row.ga} ${row.res}</span></td><td></td></tr>`;
@@ -1379,6 +1516,9 @@ const COMPETITIONS = __COMPETITIONS_PLACEHOLDER__;
          <b class="sw-l">Loss</b> to see this team's ${metricName} conditioned on that path over its next
          few games (everything else simulated). Faint branches have too few matching simulations to trust.</div>
        <div id="odds-tree"></div>`;
+
+    $("team-body").querySelectorAll("table.tsched tbody tr.gc-row").forEach((tr, i) =>
+      tr.onclick = () => showGameCard(cur, sched[i].f));
 
     // Interactive drill-down tree over r.odds_tree, driven by treePath.
     function renderTree() {
