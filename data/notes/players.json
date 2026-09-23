@@ -1,6 +1,6 @@
 {
   "_readme": "Curated player notes extracted from podcast/press briefings pasted into the assistant. Hand-reviewed and version-controlled: no live model runs at build time. Notes are DISPLAY-ONLY - they never feed the simulator. Every note keeps its source and, where possible, a verbatim quote, so a reader can judge it. Names that a transcript garbled are parked in `unresolved` rather than guessed at, because attaching a note to the wrong player is worse than dropping it.",
-  "updated": "2026-09-15T00:00:00Z",
+  "updated": "2026-09-17T00:00:00Z",
   "sources": {
     "fw-2026-08-24": {
       "show": "Football Weekly",
@@ -56,6 +56,11 @@
       "show": "Football Weekly",
       "title": "Kane on target, Barcelona stay perfect and Ballon d'Or debate",
       "date": "2026-09-15"
+    },
+    "fw-2026-09-17": {
+      "show": "Football Weekly",
+      "title": "Manchester United crisis klaxon alert and Sunderland soar: Football Weekly Extra",
+      "date": "2026-09-17"
     }
   },
   "players": [
@@ -1933,6 +1938,74 @@
       ],
       "confidence": "medium",
       "note": "Described as a starter for a flying side; the briefing says Parma, the squad data says Como."
+    },
+    {
+      "name": "Enzo Fernández",
+      "team": "Chelsea",
+      "source": "fw-2026-09-17",
+      "date": "2026-09-17",
+      "tags": [
+        "controversy"
+      ],
+      "confidence": "medium",
+      "note": "The released VAR audio from the Manchester derby shows officials focused on whether he touched the ball and missing the simpler question of whether he interfered with play. The briefings place him at Manchester City; the squad data still lists him at Chelsea.",
+      "quote": "His solution now appears to be to add another a third layer of process to check the process that's checking the process."
+    },
+    {
+      "name": "Enzo Le Fée",
+      "team": "Sunderland",
+      "source": "fw-2026-09-17",
+      "date": "2026-09-17",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "A masterclass in the 1-0 win over AZ Alkmaar — won and converted the penalty that gave Sunderland their first European goal and win since 1973."
+    },
+    {
+      "name": "JJ Gabriel",
+      "team": "Man Utd",
+      "source": "fw-2026-09-17",
+      "date": "2026-09-17",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "medium",
+      "note": "Fifteen, and reportedly looking to leave amid interest from European clubs and the instability at United."
+    },
+    {
+      "name": "Mason Mount",
+      "team": "Man Utd",
+      "source": "fw-2026-09-17",
+      "date": "2026-09-17",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Scored United's second in the 3-2 defeat to Brighton."
+    },
+    {
+      "name": "Max Dowman",
+      "team": "Arsenal",
+      "source": "fw-2026-09-17",
+      "date": "2026-09-17",
+      "tags": [
+        "breakout"
+      ],
+      "confidence": "high",
+      "note": "Fifteen, and praised for composure and technique; Arsenal are credited with protecting him by using him mainly in cup games and limited league minutes."
+    },
+    {
+      "name": "Shea Lacey",
+      "team": "Man Utd",
+      "source": "fw-2026-09-17",
+      "date": "2026-09-17",
+      "tags": [
+        "debut",
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Scored on his debut to help put United 2-0 up at home to Brighton — a lead they then lost, the first side in 50 years to surrender a 2-0 lead at Old Trafford and lose."
     }
   ],
   "unresolved": [
@@ -2406,6 +2479,71 @@
       "league": "Regional 1 (owner, not a player)",
       "source": "fw-2026-09-15",
       "note": "Heavily criticised as Bordeaux fall to the sixth division and face liquidation."
+    },
+    {
+      "mention": "Michael Carrick",
+      "team": "Man Utd",
+      "league": "Premier League (manager, not a player)",
+      "source": "fw-2026-09-17",
+      "note": "Position called tenuous after the Brighton collapse; faulted for lacking in-game problem-solving and inheriting a decade of bad decisions.",
+      "quote": "Manchester United aren't shopping in the expensive supermarket anymore. They're in Aldi. Their supposed rivals are shopping in Waitrose."
+    },
+    {
+      "mention": "Fabian Hürzeler",
+      "team": "Brighton",
+      "league": "Premier League (manager, not a player)",
+      "source": "fw-2026-09-17",
+      "note": "Credited with the in-game changes that turned the game at Old Trafford; spelt 'Fabian Herzler' in the briefing."
+    },
+    {
+      "mention": "Howard Webb",
+      "team": "-",
+      "league": "refereeing (not a player)",
+      "source": "fw-2026-09-17",
+      "note": "His answer to the derby VAR failure — another layer of process to check the process — is called a smokescreen rather than a fix."
+    },
+    {
+      "mention": "Pierre Sage",
+      "team": "Crystal Palace",
+      "league": "Premier League (manager, not a player)",
+      "source": "fw-2026-09-17",
+      "note": "Named among the managers under scrutiny going into the international break."
+    },
+    {
+      "mention": "Marco Silva",
+      "team": "Fulham",
+      "league": "Premier League (manager, not a player)",
+      "source": "fw-2026-09-17",
+      "note": "Named as Fulham's manager under pressure. NOTE the 9 and 11 Sep briefings had Alvaro Arbeloa in that job."
+    },
+    {
+      "mention": "Roberto De Zerbi",
+      "team": "Brighton",
+      "league": "Premier League (manager, not a player)",
+      "source": "fw-2026-09-17",
+      "note": "Named as Brighton's manager under pressure. NOTE this contradicts the same briefing's tactical section, which credits Hurzeler at Brighton, and the 14 Sep briefing, which had De Zerbi at Spurs."
+    },
+    {
+      "mention": "Todd Boehly",
+      "team": "Chelsea",
+      "league": "Premier League (owner, not a player)",
+      "source": "fw-2026-09-17",
+      "note": "Sold his shares as Clear Lake Capital took full control of Chelsea, which the panel expects to make footballing decisions more streamlined."
+    },
+    {
+      "mention": "Raheem Sterling",
+      "team": "-",
+      "league": "currently without a club",
+      "source": "fw-2026-09-17",
+      "note": "Without a club and facing legal consequences after pleading guilty to dangerous driving; his career is described as fizzling out."
+    },
+    {
+      "mention": "Robert Peacock",
+      "team": "-",
+      "league": "former referee (not a player)",
+      "source": "fw-2026-09-17",
+      "note": "A rocket engineer and former referee, quoted in the argument for recruiting analytically trained VAR specialists.",
+      "quote": "Designing and building rockets is much easier than trying to control a field of 22 angry Glaswegians."
     }
   ]
 }
