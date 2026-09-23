@@ -1,6 +1,6 @@
 {
   "_readme": "Curated player notes extracted from podcast/press briefings pasted into the assistant. Hand-reviewed and version-controlled: no live model runs at build time. Notes are DISPLAY-ONLY - they never feed the simulator. Every note keeps its source and, where possible, a verbatim quote, so a reader can judge it. Names that a transcript garbled are parked in `unresolved` rather than guessed at, because attaching a note to the wrong player is worse than dropping it.",
-  "updated": "2026-09-21T00:00:00Z",
+  "updated": "2026-09-22T00:00:00Z",
   "sources": {
     "fw-2026-08-24": {
       "show": "Football Weekly",
@@ -66,6 +66,11 @@
       "show": "Football Weekly",
       "title": "Arsenal battered in Brighton as Manchester City go clear",
       "date": "2026-09-21"
+    },
+    "fw-2026-09-22": {
+      "show": "Football Weekly",
+      "title": "Dockers derby delivers and England squad upheaval",
+      "date": "2026-09-22"
     }
   },
   "players": [
@@ -2156,6 +2161,72 @@
       ],
       "confidence": "high",
       "note": "Scored the only goal in Everton's 1-0 win, a scrambled finish the panel called a limbo goal. Spelt 'Tiano Barry' in the briefing."
+    },
+    {
+      "name": "Cole Palmer",
+      "team": "Chelsea",
+      "source": "fw-2026-09-22",
+      "date": "2026-09-22",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Withdrew from the England squad for the Nations League games. The briefing reads the volume of withdrawals as a disconnect between elite players and a competition they do not rate, rather than as anything about this player. Club football is unaffected."
+    },
+    {
+      "name": "Declan Rice",
+      "team": "Arsenal",
+      "source": "fw-2026-09-22",
+      "date": "2026-09-22",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Withdrew from the England squad for the Nations League games. The briefing reads the volume of withdrawals as a disconnect between elite players and a competition they do not rate, rather than as anything about this player. Club football is unaffected."
+    },
+    {
+      "name": "Kobbie Mainoo",
+      "team": "Man Utd",
+      "source": "fw-2026-09-22",
+      "date": "2026-09-22",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Withdrew from the England squad for the Nations League games. The briefing reads the volume of withdrawals as a disconnect between elite players and a competition they do not rate, rather than as anything about this player. Club football is unaffected."
+    },
+    {
+      "name": "Marcus Rashford",
+      "team": "Man Utd",
+      "source": "fw-2026-09-22",
+      "date": "2026-09-22",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Withdrew from the England squad for the Nations League games. The briefing reads the volume of withdrawals as a disconnect between elite players and a competition they do not rate, rather than as anything about this player. Club football is unaffected."
+    },
+    {
+      "name": "Valentino Livramento",
+      "team": "Newcastle",
+      "source": "fw-2026-09-22",
+      "date": "2026-09-22",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Withdrew from the England squad for the Nations League games. The briefing reads the volume of withdrawals as a disconnect between elite players and a competition they do not rate, rather than as anything about this player. Club football is unaffected. Spelt 'Liveramento' in the briefing."
+    },
+    {
+      "name": "Zian Flemming",
+      "team": "Ipswich",
+      "source": "fw-2026-09-22",
+      "date": "2026-09-22",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "medium",
+      "note": "Cited as one of the key players Burnley sold rather than reinvested in, under the debt from ALK Capital's leveraged buyout. He is at Ipswich in the current squad data."
     }
   ],
   "unresolved": [
@@ -2728,6 +2799,113 @@
       "league": "Premier League (manager, not a player)",
       "source": "fw-2026-09-21",
       "note": "Keeping a thin Everton squad competitive, held up as proof that experience gets you a long way."
+    },
+    {
+      "mention": "Caleb Taylor",
+      "team": "Millwall",
+      "league": "Championship",
+      "source": "fw-2026-09-22",
+      "note": "Scored in the 2-2 Dockers derby, from a Lyndon Dykes long throw."
+    },
+    {
+      "mention": "Camel Negley",
+      "team": "Millwall",
+      "league": "Championship",
+      "source": "fw-2026-09-22",
+      "note": "Scored Millwall's second in the 2-2 derby, also from a Dykes long throw. Name garbled in the briefing and not identifiable from the covered squads."
+    },
+    {
+      "mention": "Lyndon Dykes",
+      "team": "Millwall",
+      "league": "Championship",
+      "source": "fw-2026-09-22",
+      "note": "The 6'4\" centre-forward whose long throws set up both Millwall goals."
+    },
+    {
+      "mention": "Jensen Seidatf",
+      "team": "Millwall",
+      "league": "Championship",
+      "source": "fw-2026-09-22",
+      "note": "Set the tone of the derby by going through Jarrod Bowen after 15 seconds. Name garbled in the briefing.",
+      "quote": "Jensen Seidatf, the Millwall midfielder basically going through Jared Bowen after 15 seconds and setting the tone for the game was amazing."
+    },
+    {
+      "mention": "Konstantinos Mavropanos",
+      "team": "West Ham",
+      "league": "Championship",
+      "source": "fw-2026-09-22",
+      "note": "Scored West Ham's equaliser in the 2-2 derby."
+    },
+    {
+      "mention": "Kante",
+      "team": "West Ham",
+      "league": "Championship",
+      "source": "fw-2026-09-22",
+      "note": "Took a deliberate red card late on to stop a goal-bound Millwall break."
+    },
+    {
+      "mention": "Jarrod Bowen",
+      "team": "West Ham",
+      "league": "Championship",
+      "source": "fw-2026-09-22",
+      "note": "Fouled inside 15 seconds in the derby, setting its tone."
+    },
+    {
+      "mention": "Billy Bonds",
+      "team": "West Ham",
+      "league": "former player (died)",
+      "source": "fw-2026-09-22",
+      "note": "The West Ham legend's death was marked by Millwall supporters, cited as evidence of a new era of respect between the clubs."
+    },
+    {
+      "mention": "Jamie Vardy",
+      "team": "Burnley",
+      "league": "Championship",
+      "source": "fw-2026-09-22",
+      "note": "Signed as a 39-year-old free agent, held up as the shape of Burnley's non-reinvestment."
+    },
+    {
+      "mention": "Fabio Lopez",
+      "team": "Wolves",
+      "league": "Championship",
+      "source": "fw-2026-09-22",
+      "note": "A standout performer in a dominant Wolves side."
+    },
+    {
+      "mention": "Mathis Man",
+      "team": "Wolves",
+      "league": "Championship",
+      "source": "fw-2026-09-22",
+      "note": "Eighteen, named with Lopez among Wolves' standouts. Name garbled in the briefing."
+    },
+    {
+      "mention": "Alan Pace",
+      "team": "Burnley",
+      "league": "Championship (chairman, not a player)",
+      "source": "fw-2026-09-22",
+      "note": "Chairman behind ALK Capital's leveraged buyout: about £142m of debt at 7-12% interest, and his company reportedly owes the club £81m.",
+      "quote": "A leveraged buyout... ALK Capital led by Alan Pace, the chairman, borrowed a load of money essentially against the club."
+    },
+    {
+      "mention": "Nikki Hayan",
+      "team": "Burnley",
+      "league": "Championship (manager, not a player)",
+      "source": "fw-2026-09-22",
+      "note": "Under intense pressure with Burnley bottom and a double drop in prospect. Name garbled in the briefing."
+    },
+    {
+      "mention": "Tunder Ekert",
+      "team": "Southampton",
+      "league": "Championship (manager, not a player)",
+      "source": "fw-2026-09-22",
+      "note": "Facing an FA ban over an alleged spying operation on Middlesbrough; the televised apologies are read as a PR play. Name garbled in the briefing."
+    },
+    {
+      "mention": "Russell Martin",
+      "team": "Leicester City",
+      "league": "Championship (manager, not a player)",
+      "source": "fw-2026-09-22",
+      "note": "A polarising figure over his rigid possession style and his public criticism of players."
     }
   ]
 }
