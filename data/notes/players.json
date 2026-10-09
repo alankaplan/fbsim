@@ -1,6 +1,6 @@
 {
   "_readme": "Curated player notes extracted from podcast/press briefings pasted into the assistant. Hand-reviewed and version-controlled: no live model runs at build time. Notes are DISPLAY-ONLY - they never feed the simulator. Every note keeps its source and, where possible, a verbatim quote, so a reader can judge it. Names that a transcript garbled are parked in `unresolved` rather than guessed at, because attaching a note to the wrong player is worse than dropping it.",
-  "updated": "2026-09-22T00:00:00Z",
+  "updated": "2026-10-08T00:00:00Z",
   "sources": {
     "fw-2026-08-24": {
       "show": "Football Weekly",
@@ -71,6 +71,41 @@
       "show": "Football Weekly",
       "title": "Dockers derby delivers and England squad upheaval",
       "date": "2026-09-22"
+    },
+    "fw-2026-09-24": {
+      "show": "Football Weekly",
+      "title": "England v Spain preview and Zidane and Klopp take the reins",
+      "date": "2026-09-24"
+    },
+    "fw-2026-09-28": {
+      "show": "Football Weekly",
+      "title": "The Manchester City verdict and England run world champions close",
+      "date": "2026-09-28"
+    },
+    "fw-2026-09-30": {
+      "show": "Football Weekly",
+      "title": "The Premier League v Manchester City and England beat Czechia",
+      "date": "2026-09-30"
+    },
+    "fw-2026-10-01": {
+      "show": "Football Weekly",
+      "title": "Manchester City scandal latest as Pep Guardiola speaks: Football Weekly Extra",
+      "date": "2026-10-01"
+    },
+    "fw-2026-10-05": {
+      "show": "Football Weekly",
+      "title": "England hammer Croatia and Manchester City get their appeal on",
+      "date": "2026-10-05"
+    },
+    "fw-2026-10-07": {
+      "show": "Football Weekly",
+      "title": "Kane makes more England history and Ronaldo claps back",
+      "date": "2026-10-07"
+    },
+    "fw-2026-10-08": {
+      "show": "Football Weekly",
+      "title": "Manchester City's trip to Anfield and is Eckert's Spygate ban too lenient?",
+      "date": "2026-10-08"
     }
   },
   "players": [
@@ -142,7 +177,7 @@
       "note": "Named among high-value signings the briefing says need patient integration; early results are favouring settled squads."
     },
     {
-      "name": "Ezri Konsa",
+      "name": "Ezri Konsa Ngoyo",
       "team": "Aston Villa",
       "source": "fw-2026-08-24",
       "date": "2026-08-24",
@@ -410,7 +445,7 @@
       "note": "Named among the long-serving players whose high turnover is seen as a possible breaking point for Villa's European ambitions (surname only)."
     },
     {
-      "name": "Ezri Konsa",
+      "name": "Ezri Konsa Ngoyo",
       "team": "Aston Villa",
       "source": "fw-2026-08-27",
       "date": "2026-08-27",
@@ -832,6 +867,17 @@
       ],
       "confidence": "medium",
       "note": "The player a depleted Everton midfield has to neutralise, in the briefing's preview of Everton v Manchester United."
+    },
+    {
+      "name": "Elliot Anderson",
+      "team": "Man City",
+      "source": "fw-2026-09-03",
+      "date": "2026-09-03",
+      "tags": [
+        "transfer"
+      ],
+      "confidence": "medium",
+      "note": "Named as a midfield arrival at City alongside Enzo Fernandez. Surname only in the briefing; identified as Elliot Anderson, the only Anderson in City's squad."
     },
     {
       "name": "Enzo Fernandez",
@@ -2227,6 +2273,816 @@
       ],
       "confidence": "medium",
       "note": "Cited as one of the key players Burnley sold rather than reinvested in, under the debt from ALK Capital's leveraged buyout. He is at Ipswich in the current squad data."
+    },
+    {
+      "name": "Anthony Gordon",
+      "team": "FC Barcelona",
+      "source": "fw-2026-09-24",
+      "date": "2026-09-24",
+      "tags": [
+        "role"
+      ],
+      "confidence": "medium",
+      "note": "Argued England should not try to copy Spain's style, in the debate over England's footballing identity."
+    },
+    {
+      "name": "James Garner",
+      "team": "Everton",
+      "source": "fw-2026-09-24",
+      "date": "2026-09-24",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Called into the England squad as a replacement for the withdrawals."
+    },
+    {
+      "name": "Morgan Gibbs-White",
+      "team": "Nott'm Forest",
+      "source": "fw-2026-09-24",
+      "date": "2026-09-24",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Called into the England squad as a replacement for the withdrawals."
+    },
+    {
+      "name": "Oliver McBurnie",
+      "team": "Hull",
+      "source": "fw-2026-09-24",
+      "date": "2026-09-24",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Recalled by Scotland's new manager on the strength of his form at Hull. Spelt 'Ollie McBurney' in the briefing."
+    },
+    {
+      "name": "Anthony Gordon",
+      "team": "FC Barcelona",
+      "source": "fw-2026-09-28",
+      "date": "2026-09-28",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Read the 2-3 defeat to Spain as a realistic benchmark rather than a setback.",
+      "quote": "It was a good game and we lost to the best team in the world by one goal and we're pretty happy with it."
+    },
+    {
+      "name": "Ben Doak",
+      "team": "Bournemouth",
+      "source": "fw-2026-09-28",
+      "date": "2026-09-28",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "medium",
+      "note": "Named among the injuries from the international window."
+    },
+    {
+      "name": "Dan Ballard",
+      "team": "Sunderland",
+      "source": "fw-2026-09-28",
+      "date": "2026-09-28",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "medium",
+      "note": "Named among the injuries from the international window."
+    },
+    {
+      "name": "Elliot Anderson",
+      "team": "Man City",
+      "source": "fw-2026-09-28",
+      "date": "2026-09-28",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "His tackle started the move that produced England's goal in the 2-3 defeat to Spain."
+    },
+    {
+      "name": "Gonçalo Ramos",
+      "team": "Milan",
+      "source": "fw-2026-09-28",
+      "date": "2026-09-28",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Led Portugal's attack with Ronaldo an unused substitute, scoring twice (one disallowed)."
+    },
+    {
+      "name": "James Trafford",
+      "team": "Leeds",
+      "source": "fw-2026-09-28",
+      "date": "2026-09-28",
+      "tags": [
+        "role"
+      ],
+      "confidence": "high",
+      "note": "Started in goal for England ahead of Jordan Pickford."
+    },
+    {
+      "name": "Jordan Pickford",
+      "team": "Everton",
+      "source": "fw-2026-09-28",
+      "date": "2026-09-28",
+      "tags": [
+        "role"
+      ],
+      "confidence": "medium",
+      "note": "Left out of England's starting side; the briefing puts it down to Tuchel's frustration with his frantic long clearances under pressure."
+    },
+    {
+      "name": "Jude Bellingham",
+      "team": "Real Madrid",
+      "source": "fw-2026-09-28",
+      "date": "2026-09-28",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Crafted England's goal against Spain with Anthony Gordon."
+    },
+    {
+      "name": "Kai Havertz",
+      "team": "Arsenal",
+      "source": "fw-2026-09-28",
+      "date": "2026-09-28",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Injured during the international window."
+    },
+    {
+      "name": "Pedri",
+      "team": "FC Barcelona",
+      "source": "fw-2026-09-28",
+      "date": "2026-09-28",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Cited as an example of the quality Spain could bring off the bench."
+    },
+    {
+      "name": "Álex Baena",
+      "team": "Atlético de Madrid",
+      "source": "fw-2026-09-28",
+      "date": "2026-09-28",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Named with Pedri as Spain's bench depth at Wembley."
+    },
+    {
+      "name": "Alex Scott",
+      "team": "Bournemouth",
+      "source": "fw-2026-09-30",
+      "date": "2026-09-30",
+      "tags": [
+        "debut"
+      ],
+      "confidence": "high",
+      "note": "Made his England debut off the bench, noted for his work rate."
+    },
+    {
+      "name": "Anthony Gordon",
+      "team": "FC Barcelona",
+      "source": "fw-2026-09-30",
+      "date": "2026-09-30",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Scored England's opener against Czechia with a stooping header — three goals in three for England — and has taken the left-wing place ahead of Rashford, Eze and Gibbs-White.",
+      "quote": "He's someone who, when he was bought by Newcastle, was met by derision in some quarters... Now he's doing it for England."
+    },
+    {
+      "name": "Granit Xhaka",
+      "team": "Sunderland",
+      "source": "fw-2026-09-30",
+      "date": "2026-09-30",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Left out of the Switzerland squad over legal proceedings concerning falsified COVID-19 documents."
+    },
+    {
+      "name": "Jarell Quansah",
+      "team": "Bayer 04 Leverkusen",
+      "source": "fw-2026-09-30",
+      "date": "2026-09-30",
+      "tags": [
+        "role"
+      ],
+      "confidence": "medium",
+      "note": "Cited as the physical, robust defensive profile Tuchel favours over a purely technical full-back."
+    },
+    {
+      "name": "Jeremie Frimpong",
+      "team": "Liverpool",
+      "source": "fw-2026-09-30",
+      "date": "2026-09-30",
+      "tags": [
+        "role"
+      ],
+      "confidence": "medium",
+      "note": "Cited with Quansah as the kind of defender Tuchel prefers."
+    },
+    {
+      "name": "Lamine Yamal",
+      "team": "FC Barcelona",
+      "source": "fw-2026-09-30",
+      "date": "2026-09-30",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "An assist in Spain's 4-2 win over Croatia."
+    },
+    {
+      "name": "Lewis Hall",
+      "team": "Newcastle",
+      "source": "fw-2026-09-30",
+      "date": "2026-09-30",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "A strong performance at left-back in the 2-0 win over Czechia."
+    },
+    {
+      "name": "Michael Olise",
+      "team": "FC Bayern München",
+      "source": "fw-2026-09-30",
+      "date": "2026-09-30",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Scored the late winner for France against Belgium."
+    },
+    {
+      "name": "Ricardo Rodríguez",
+      "team": "Torino",
+      "source": "fw-2026-09-30",
+      "date": "2026-09-30",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Scored Switzerland's free kick against ten-man Scotland in a 3-0 win."
+    },
+    {
+      "name": "Rio Ngumoha",
+      "team": "Liverpool",
+      "source": "fw-2026-09-30",
+      "date": "2026-09-30",
+      "tags": [
+        "debut"
+      ],
+      "confidence": "high",
+      "note": "Made his England debut off the bench, noted for his ball-carrying."
+    },
+    {
+      "name": "Trent Alexander-Arnold",
+      "team": "Real Madrid",
+      "source": "fw-2026-09-30",
+      "date": "2026-09-30",
+      "tags": [
+        "role"
+      ],
+      "confidence": "high",
+      "note": "Back at right-back for England, with a curling cross for Gordon's goal; Tuchel's preference for more physical full-backs keeps his long-term place in question."
+    },
+    {
+      "name": "Esteban Lepaul",
+      "team": "Stade Rennais FC",
+      "source": "fw-2026-10-01",
+      "date": "2026-10-01",
+      "tags": [
+        "role"
+      ],
+      "confidence": "medium",
+      "note": "Named among France's squad depth under Zidane. Named as 'Esteban (Stade Rennais)' in the briefing."
+    },
+    {
+      "name": "Gonçalo Ramos",
+      "team": "Milan",
+      "source": "fw-2026-10-01",
+      "date": "2026-10-01",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Scored Portugal's winner against Norway with Ronaldo on the bench — 12 goals for his country at one every 94 minutes."
+    },
+    {
+      "name": "Kylian Mbappe-Lottin",
+      "team": "Real Madrid",
+      "source": "fw-2026-10-01",
+      "date": "2026-10-01",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Picked up an early knee injury on France duty."
+    },
+    {
+      "name": "Lucas Da Cunha",
+      "team": "Como",
+      "source": "fw-2026-10-01",
+      "date": "2026-10-01",
+      "tags": [
+        "role"
+      ],
+      "confidence": "medium",
+      "note": "Named in the depth France used in Zidane's opening games. Spelt 'Lucad Akuna, Como captain' in the briefing."
+    },
+    {
+      "name": "Luka Modric",
+      "team": "Milan",
+      "source": "fw-2026-10-01",
+      "date": "2026-10-01",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Scored in Croatia's 2-1 win over Czechia, Slaven Bilić's first game."
+    },
+    {
+      "name": "Michael Olise",
+      "team": "FC Bayern München",
+      "source": "fw-2026-10-01",
+      "date": "2026-10-01",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "A notable individual goal for France under Zidane."
+    },
+    {
+      "name": "Alex Scott",
+      "team": "Bournemouth",
+      "source": "fw-2026-10-05",
+      "date": "2026-10-05",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Part of the midfield that covered for Rice, and of the move for the fourth goal."
+    },
+    {
+      "name": "Andrew Robertson",
+      "team": "Spurs",
+      "source": "fw-2026-10-05",
+      "date": "2026-10-05",
+      "tags": [
+        "milestone"
+      ],
+      "confidence": "high",
+      "note": "Won his 100th Scotland cap in the 2-0 win in North Macedonia."
+    },
+    {
+      "name": "Bukayo Saka",
+      "team": "Arsenal",
+      "source": "fw-2026-10-05",
+      "date": "2026-10-05",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "One of England's front four that exploited Croatia's ageing midfield."
+    },
+    {
+      "name": "Elliot Anderson",
+      "team": "Man City",
+      "source": "fw-2026-10-05",
+      "date": "2026-10-05",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "With Alex Scott, showed England can cope without Declan Rice."
+    },
+    {
+      "name": "Gonçalo Ramos",
+      "team": "Milan",
+      "source": "fw-2026-10-05",
+      "date": "2026-10-05",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Scored in three consecutive starts as Portugal won all four games without Ronaldo."
+    },
+    {
+      "name": "Harry Kane",
+      "team": "FC Bayern München",
+      "source": "fw-2026-10-05",
+      "date": "2026-10-05",
+      "tags": [
+        "milestone"
+      ],
+      "confidence": "high",
+      "note": "Reached 89 international goals in the 7-0 win over Croatia."
+    },
+    {
+      "name": "Jarell Quansah",
+      "team": "Bayer 04 Leverkusen",
+      "source": "fw-2026-10-05",
+      "date": "2026-10-05",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Named among England's key performers against Croatia."
+    },
+    {
+      "name": "John McGinn",
+      "team": "Aston Villa",
+      "source": "fw-2026-10-05",
+      "date": "2026-10-05",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Scored a VAR-awarded penalty in Scotland's 2-0 win."
+    },
+    {
+      "name": "Jude Bellingham",
+      "team": "Real Madrid",
+      "source": "fw-2026-10-05",
+      "date": "2026-10-05",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Drove England's 7-0 win over Croatia with his positional awareness and work rate, and assisted the seventh."
+    },
+    {
+      "name": "Kieron Bowie",
+      "team": "Sassuolo",
+      "source": "fw-2026-10-05",
+      "date": "2026-10-05",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Scored in Scotland's 2-0 win over North Macedonia."
+    },
+    {
+      "name": "Lewis Hall",
+      "team": "Newcastle",
+      "source": "fw-2026-10-05",
+      "date": "2026-10-05",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Started the team move for England's fourth goal."
+    },
+    {
+      "name": "Luka Modric",
+      "team": "Milan",
+      "source": "fw-2026-10-05",
+      "date": "2026-10-05",
+      "tags": [
+        "weakness"
+      ],
+      "confidence": "high",
+      "note": "Captained a Croatia side he said he was ashamed of after the 7-0.",
+      "quote": "No duel, no aggression, no fouls, no unity. I've been here for 20 years... for the first time, I feel ashamed after a game."
+    },
+    {
+      "name": "Marc Guehi",
+      "team": "Man City",
+      "source": "fw-2026-10-05",
+      "date": "2026-10-05",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Involved in the team move for England's fourth goal."
+    },
+    {
+      "name": "Morgan Rogers",
+      "team": "Chelsea",
+      "source": "fw-2026-10-05",
+      "date": "2026-10-05",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Scored England's seventh against Croatia, assisted by Bellingham."
+    },
+    {
+      "name": "Troy Parrott",
+      "team": "Real Betis",
+      "source": "fw-2026-10-05",
+      "date": "2026-10-05",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "A standout solo goal for Ireland against Austria, beating several defenders and finishing through the keeper's legs."
+    },
+    {
+      "name": "Vitinha",
+      "team": "Paris Saint-Germain",
+      "source": "fw-2026-10-05",
+      "date": "2026-10-05",
+      "tags": [
+        "role"
+      ],
+      "confidence": "medium",
+      "note": "Said Portugal's structure and fluidity have improved under Jorge Jesus."
+    },
+    {
+      "name": "Alex Scott",
+      "team": "Bournemouth",
+      "source": "fw-2026-10-07",
+      "date": "2026-10-07",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Featured in midfield in Rice's absence."
+    },
+    {
+      "name": "Declan Rice",
+      "team": "Arsenal",
+      "source": "fw-2026-10-07",
+      "date": "2026-10-07",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Missed the England games because of heavy physical loading."
+    },
+    {
+      "name": "Désiré Doué",
+      "team": "Paris Saint-Germain",
+      "source": "fw-2026-10-07",
+      "date": "2026-10-07",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Key to France scoring four in 13 minutes to beat Belgium from 1-0 down."
+    },
+    {
+      "name": "Harry Kane",
+      "team": "FC Bayern München",
+      "source": "fw-2026-10-07",
+      "date": "2026-10-07",
+      "tags": [
+        "milestone",
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Won his 125th cap to draw level with Peter Shilton as England's most capped player, with two goals and an assist in a 3-0 win over Czechia — 91 international goals, and 85 in 75 for club and country since last season.",
+      "quote": "In the modern era it's Kane, fresh air, and then everyone else."
+    },
+    {
+      "name": "Jude Bellingham",
+      "team": "Real Madrid",
+      "source": "fw-2026-10-07",
+      "date": "2026-10-07",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Praised for his strength and composure on England duty.",
+      "quote": "He looks like a dad playing in the garden with his four kids under the age of five."
+    },
+    {
+      "name": "Khvicha Kvaratskhelia",
+      "team": "Paris Saint-Germain",
+      "source": "fw-2026-10-07",
+      "date": "2026-10-07",
+      "tags": [
+        "weakness"
+      ],
+      "confidence": "medium",
+      "note": "Kept quiet by Northern Ireland across both meetings with Georgia."
+    },
+    {
+      "name": "Lewis Hall",
+      "team": "Newcastle",
+      "source": "fw-2026-10-07",
+      "date": "2026-10-07",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Has established himself as a reliable England left-back."
+    },
+    {
+      "name": "Lionel Messi",
+      "team": "Inter Miami",
+      "source": "fw-2026-10-07",
+      "date": "2026-10-07",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Two assists and a penalty in a staged home farewell against Benin."
+    },
+    {
+      "name": "Marc Cucurella",
+      "team": "Real Madrid",
+      "source": "fw-2026-10-07",
+      "date": "2026-10-07",
+      "tags": [
+        "controversy"
+      ],
+      "confidence": "medium",
+      "note": "The clash with Ivan Perišić that led to the Croatian's red card."
+    },
+    {
+      "name": "Michael Olise",
+      "team": "FC Bayern München",
+      "source": "fw-2026-10-07",
+      "date": "2026-10-07",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Contributed to France's comeback against Belgium."
+    },
+    {
+      "name": "Mikel Merino",
+      "team": "Arsenal",
+      "source": "fw-2026-10-07",
+      "date": "2026-10-07",
+      "tags": [
+        "form"
+      ],
+      "confidence": "high",
+      "note": "Two late goals as Spain came from behind against Croatia — half his Spain goals have come after the 88th minute."
+    },
+    {
+      "name": "Myles Lewis-Skelly",
+      "team": "Arsenal",
+      "source": "fw-2026-10-07",
+      "date": "2026-10-07",
+      "tags": [
+        "form",
+        "error"
+      ],
+      "confidence": "high",
+      "note": "Showed exceptional skill in midfield in Rice's absence, but a yellow card brings a suspension."
+    },
+    {
+      "name": "Nico Paz",
+      "team": "Como",
+      "source": "fw-2026-10-07",
+      "date": "2026-10-07",
+      "tags": [
+        "form"
+      ],
+      "confidence": "medium",
+      "note": "Scored from a Messi assist in Argentina's 3-0 win over Benin."
+    },
+    {
+      "name": "Trent Alexander-Arnold",
+      "team": "Real Madrid",
+      "source": "fw-2026-10-07",
+      "date": "2026-10-07",
+      "tags": [
+        "role"
+      ],
+      "confidence": "medium",
+      "note": "Adds attacking range at right-back, provided the team is built around his defensive profile."
+    },
+    {
+      "name": "Alex Scott",
+      "team": "Bournemouth",
+      "source": "fw-2026-10-08",
+      "date": "2026-10-08",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Out with a tendon injury for the game at Chelsea."
+    },
+    {
+      "name": "Brian Brobbey",
+      "team": "Sunderland",
+      "source": "fw-2026-10-08",
+      "date": "2026-10-08",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Missing for the game against Brighton. Spelt 'Brian Brobby' in the briefing."
+    },
+    {
+      "name": "Christos Tzolis",
+      "team": "Arsenal",
+      "source": "fw-2026-10-08",
+      "date": "2026-10-08",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Out with a hamstring injury for the game against Leeds. Named only as 'Christos' in the briefing."
+    },
+    {
+      "name": "Dan Ballard",
+      "team": "Sunderland",
+      "source": "fw-2026-10-08",
+      "date": "2026-10-08",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Missing for the game against Brighton."
+    },
+    {
+      "name": "David Brooks",
+      "team": "Bournemouth",
+      "source": "fw-2026-10-08",
+      "date": "2026-10-08",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Missing for the game at Chelsea."
+    },
+    {
+      "name": "Erling Haaland",
+      "team": "Man City",
+      "source": "fw-2026-10-08",
+      "date": "2026-10-08",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "medium",
+      "note": "Was limping before the international break, ahead of the trip to Anfield."
+    },
+    {
+      "name": "Ezri Konsa Ngoyo",
+      "team": "Arsenal",
+      "source": "fw-2026-10-08",
+      "date": "2026-10-08",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "medium",
+      "note": "A doubt for the game against Leeds."
+    },
+    {
+      "name": "Francesco Pio Esposito",
+      "team": "Internazionale",
+      "source": "fw-2026-10-08",
+      "date": "2026-10-08",
+      "tags": [
+        "milestone"
+      ],
+      "confidence": "high",
+      "note": "Played alongside his brother Sebastiano for Italy — the first brothers to do so in 111 years."
+    },
+    {
+      "name": "Justin Kluivert",
+      "team": "Bournemouth",
+      "source": "fw-2026-10-08",
+      "date": "2026-10-08",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Missing for the game at Chelsea."
+    },
+    {
+      "name": "Kai Havertz",
+      "team": "Arsenal",
+      "source": "fw-2026-10-08",
+      "date": "2026-10-08",
+      "tags": [
+        "absence"
+      ],
+      "confidence": "high",
+      "note": "Out with a hamstring injury for the game against Leeds."
+    },
+    {
+      "name": "Sebastiano Esposito",
+      "team": "Sassuolo",
+      "source": "fw-2026-10-08",
+      "date": "2026-10-08",
+      "tags": [
+        "milestone"
+      ],
+      "confidence": "high",
+      "note": "Played alongside his brother Francesco Pio for Italy — the first brothers to do so in 111 years."
     }
   ],
   "unresolved": [
@@ -2311,11 +3167,6 @@
       "source": "fw-2026-09-03"
     },
     {
-      "mention": "Anderson",
-      "context": "Manchester City - a midfield arrival named with Enzo Fernandez; surname only, several candidates",
-      "source": "fw-2026-09-03"
-    },
-    {
       "mention": "Bardi",
       "context": "Manchester City - midfielder competing for a place after the Fernandez signing; already parked from an earlier episode",
       "source": "fw-2026-09-03"
@@ -2329,6 +3180,16 @@
       "mention": "Milenovic",
       "context": "Everton - credited with Pickford for the defensive organisation, but there is no Milenkovic at Everton. Two candidates pull opposite ways: Nikola Milenkovic matches on spelling but plays for Nott'm Forest, Vitalii Mykolenko matches on club and role but is a rougher phonetic fit",
       "source": "fw-2026-09-21"
+    },
+    {
+      "mention": "Koa O'Neal",
+      "context": "Arsenal - 18, committed to Northern Ireland over the Republic. Not in the Arsenal squad data, and spelt 'Kad Conneal' in the 5 Oct briefing, so the name itself is uncertain",
+      "source": "fw-2026-09-24"
+    },
+    {
+      "mention": "Volpato",
+      "context": "Germany - an unselected player shuttled back to the team hotel mid-match under Klopp. The only Volpato in the data is Sassuolo's Cristian Volpato, who is not a Germany player, so the identification does not fit",
+      "source": "fw-2026-09-28"
     }
   ],
   "out_of_scope": [
@@ -2906,6 +3767,297 @@
       "league": "Championship (manager, not a player)",
       "source": "fw-2026-09-22",
       "note": "A polarising figure over his rigid possession style and his public criticism of players."
+    },
+    {
+      "mention": "Thomas Tuchel",
+      "team": "England",
+      "league": "international (manager, not a player)",
+      "source": "fw-2026-09-24",
+      "note": "Under scrutiny after the World Cup semi-final; a pre-tournament contract extension makes dismissal costly.",
+      "quote": "Tuchel is gaslighting people if he's saying it's not his fault."
+    },
+    {
+      "mention": "Heimir Hallgrímsson",
+      "team": "Republic of Ireland",
+      "league": "international (manager, not a player)",
+      "source": "fw-2026-09-24",
+      "note": "Under pressure over the fixtures against Israel and calls for a boycott."
+    },
+    {
+      "mention": "Sébastien Pocognoli",
+      "team": "Scotland",
+      "league": "international (manager, not a player)",
+      "source": "fw-2026-09-24",
+      "note": "Replaced Steve Clarke and began a squad cull. Spelt 'Sebastian Pognoli' in the briefing."
+    },
+    {
+      "mention": "Grant Hanley",
+      "team": "-",
+      "league": "Scotland",
+      "source": "fw-2026-09-24",
+      "note": "A veteran left out of Pocognoli's first squad; not in the loaded squads."
+    },
+    {
+      "mention": "John Souttar",
+      "team": "-",
+      "league": "Scotland",
+      "source": "fw-2026-09-24",
+      "note": "A veteran left out of Pocognoli's first squad; not in the loaded squads."
+    },
+    {
+      "mention": "Michael O'Neill",
+      "team": "Northern Ireland",
+      "league": "international (manager, not a player)",
+      "source": "fw-2026-09-24",
+      "note": "Observed that individual quality decided matches at the highest level."
+    },
+    {
+      "mention": "Zachary Boucher",
+      "team": "-",
+      "league": "Madagascar",
+      "source": "fw-2026-09-24",
+      "note": "A first call-up at 34, met with backlash over a 2018 interview pledging himself to France."
+    },
+    {
+      "mention": "Gavin Bazunu",
+      "team": "-",
+      "league": "Republic of Ireland",
+      "source": "fw-2026-09-28",
+      "note": "Refused to play against Israel and was verbally abused by a team-mate who later apologised; not in the loaded squads."
+    },
+    {
+      "mention": "Khaldoon Al Mubarak",
+      "team": "Man City",
+      "league": "Premier League (chairman, not a player)",
+      "source": "fw-2026-09-28",
+      "note": "Maintained the club's innocence after the leaked guilty verdict.",
+      "quote": "The Premier League process still has a long way to run and our confidence and intent in proving the club's innocence is just as strong as when this began."
+    },
+    {
+      "mention": "Jürgen Klopp",
+      "team": "Germany",
+      "league": "international (manager, not a player)",
+      "source": "fw-2026-09-28",
+      "note": "Lost at home to Greece; his 44-man squad caused logistical problems."
+    },
+    {
+      "mention": "Cristiano Ronaldo",
+      "team": "-",
+      "league": "Saudi Pro League",
+      "source": "fw-2026-09-28",
+      "note": "An unused substitute for Portugal."
+    },
+    {
+      "mention": "Jack Hendry",
+      "team": "-",
+      "league": "Scotland",
+      "source": "fw-2026-09-30",
+      "note": "Sent off after seven minutes against Switzerland; not in the loaded squads."
+    },
+    {
+      "mention": "Breel Embolo",
+      "team": "-",
+      "league": "Switzerland",
+      "source": "fw-2026-09-30",
+      "note": "Absent with Xhaka over the COVID-19 documents case; not in the loaded squads."
+    },
+    {
+      "mention": "Fabian Ruiz",
+      "team": "-",
+      "league": "Spain",
+      "source": "fw-2026-09-30",
+      "note": "Extended his unbeaten run with Spain to 52; not in the loaded squads."
+    },
+    {
+      "mention": "Pierce Charles",
+      "team": "-",
+      "league": "Northern Ireland",
+      "source": "fw-2026-09-30",
+      "note": "Saved a Kvaratskhelia penalty in the 1-0 win in Georgia."
+    },
+    {
+      "mention": "Shay Charles",
+      "team": "-",
+      "league": "Northern Ireland",
+      "source": "fw-2026-09-30",
+      "note": "Scored the 99th-minute winner in Georgia."
+    },
+    {
+      "mention": "Ferran Soriano",
+      "team": "Man City",
+      "league": "Premier League (CEO, not a player)",
+      "source": "fw-2026-09-30",
+      "note": "A leaked staff video denied the case and threatened legal action.",
+      "quote": "The whole Premier League case against us is based on a single false accusation."
+    },
+    {
+      "mention": "Robbie Savage",
+      "team": "Forest Green Rovers",
+      "league": "National League (manager, not a player)",
+      "source": "fw-2026-09-30",
+      "note": "Linked with the vacancy at Peterborough United."
+    },
+    {
+      "mention": "Pep Guardiola",
+      "team": "Man City",
+      "league": "Premier League (manager, not a player)",
+      "source": "fw-2026-10-01",
+      "note": "Pledged support to the owners and to Soriano after the verdict, despite saying in 2022 he would leave if lied to. NOTE the 9, 11 and 14 Sep briefings had Enzo Maresca as City's manager.",
+      "quote": "I want every single Manchester City fan across the world to know I am here more than ever."
+    },
+    {
+      "mention": "Micah Richards",
+      "team": "-",
+      "league": "former player",
+      "source": "fw-2026-10-01",
+      "note": "Said he was devastated by the phrase 'sham contracts'."
+    },
+    {
+      "mention": "Cristiano Ronaldo",
+      "team": "-",
+      "league": "Saudi Pro League",
+      "source": "fw-2026-10-01",
+      "note": "Walked out of the Portugal camp after being benched.",
+      "quote": "In time, I will tell all the Portuguese the truth about the reasons that motivated me to leave the national team."
+    },
+    {
+      "mention": "Jorge Jesus",
+      "team": "Portugal",
+      "league": "international (manager, not a player)",
+      "source": "fw-2026-10-01",
+      "note": "Insisted no one influences his selection.",
+      "quote": "No player can change my mind. Not him, not anyone in the football world."
+    },
+    {
+      "mention": "Slaven Bilić",
+      "team": "Croatia",
+      "league": "international (manager, not a player)",
+      "source": "fw-2026-10-01",
+      "note": "Took over from Zlatko Dalić."
+    },
+    {
+      "mention": "Zinedine Zidane",
+      "team": "France",
+      "league": "international (manager, not a player)",
+      "source": "fw-2026-10-01",
+      "note": "Opened with consecutive 1-0 wins."
+    },
+    {
+      "mention": "Scott McKenna",
+      "team": "-",
+      "league": "Scotland",
+      "source": "fw-2026-10-05",
+      "note": "Sent off late against North Macedonia after an under-hit pass; not in the loaded squads."
+    },
+    {
+      "mention": "Kieran Brown",
+      "team": "Oxford United",
+      "league": "League One",
+      "source": "fw-2026-10-05",
+      "note": "Scored twice in Northern Ireland's 3-0 win over Ukraine."
+    },
+    {
+      "mention": "Craig Bellamy",
+      "team": "Wales",
+      "league": "international (manager, not a player)",
+      "source": "fw-2026-10-05",
+      "note": "Argued the four-game window disadvantages smaller nations.",
+      "quote": "We know it's a complete disadvantage to us."
+    },
+    {
+      "mention": "Damian Doyle",
+      "team": "Republic of Ireland",
+      "league": "coaching staff",
+      "source": "fw-2026-10-05",
+      "note": "The Ireland fitness coach reportedly spat at by an Israel player."
+    },
+    {
+      "mention": "Ivan Perišić",
+      "team": "-",
+      "league": "Croatia",
+      "source": "fw-2026-10-07",
+      "note": "Scored against Spain before being sent off; not in the loaded squads."
+    },
+    {
+      "mention": "Nicolás Otamendi",
+      "team": "-",
+      "league": "Argentina",
+      "source": "fw-2026-10-07",
+      "note": "Scored in the 3-0 win over Benin; not in the loaded squads."
+    },
+    {
+      "mention": "Angus Gunn",
+      "team": "-",
+      "league": "Scotland",
+      "source": "fw-2026-10-07",
+      "note": "Scotland's main goalkeeping option amid doubts about depth; not in the loaded squads."
+    },
+    {
+      "mention": "Sébastien Pocognoli",
+      "team": "Scotland",
+      "league": "international (manager, not a player)",
+      "source": "fw-2026-10-07",
+      "note": "Lost 2-1 at home to Slovenia after leading.",
+      "quote": "Pocognoli had the look of a coach throwing darts blindly at a board and missing."
+    },
+    {
+      "mention": "Cristiano Ronaldo",
+      "team": "-",
+      "league": "Saudi Pro League",
+      "source": "fw-2026-10-07",
+      "note": "An 11-slide, 1,740-word Instagram statement after walking out of the Portugal camp.",
+      "quote": "The coach asking someone of the stature of Pelé or Maradona to warm-up and then not putting him in the game was a mistake."
+    },
+    {
+      "mention": "Jesse Marsch",
+      "team": "-",
+      "league": "international (manager, not a player)",
+      "source": "fw-2026-10-07",
+      "note": "Said Manchester City should be relegated.",
+      "quote": "I think Man City should be punished severely. I think they should have to go down."
+    },
+    {
+      "mention": "Tonda Eckert",
+      "team": "Southampton",
+      "league": "Championship (manager, not a player)",
+      "source": "fw-2026-10-08",
+      "note": "Given a six-week ban suspended to the end of next season, plus a fine, for spying on opponents' training — the FA had asked for an immediate three-month ban. Spelt 'Tonda Echart' in the briefing.",
+      "quote": "Suspended sentence always implies just don't do it again... It was cheating."
+    },
+    {
+      "mention": "Mikel Arteta",
+      "team": "Arsenal",
+      "league": "Premier League (manager, not a player)",
+      "source": "fw-2026-10-08",
+      "note": "Signed a new long-term contract."
+    },
+    {
+      "mention": "Nasser Al-Khelaifi",
+      "team": "Paris Saint-Germain",
+      "league": "Ligue 1 (owner, not a player)",
+      "source": "fw-2026-10-08",
+      "note": "Pushed back on calling Manchester City cheats, saying the courts must decide."
+    },
+    {
+      "mention": "Omar Berrada",
+      "team": "Man Utd",
+      "league": "Premier League (CEO, not a player)",
+      "source": "fw-2026-10-08",
+      "note": "Formerly worked at Manchester City."
+    },
+    {
+      "mention": "Roberto Mancini",
+      "team": "Italy",
+      "league": "international (manager, not a player)",
+      "source": "fw-2026-10-08",
+      "note": "Italy beat Turkey twice and drew with France."
+    },
+    {
+      "mention": "James Scanlon",
+      "team": "-",
+      "league": "Gibraltar",
+      "source": "fw-2026-10-08",
+      "note": "Six international goals at 20, two short of Liam Walker's record; not in the loaded squads."
     }
   ]
 }
