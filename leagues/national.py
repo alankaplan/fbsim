@@ -83,21 +83,56 @@ _MONTHS = {m: i for i, m in enumerate(
      "September", "October", "November", "December"], start=1)}
 
 
-def _infer_iso(date_txt: str, played: bool, today: date) -> str:
-    """A Month-Day (no year) -> ISO date, inferring the year from played/upcoming.
-
-    Wikipedia's fixtures list shows the last ~12 months + upcoming, without years. A
-    played game in a month after this one must be last year; an upcoming game in a month
-    before this one must be next year."""
+def _month_day(date_txt: str) -> tuple[int, int] | None:
+    """(month, day) from a box's date cell, e.g. "October 23" -> (10, 23); None if unparseable."""
     m = re.search(r"([A-Z][a-z]+)\s+(\d{1,2})", date_txt)
     if not m or m.group(1) not in _MONTHS:
-        return ""
-    mm, dd = _MONTHS[m.group(1)], int(m.group(2))
-    if played:
-        year = today.year if mm <= today.month else today.year - 1
+        return None
+    return _MONTHS[m.group(1)], int(m.group(2))
+
+
+def _assign_years(mds: list, completed: list[bool], today: date) -> list[int | None]:
+    """Year for each box, from the boxes' ORDER rather than each date on its own.
+
+    Wikipedia's football boxes carry no year at all — the cell is just "October 23" — and the
+    list runs a little over twelve months, so the same month can appear twice. Guessing each
+    box's year from its month alone (the old rule: "a played game in a month up to now is this
+    year") stamped October 2025's results as October 2026: completed games dated in the future,
+    sorted after the real current ones.
+
+    What the page does give us is order: the boxes are chronological. Anchor on the LAST RESULT
+    — the only kind of box certain to be in the past — as the latest such date on or before
+    today, then walk outwards: backwards stepping a year down wherever the month/day goes up,
+    forwards stepping a year up wherever it goes down. Anchoring on a fixture instead would let
+    one postponed or not-yet-scored game drag the whole list a year into the future. With no
+    results at all, anchor the first fixture on or after today. Boxes whose date can't be
+    parsed get None and don't break the chain."""
+    years: list[int | None] = [None] * len(mds)
+    idx = [i for i, md in enumerate(mds) if md]
+    if not idx:
+        return years
+    t = (today.month, today.day)
+    results = [i for i in idx if completed[i]]
+    if results:
+        a = results[-1]
+        y = today.year if mds[a] <= t else today.year - 1
     else:
-        year = today.year if mm >= today.month else today.year + 1
-    return f"{year:04d}-{mm:02d}-{dd:02d}"
+        a = idx[0]
+        y = today.year if mds[a] >= t else today.year + 1
+    years[a] = y
+    yy, following = y, mds[a]
+    for i in reversed([j for j in idx if j < a]):
+        if mds[i] > following:              # later in the year than the box after it
+            yy -= 1
+        years[i] = yy
+        following = mds[i]
+    yy, previous = y, mds[a]
+    for i in (j for j in idx if j > a):
+        if mds[i] < previous:               # earlier in the year than the box before it
+            yy += 1
+        years[i] = yy
+        previous = mds[i]
+    return years
 
 
 def _parse_boxes(section_html: str, today: date | None = None) -> list[dict]:
@@ -140,11 +175,11 @@ def _parse_boxes(section_html: str, today: date | None = None) -> list[dict]:
         else:
             gf = ga = None
             result = ""
-        iso = _infer_iso(date_txt, completed, today)
         rows.append({
-            "event_id": f"{iso}|{venue}|{re.sub(r'[^a-z]', '', opponent.lower())}",
-            "date": iso,
-            "datetime_utc": iso,                       # date only (no kickoff time)
+            "_md": _month_day(date_txt),               # year assigned below, from list order
+            "event_id": "",
+            "date": "",
+            "datetime_utc": "",                        # date only (no kickoff time)
             "competition": comp,
             "opponent": opponent,
             "opp_code": "",
@@ -154,6 +189,13 @@ def _parse_boxes(section_html: str, today: date | None = None) -> list[dict]:
             "result": result,
             "status": "completed" if completed else "scheduled",
         })
+    years = _assign_years([r["_md"] for r in rows],
+                          [r["status"] == "completed" for r in rows], today)
+    for r, y in zip(rows, years):
+        md = r.pop("_md")
+        iso = f"{y:04d}-{md[0]:02d}-{md[1]:02d}" if (md and y) else ""
+        r["date"] = r["datetime_utc"] = iso
+        r["event_id"] = f"{iso}|{r['venue']}|{re.sub(r'[^a-z]', '', r['opponent'].lower())}"
     return rows
 
 
@@ -185,6 +227,17 @@ def fetch_games(entry: dict, season: int | None = None) -> list[dict]:
     span = f"{min(dates)} → {max(dates)}" if dates else "no dates"
     print(f"  [national] {entry['key']}: section had {n_boxes} match boxes → "
           f"{len(games)} games ({played} played, {len(games) - played} upcoming; {span})")
+    # Dates are inferred (the page gives no years), so say so when the result is implausible
+    # rather than showing it: a result in the future, or a fixture well past with no score.
+    today = datetime.now(timezone.utc).date()
+    future_results = [g for g in games if g["status"] == "completed" and g["date"] > today.isoformat()]
+    stale_fixtures = [g for g in games if g["status"] == "scheduled" and g["date"]
+                      and g["date"] < (today - timedelta(days=3)).isoformat()]
+    for label, bad in (("result(s) dated in the future", future_results),
+                       ("fixture(s) past with no score", stale_fixtures)):
+        if bad:
+            print(f"  [national] WARNING {entry['key']}: {len(bad)} {label} — "
+                  + ", ".join(f"{g['date']} {g['opponent']}" for g in bad[:4]))
     return games
 
 
